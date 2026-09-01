@@ -79,7 +79,7 @@ window.Datos = (function () {
   function nombreDe(cod) {
     const p = producto(cod);
     if (!p) return String(cod || "");
-    return p.presentacion ? p.producto + " " + p.presentacion : p.producto;
+    return p.presentacion ? p.producto + " " + window.Util.enBloque(p.presentacion) : p.producto;
   }
 
   const precioDe = (cod, lista) => {

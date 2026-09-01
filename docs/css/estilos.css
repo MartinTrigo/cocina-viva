@@ -184,7 +184,10 @@ h2 { font-size: 19px; margin: 0 0 4px; }
   margin-bottom: 6px;
 }
 
-.fila { display: flex; gap: 10px; }
+ /* Los campos se alinean por abajo, no por arriba: cuando una etiqueta ocupa
+   dos renglones y la de al lado uno, alinear por arriba deja los dos casilleros
+   en alturas distintas y el formulario se ve roto. */
+.fila { display: flex; gap: 10px; align-items: flex-end; }
 .fila > .campo { flex: 1; min-width: 0; }
 
 input, select, textarea {
@@ -267,9 +270,19 @@ a.boton { text-decoration: none; }
   overflow: hidden;
   font-size: 15px;
 }
-.tabla th, .tabla td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--borde); }
-.tabla th { background: var(--bordo-suave); font-size: 13px; text-transform: uppercase; letter-spacing: .3px; }
-.tabla td.numero, .tabla th.numero { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla th, .tabla td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--borde); }
+.tabla th { background: var(--bordo-suave); font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
+
+/* Las columnas de números se achican hasta lo que ocupa su contenido y no se
+   parten nunca. Sin esto, en un teléfono de 375 px el ancho se reparte parejo
+   y la columna del nombre queda tan angosta que "chutney de ciruela" cae en
+   tres renglones, que es justo la columna que se viene a leer. */
+.tabla td.numero, .tabla th.numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  width: 1%;
+}
 .tabla tr:last-child td { border-bottom: 0; }
 .tabla tfoot td { font-weight: 700; background: var(--bordo-suave); }
 .tabla tbody tr:nth-child(even) { background: #fdfbf8; }
@@ -384,4 +397,178 @@ a.boton { text-decoration: none; }
   border-radius: 24px;
   box-shadow: 0 3px 12px rgba(0, 0, 0, .3);
   z-index: 50;
+}
+
+/* ==========================================================================
+   Componentes de las pantallas de catálogo y stock
+   ========================================================================== */
+
+/* ---------- Fila de acciones arriba de una lista ---------- */
+
+.acciones { display: flex; gap: 10px; margin-bottom: 16px; }
+
+/* Padding y cuerpo más chicos que un botón suelto: son dos en una fila y en un
+   teléfono de 375 px, con el padding normal, «+ Producto nuevo» cae en dos
+   renglones. */
+.acciones .boton { flex: 1; min-width: 0; padding: 12px 8px; font-size: 16px; }
+
+/* ---------- Celdas de dos renglones ----------
+   El nombre arriba y el código abajo: en un teléfono no entran uno al lado del
+   otro, y el código hace falta igual porque es lo que dicen los remitos. */
+
+.celda__que { display: block; font-weight: 600; }
+.celda__detalle {
+  display: block;
+  font-size: 13px;
+  color: var(--texto-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* El lápiz de editar. Cuarenta y cuatro píxeles de lado aunque el dibujo sea
+   chico: con el dedo, un botón de veinte no se acierta. */
+.lapiz {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  color: var(--bordo);
+  background: none;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.lapiz:active { background: var(--bordo-suave); }
+
+/* Para un encabezado de tabla que solo existe para los lectores de pantalla. */
+.oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* El puntito que marca los campos que no se pueden dejar vacíos. Va después de
+   la etiqueta y no como un asterisco rojo: no es un error, es un aviso. */
+.obliga { color: var(--bordo); font-weight: 700; }
+
+/* ---------- Grupo plegable ----------
+   Hecho con <details>: ya sabe abrirse y cerrarse solo, responde al teclado y
+   funciona aunque algo del JavaScript falle. */
+
+.grupo {
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.grupo[open] { border-color: var(--bordo-claro); }
+
+.grupo__cab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;              /* saca el triangulito de Firefox */
+  user-select: none;
+}
+.grupo__cab::-webkit-details-marker { display: none; }   /* y el de Chrome */
+.grupo__cab:active { background: var(--bordo-suave); }
+.grupo[open] .grupo__cab { border-bottom: 1px solid var(--borde); }
+
+.grupo__texto { flex: 1; min-width: 0; }
+.grupo__nombre { display: block; font-weight: 600; }
+.grupo__cuenta { display: block; font-size: 14px; color: var(--texto-suave); }
+.grupo__cuerpo { padding: 12px 14px 4px; }
+
+/* ---------- Lista para marcar varios ---------- */
+
+.chequeos { list-style: none; margin: 0; padding: 0; }
+
+.chequeo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.chequeo:active { background: var(--bordo-suave); }
+.chequeo input { width: 22px; height: 22px; min-height: 0; flex: none; accent-color: var(--bordo); }
+
+/* ---------- Precio de antes y de después ---------- */
+
+.antes { color: var(--texto-suave); text-decoration: line-through; }
+.despues { font-weight: 700; color: var(--bordo); white-space: nowrap; }
+.despues::before { content: "→ "; color: var(--texto-suave); font-weight: 400; }
+.igual { color: var(--texto-suave); }
+
+/* ---------- Elegir entre pocas opciones ----------
+   Botones en fila y no un desplegable: son tres, se ven todas de una, y con el
+   dedo un desplegable de tres opciones es más trabajo que tres botones. */
+
+.opciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+.opcion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 76px;
+  padding: 8px 4px;
+  text-align: center;
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* El radio real queda oculto pero sigue existiendo: el teclado y los lectores
+   de pantalla lo encuentran igual. */
+.opcion input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.opcion__icono { font-size: 22px; line-height: 1; }
+.opcion__texto { font-size: 12px; line-height: 1.15; color: var(--texto-suave); }
+
+.opcion.elegida {
+  color: #fff;
+  background: var(--bordo);
+  border-color: var(--bordo);
+}
+.opcion.elegida .opcion__texto { color: rgba(255, 255, 255, .9); font-weight: 600; }
+.opcion:focus-within { outline: 3px solid var(--bordo-claro); outline-offset: 1px; }
+
+/* ---------- El texto que se arma solo mientras se carga ----------
+   Dice en castellano lo que va a pasar al guardar. Es lo que evita el error de
+   cargar veinticinco donde iban dos. */
+
+.resumen-vivo {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: var(--verde-suave);
+  border: 1px solid var(--verde-claro);
+  border-left: 4px solid var(--verde);
+  border-radius: 8px;
+}
+.resumen-vivo--resta {
+  background: var(--tierra-suave);
+  border-color: #ddb87a;
+  border-left-color: var(--tierra);
 }

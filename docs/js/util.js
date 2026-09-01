@@ -85,6 +85,12 @@ window.Util = (function () {
 
   const mesDe = (iso) => String(iso || "").slice(0, 7);
 
+  // Une las palabras con un espacio que no se parte. Es para las
+  // presentaciones: "360 g" cortado deja un renglón con una letra sola, y en
+  // una tabla de productos en un teléfono eso pasa en casi todas las filas.
+  // Son textos cortos siempre, así que van enteros o no van.
+  const enBloque = (texto) => String(texto == null ? "" : texto).replace(/ /g, " ");
+
   // Identificador propio de cada registro. Va desde que se crea en el teléfono
   // y no cambia nunca: es lo que permite reintentar un envío sin duplicar la
   // fila en la planilla.
@@ -93,5 +99,5 @@ window.Util = (function () {
     return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
 
-  return { esc, brindis, numero, dinero, aNumero, hoy, fecha, mesLargo, mesDe, nuevoId };
+  return { esc, brindis, numero, dinero, aNumero, hoy, fecha, mesLargo, mesDe, enBloque, nuevoId };
 })();

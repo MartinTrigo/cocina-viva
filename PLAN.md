@@ -36,25 +36,36 @@ cuando todavía es barato cambiarlo.
       lo saca de la planilla. El depósito quedó de nuevo en $2.060.950.
       Es lo que en Semillas estuvo meses sin comprobarse.
 
-### Lo que queda de la fase 0
+- [x] Teléfono de prueba dado de baja y códigos repartidos.
+- [x] **Luna tiene la app activada y andando en su celular** (1/9/2026).
+- [ ] Falta activar el teléfono de Melí y el de Martín.
 
-- [ ] Dar de baja el teléfono de prueba: escribir `no` en la columna `activo`
-      de la hoja oculta `dispositivos`, fila `prueba-claude`.
-- [ ] Anotar en la hoja `invitaciones`, columna «para quién», a quién le toca
-      cada uno de los tres códigos que quedan.
-- [ ] Activar los teléfonos de Luna y Melí.
+## Fase 1 — Productos y Stock · **hecha**
 
-## Fase 1 — Productos y Stock · **falta**
+- [x] **Productos.** La lista con código, presentación y los dos precios; alta,
+      lápiz de edición en cada uno, y edición en masa: porcentaje con vista
+      previa y redondeo elegible, y bajas marcando varios.
+- [x] **Stock.** Formulario con el texto vivo («Estás ingresando 25 kimchi
+      340 g. Pasan a ser 54 en el depósito») y el depósito al día con cantidad,
+      precio, subtotal y total.
+- [x] Probado renglón por renglón: envasar 25, romper 4 y contar 40 dejan el
+      kimchi en 40 y el depósito en 274 unidades; deshacer los tres lo devuelve
+      a 263 y $2.060.950. El aumento del 12 % lleva el kale de $6.150 a $6.900
+      (redondeado a los $50). Un código repetido se rechaza, uno con historia no
+      se deja borrar, y un producto dado de baja con stock sigue contando.
 
-Van juntas: todo lo demás depende de que los códigos y los precios estén firmes.
+### Lo que se decidió sobre la marcha
 
-- [ ] **Productos.** La lista completa con código, presentación y los dos
-      precios. Alta de un producto nuevo, lápiz de edición en cada uno, y
-      edición en masa: subir todos los precios por porcentaje y dar de baja
-      marcando varios.
-- [ ] **Stock.** Formulario de ingreso de producción con el texto vivo
-      («Estás ingresando 25 kimchi de 340 g») y, abajo, el depósito al día con
-      cantidad, precio, subtotal y total.
+- El **código de un producto no se edita**. Lo guardan todos los movimientos y
+  todas las ventas; cambiarlo dejaría la historia huérfana y el stock en cero
+  sin que nada avise.
+- **Dar de baja no es borrar.** Un producto con historia solo se da de baja.
+  Uno sin ningún registro —recién cargado, y mal— sí se borra de verdad.
+- **La pantalla de Stock también resta.** Además de envasar, hay «se rompió o
+  venció» y «corrección por conteo». Una pantalla que solo suma miente apenas
+  se rompe un frasco.
+- La **corrección pide el total contado**, no la diferencia: nadie cuenta
+  diferencias, se cuentan frascos.
 
 ## Fase 2 — Ingresos · **falta**
 

@@ -129,3 +129,50 @@ como PDF» del teléfono o de la PC. La descarga en CSV sí es un archivo de ver
 
 **Por qué:** lo mismo que arriba. Generar un PDF de verdad significa meter una
 librería.
+
+## El código de un producto no se edita
+
+El nombre, la presentación y los precios sí. El código no.
+
+**Por qué:** cada movimiento y cada venta guardan el código, no el nombre. Si
+`KIM340` pasara a llamarse otra cosa, todas sus filas quedarían huérfanas y el
+stock del kimchi de 340 pasaría a contar cero sin que nada avise. Para
+reemplazar un producto se lo da de baja y se crea otro.
+
+**Costo:** un código mal escrito al crearlo no se arregla; hay que dar de baja y
+crear de nuevo. Es molesto una vez y evita un desastre silencioso.
+
+## Dar de baja no es borrar
+
+Un producto con historia se da de baja: desaparece de los desplegables y de los
+resúmenes, pero sus filas viejas siguen teniendo sentido. Solo se borra de
+verdad el que no tiene ni un movimiento ni una venta, que es el caso de haberlo
+cargado mal recién.
+
+**Por qué:** el pedido original decía «quitar productos». Quitarlos de verdad
+rompería el historial de ventas, que es lo que la app viene a cuidar.
+
+## La pantalla de Stock también resta
+
+Además de cargar producción, permite «se rompió o venció» y «corrección por
+conteo».
+
+**Por qué:** no estaba pedido, pero una pantalla de stock que solo suma miente
+apenas se rompe un frasco: el número queda alto para siempre y no hay dónde
+anotar por qué. Con el depósito calculado a partir de los movimientos, la única
+forma de que cierre es que todo lo que sale tenga su fila.
+
+**La corrección pide el total contado, no la diferencia.** Nadie cuenta
+diferencias: se cuentan frascos. La diferencia la saca la app y la muestra en
+castellano antes de guardar.
+
+## Los precios en masa se redondean, y se ve antes de aplicar
+
+El aumento por porcentaje redondea a los $50 —se puede cambiar a $100 o a nada—
+y muestra una tabla de precio viejo → precio nuevo antes de tocar nada.
+
+**Por qué:** los precios que vienen usando son todos múltiplos de 50 y algunos
+no de 100 ($6.150 el kale). Redondear sin mostrarlo haría aparecer números que
+nadie pidió; mostrarlo primero convierte el redondeo en una decisión y no en una
+sorpresa. Los productos cuyo precio no cambia después de redondear no se tocan,
+para no gastar una sincronización de gusto.

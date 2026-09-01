@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "0.1.0 · fase 0";
+  const VERSION = "0.2.0 · fase 1";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -65,20 +65,14 @@
       detalle: "Cargar producción y ver el depósito",
       subtitulo: "Depósito",
       clase: "menu__boton--entra",
-      fase: 1,
-      queVa: `Cargás lo que envasaron y entra al depósito. Abajo, el stock
-        actualizado producto por producto, con el valor de cada uno y el total.
-        Se mueve solo con las ventas, las entregas y las devoluciones.`,
+      listo: true,          // la atiende js/stock.js
     },
     productos: {
       icono: "🫙",
       titulo: "Productos",
       detalle: "La oferta completa y los precios",
       subtitulo: "Catálogo",
-      fase: 1,
-      queVa: `Los productos con su código, presentación y los dos precios.
-        Podés dar de alta uno nuevo, editar cualquiera con el lápiz, y subir
-        todos los precios de una por porcentaje.`,
+      listo: true,          // la atiende js/productos.js
     },
     resumen: {
       icono: "📊",
@@ -118,6 +112,15 @@
     if (base === "acceso") {
       encabezado("Acceso", "Activación y sincronización");
       await window.Sincro.render(vista, () => ir("inicio"));
+      return;
+    }
+
+    // Las secciones ya programadas manejan sus propias sub-pantallas y
+    // devuelven qué poner en la cabecera, que cambia según dónde se esté.
+    const MODULOS = { productos: window.Productos, stock: window.Stock };
+    if (MODULOS[base]) {
+      const cabecera = await MODULOS[base].render(vista, ruta, ir);
+      encabezado(cabecera.titulo, cabecera.subtitulo);
       return;
     }
 
@@ -276,7 +279,20 @@
   document.getElementById("pie-version").textContent = "versión " + VERSION;
 
   async function arrancar() {
-    await window.CVDB.abrir();
+    // Abrir el almacenamiento se prueba aparte del resto. Si todo colgara del
+    // mismo catch, cualquier error de cualquier pantalla saldría con el cartel
+    // de «no se pudo abrir el almacenamiento», que manda a buscar el problema
+    // donde no está: pasó una vez y se perdió un rato averiguándolo.
+    try {
+      await window.CVDB.abrir();
+    } catch (err) {
+      vista.innerHTML = `<p class="aviso aviso--error">No se pudo abrir el almacenamiento
+        del teléfono, así que la app no puede guardar nada. Suele pasar en modo
+        incógnito o con el almacenamiento del navegador bloqueado.<br><br>
+        Detalle: ${esc(err.message || err)}</p>`;
+      return;
+    }
+
     await mostrar();
 
     // Al abrir se sincroniza sola y en silencio: si hay señal, los números ya
@@ -286,10 +302,11 @@
     }
   }
 
+  // Cualquier otra cosa que falle se muestra como lo que es, sin inventarle
+  // una causa. Un cartel que nombra mal el problema es peor que uno genérico.
   arrancar().catch((err) => {
-    vista.innerHTML = `<p class="aviso aviso--error">No se pudo abrir el almacenamiento
-      del teléfono, así que la app no puede guardar nada. Suele pasar en modo
-      incógnito o con el almacenamiento del navegador bloqueado.<br><br>
+    vista.innerHTML = `<p class="aviso aviso--error">Algo falló al arrancar la app.
+      Lo que tengas cargado no se perdió: sigue guardado en el teléfono.<br><br>
       Detalle: ${esc(err.message || err)}</p>`;
   });
 
