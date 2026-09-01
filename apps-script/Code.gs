@@ -344,6 +344,7 @@ function escribirFilas(nombre, objetos) {
       return v == null ? '' : v;
     });
   });
+  asegurarFilas(h, filas.length + 1);
   h.getRange(2, 1, filas.length, cols.length).setValues(filas);
 }
 
@@ -685,11 +686,14 @@ function asegurarEsquema() {
       hechas.push('Listas de medios de pago y rubros cargadas.');
     }
 
-    if (hoja('productos').getLastRow() < 2) {
-      hechas.push(cargarProductos());
-      hechas.push(cargarStockInicial());
-    }
+    // Cada carga mira SU propia hoja, no la de al lado. Si las tres colgaran
+    // de una sola condición y la ejecución se cortara en el medio —Apps Script
+    // corta a los seis minutos, y una autorización a medias también corta—, al
+    // volver a ejecutar la condición ya sería falsa y lo que faltaba no se
+    // cargaría nunca.
+    if (hoja('productos').getLastRow() < 2) hechas.push(cargarProductos());
     if (hoja('clientes').getLastRow() < 2) hechas.push(cargarClientes());
+    if (hoja('movimientos').getLastRow() < 2) hechas.push(cargarStockInicial());
 
     crearResumen();
     hechas.push('Hoja resumen creada.');
@@ -755,29 +759,45 @@ function darFormato() {
   l.setColumnWidth(2, 170);
 }
 
+// Hasta qué fila llegan el formato, los desplegables y el rayado. Google crea
+// las hojas con mil filas; acá se estiran hasta esta cantidad de una vez, para
+// no tener que reaplicar el formato cada vez que crecen.
+var FILAS_CON_FORMATO = 2000;
+
+// Un getRange que se pasa del tamaño de la hoja NO devuelve un rango recortado:
+// tira «those rows are out of bounds» y corta la ejecución ahí mismo. Como la
+// hoja de ingresos va a pasar las mil filas dentro del primer año —la planilla
+// vieja llevaba unas ochocientas en ocho meses—, la hoja se agranda antes de
+// escribir en vez de suponer que entra.
+function asegurarFilas(h, cuantas) {
+  var faltan = cuantas - h.getMaxRows();
+  if (faltan > 0) h.insertRowsAfter(h.getMaxRows(), faltan);
+}
+
 function formatoDatos(nombre, fuerte, suave) {
   var h = hoja(nombre);
   var cols = COLUMNAS[nombre];
   var n = cols.length;
 
+  asegurarFilas(h, FILAS_CON_FORMATO);
   h.setTabColor(fuerte);
   h.setFrozenRows(1);
   h.getRange(1, 1, 1, n).setValues([ENCABEZADOS[nombre]])
     .setBackground(fuerte).setFontColor(COLOR.blanco).setFontWeight('bold').setFontSize(11);
 
   if (h.getBandings().length === 0) {
-    h.getRange(1, 1, 2000, n).applyRowBanding()
+    h.getRange(1, 1, FILAS_CON_FORMATO, n).applyRowBanding()
       .setHeaderRowColor(fuerte).setFirstRowColor(COLOR.blanco).setSecondRowColor(suave);
   }
 
   var col = function (c) { return cols.indexOf(c) + 1; };
   if (col('fecha')) {
-    h.getRange(2, col('fecha'), 1999).setNumberFormat('dd/mm/yyyy');
+    h.getRange(2, col('fecha'), FILAS_CON_FORMATO - 1).setNumberFormat('dd/mm/yyyy');
     h.setColumnWidth(col('fecha'), 95);
   }
   ['pmayor', 'pminor', 'precio', 'subtotal', 'monto'].forEach(function (c) {
     if (col(c)) {
-      h.getRange(2, col(c), 1999).setNumberFormat('"$"#,##0');
+      h.getRange(2, col(c), FILAS_CON_FORMATO - 1).setNumberFormat('"$"#,##0');
       h.setColumnWidth(col(c), 110);
     }
   });
@@ -795,36 +815,36 @@ function formatoDatos(nombre, fuerte, suave) {
       .requireValueInRange(ss.getRange(rango), true).setAllowInvalid(true).build();
   };
   if (col('medio_pago')) {
-    h.getRange(2, col('medio_pago'), 1999).setDataValidation(contra('listas!A2:A200'));
+    h.getRange(2, col('medio_pago'), FILAS_CON_FORMATO - 1).setDataValidation(contra('listas!A2:A200'));
   }
   if (nombre === 'egresos') {
-    h.getRange(2, col('rubro'), 1999).setDataValidation(contra('listas!B2:B200'));
+    h.getRange(2, col('rubro'), FILAS_CON_FORMATO - 1).setDataValidation(contra('listas!B2:B200'));
   }
   if (col('cod') && nombre !== 'productos') {
-    h.getRange(2, col('cod'), 1999).setDataValidation(contra('productos!A2:A500'));
+    h.getRange(2, col('cod'), FILAS_CON_FORMATO - 1).setDataValidation(contra('productos!A2:A500'));
   }
   if (nombre === 'ingresos') {
-    h.getRange(2, col('cliente'), 1999).setDataValidation(contra('clientes!A2:A500'));
-    h.getRange(2, col('lista'), 1999).setDataValidation(
+    h.getRange(2, col('cliente'), FILAS_CON_FORMATO - 1).setDataValidation(contra('clientes!A2:A500'));
+    h.getRange(2, col('lista'), FILAS_CON_FORMATO - 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(['mayorista', 'minorista'], true)
         .setAllowInvalid(true).build());
   }
   if (nombre === 'movimientos') {
-    h.getRange(2, col('tipo'), 1999).setDataValidation(
+    h.getRange(2, col('tipo'), FILAS_CON_FORMATO - 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(TIPOS, true)
         .setAllowInvalid(true).build());
   }
   if (col('activo')) {
-    h.getRange(2, col('activo'), 1999).setDataValidation(
+    h.getRange(2, col('activo'), FILAS_CON_FORMATO - 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(['sí', 'no'], true)
         .setAllowInvalid(true).build());
   }
 
   // Columnas técnicas: existen porque la sincronización las necesita, pero no
   // le sirven a nadie que abra la planilla a mirar.
-  if (col('id')) { h.getRange(2, col('id'), 1999).setNumberFormat('@'); h.hideColumns(col('id')); }
-  if (col('venta')) { h.getRange(2, col('venta'), 1999).setNumberFormat('@'); h.hideColumns(col('venta')); }
-  if (col('mod')) { h.getRange(2, col('mod'), 1999).setNumberFormat('0'); h.hideColumns(col('mod')); }
+  if (col('id')) { h.getRange(2, col('id'), FILAS_CON_FORMATO - 1).setNumberFormat('@'); h.hideColumns(col('id')); }
+  if (col('venta')) { h.getRange(2, col('venta'), FILAS_CON_FORMATO - 1).setNumberFormat('@'); h.hideColumns(col('venta')); }
+  if (col('mod')) { h.getRange(2, col('mod'), FILAS_CON_FORMATO - 1).setNumberFormat('0'); h.hideColumns(col('mod')); }
 }
 
 /* ==========================================================================

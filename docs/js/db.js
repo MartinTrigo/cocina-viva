@@ -182,14 +182,24 @@ window.CVDB = (function () {
   }
 
   async function guardarEstado(estado) {
+    // La marca no puede quedar por detrás del registro más nuevo que acaba de
+    // bajar. El reloj del teléfono y el del servicio no son el mismo: si el
+    // del servicio va unos segundos adelantado, todo lo que baje con un "mod"
+    // mayor que Date.now() se contaría como pendiente y se volvería a subir en
+    // cada sincronización hasta que el reloj lo alcance.
+    let masNuevo = Date.now();
+    const mirar = (lista) => (lista || []).forEach((r) => {
+      if ((r.mod || 0) > masNuevo) masNuevo = r.mod;
+    });
+
     for (const nombre of Object.keys(SINCRONIZABLES)) {
-      if (estado[nombre]) await reemplazar(nombre, estado[nombre]);
+      if (estado[nombre]) { mirar(estado[nombre]); await reemplazar(nombre, estado[nombre]); }
     }
-    if (estado.borrados) await reemplazar("borrados", estado.borrados);
+    if (estado.borrados) { mirar(estado.borrados); await reemplazar("borrados", estado.borrados); }
     if (estado.listas) {
       await operar("meta", "readwrite", (a) => a.put({ clave: "listas", valor: estado.listas }));
     }
-    await marcarSincro(Date.now());
+    await marcarSincro(masNuevo);
   }
 
   const listas = () => obtener("meta", "listas").then((m) => (m && m.valor) || null);
