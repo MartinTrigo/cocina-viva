@@ -16,7 +16,7 @@
 // IMPORTANTE: al cambiar un archivo de la lista, subir el número de CACHE.
 // ==========================================================================
 
-const CACHE = "cocinaviva-v1";
+const CACHE = "cocinaviva-v2";
 
 // Cuánto se espera a la red antes de usar lo guardado en el teléfono.
 const ESPERA_MS = 3000;

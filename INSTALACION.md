@@ -23,7 +23,13 @@ script en el paso siguiente.
 
 1. Desde el libro recién creado: **Extensiones → Apps Script**.
 2. Borrar todo lo que haya en `Código.gs` y pegar el contenido completo de
-   [`apps-script/Code.gs`](apps-script/Code.gs). Guardar (💾).
+   `apps-script/Code.gs` **de este repositorio**, que es este archivo y ninguna
+   otra cosa parecida de otro proyecto:
+
+   <https://github.com/MartinTrigo/cocina-viva/blob/main/apps-script/Code.gs>
+
+   (el botón de copiar está arriba a la derecha del recuadro de código).
+   Guardar (💾).
 3. En el desplegable de funciones elegir **`prepararLibro`** y **Ejecutar**.
    - La primera vez pide autorización: *Revisar permisos* → elegir la cuenta →
      *Configuración avanzada* → *Ir a Cocina Viva (no seguro)* → *Permitir*.

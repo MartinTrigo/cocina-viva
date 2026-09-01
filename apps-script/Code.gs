@@ -829,9 +829,19 @@ function formatoDatos(nombre, fuerte, suave) {
       SpreadsheetApp.newDataValidation().requireValueInList(['mayorista', 'minorista'], true)
         .setAllowInvalid(true).build());
   }
+  // Ojo: "tipo" existe en dos hojas y quiere decir cosas distintas en cada
+  // una, así que va por nombre de hoja y no por nombre de columna.
   if (nombre === 'movimientos') {
     h.getRange(2, col('tipo'), FILAS_CON_FORMATO - 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(TIPOS, true)
+        .setAllowInvalid(true).build());
+  }
+  if (nombre === 'clientes') {
+    // Sin la lista, cualquier cosa que no empiece con "consig" se lee como
+    // "compra". Un cliente de consignación mal tipeado desaparecería de la
+    // pantalla de consignaciones sin que nada avise.
+    h.getRange(2, col('tipo'), FILAS_CON_FORMATO - 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(['compra', 'consignación'], true)
         .setAllowInvalid(true).build());
   }
   if (col('activo')) {
