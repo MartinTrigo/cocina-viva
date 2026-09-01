@@ -1,0 +1,387 @@
+/* ==========================================================================
+   Cocina Viva — estilos
+
+   Pensado para usarse con el celular en una mano, parado en el mostrador de un
+   local o en el depósito: contraste alto, números grandes y nada que se toque
+   con menos de 48 px.
+
+   La paleta sale del logo: el bordó #8c0730 de las bacterias es el color de la
+   marca. El verde y el ocre acompañan y sirven para distinguir de un vistazo
+   lo que entra de lo que sale, que es la lectura más frecuente de la app.
+   ========================================================================== */
+
+:root {
+  --bordo: #8c0730;           /* el color del logo */
+  --bordo-claro: #b4143f;
+  --bordo-suave: #f9edf0;
+  --verde: #4a6b3a;           /* lo que entra */
+  --verde-claro: #6b8f56;
+  --verde-suave: #eef3ea;
+  --tierra: #a9722f;          /* lo que sale */
+  --tierra-suave: #faf1e3;
+
+  --texto: #2a2124;
+  --texto-suave: #6b6560;
+  --fondo: #faf6f0;           /* crema, como las etiquetas */
+  --papel: #ffffff;
+  --borde: #e5ddd4;
+  --error: #b3261e;
+  --error-suave: #fceceb;
+
+  --radio: 12px;
+  --sombra: 0 1px 3px rgba(42, 33, 36, .12);
+  --ancho: 720px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; min-height: 100%; }
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ---------- Cabecera ---------- */
+
+.cabecera {
+  background: var(--bordo);
+  color: #fff;
+  box-shadow: var(--sombra);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 3px solid var(--bordo-claro);
+}
+
+.barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: 12px 16px;
+}
+
+/* El logotipo es blanco sobre el bordó de la barra: así viene el original.
+   Solo se muestra en el inicio; en las demás pantallas manda el título. */
+.marca { flex: none; height: 26px; width: auto; }
+.marca[hidden] { display: none; }
+
+.barra__texto { min-width: 0; flex: 1; }
+.barra h1 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.2; }
+.barra p { margin: 2px 0 0; font-size: 13px; opacity: .85; }
+
+/* Cuando se ve el logotipo, el nombre repetido al lado sobra. */
+.barra--inicio h1 { display: none; }
+
+.volver, .sincro {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  color: #fff;
+  background: rgba(255, 255, 255, .15);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.volver:active, .sincro:active { background: rgba(255, 255, 255, .3); }
+
+/* El botón de sincronizar cambia de cara según cómo salió la última vez: no
+   hace falta entrar a ninguna pantalla para saber si quedó algo sin subir. */
+.sincro--pendiente { background: #e8b23a; color: #4a3000; }
+.sincro--error { background: #f3d0cd; color: var(--error); }
+.sincro--girando { animation: girar 1s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* ---------- Contenido ---------- */
+
+.vista {
+  flex: 1;
+  width: 100%;
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+}
+
+.cargando { color: var(--texto-suave); text-align: center; padding: 40px 0; }
+
+h2 { font-size: 19px; margin: 0 0 4px; }
+
+.tarjeta {
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.tarjeta h2 { margin-top: 0; }
+
+.nota { color: var(--texto-suave); font-size: 15px; margin: 4px 0 0; }
+
+/* ---------- Menú del inicio ---------- */
+
+.menu { display: grid; gap: 12px; }
+
+.menu__boton {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 68px;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--texto);
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-left: 5px solid var(--bordo);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  cursor: pointer;
+}
+.menu__boton:active { background: var(--bordo-suave); }
+
+.menu__boton[disabled] {
+  cursor: not-allowed;
+  opacity: .55;
+  border-left-color: var(--borde);
+  box-shadow: none;
+}
+
+.menu__boton--entra { border-left-color: var(--verde); }
+.menu__boton--sale { border-left-color: var(--tierra); }
+
+.menu__icono { font-size: 26px; flex: none; width: 34px; text-align: center; }
+.menu__titulo { font-weight: 600; display: block; }
+.menu__detalle { display: block; font-size: 14px; color: var(--texto-suave); }
+
+/* ---------- Avisos ---------- */
+
+.aviso { border-radius: var(--radio); padding: 12px 14px; margin: 0 0 16px; font-size: 15px; }
+.aviso--info { background: #fdf6e6; border: 1px solid #d8a53c; }
+.aviso--error { background: var(--error-suave); border: 1px solid var(--error); color: var(--error); }
+.aviso--ok { background: var(--verde-suave); border: 1px solid var(--verde-claro); }
+
+/* ---------- Formularios ---------- */
+
+.campo { margin-bottom: 16px; }
+.campo > label { display: block; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+
+.campo .ayuda {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--texto-suave);
+  margin-bottom: 6px;
+}
+
+.fila { display: flex; gap: 10px; }
+.fila > .campo { flex: 1; min-width: 0; }
+
+input, select, textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--texto);
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 3px solid var(--bordo-claro);
+  outline-offset: 1px;
+  border-color: var(--bordo-claro);
+}
+
+input.mal, select.mal, textarea.mal { border-color: var(--error); background: var(--error-suave); }
+.campo__error { display: block; color: var(--error); font-size: 14px; margin-top: 4px; }
+textarea { resize: vertical; min-height: 70px; }
+
+/* Los importes y las cantidades se leen mejor tabulados y a la derecha. */
+.numero { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Botones ---------- */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 12px 20px;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--bordo);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.boton:active { background: var(--bordo-claro); }
+.boton[disabled] { opacity: .5; cursor: not-allowed; }
+.boton--ancho { width: 100%; }
+
+.boton--secundario {
+  color: var(--bordo);
+  background: var(--papel);
+  border: 2px solid var(--bordo);
+}
+.boton--secundario:active { background: var(--bordo-suave); }
+
+a.boton { text-decoration: none; }
+
+.boton--peligro {
+  color: var(--error);
+  background: none;
+  border: 0;
+  font: inherit;
+  min-height: 44px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+/* ---------- Tablas de resumen ----------
+   Se envuelven en .tabla-envoltorio porque en un teléfono angosto una tabla de
+   cuatro columnas no entra: se desliza sola en vez de romper el ancho de la
+   página. */
+
+.tabla-envoltorio { overflow-x: auto; margin-bottom: 16px; }
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+  font-size: 15px;
+}
+.tabla th, .tabla td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--borde); }
+.tabla th { background: var(--bordo-suave); font-size: 13px; text-transform: uppercase; letter-spacing: .3px; }
+.tabla td.numero, .tabla th.numero { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla tr:last-child td { border-bottom: 0; }
+.tabla tfoot td { font-weight: 700; background: var(--bordo-suave); }
+.tabla tbody tr:nth-child(even) { background: #fdfbf8; }
+
+/* Una fila con el stock en cero no es un error, pero tampoco es lo que se
+   viene a mirar: se apaga sin esconderla. */
+.tabla tr.en-cero td { color: var(--texto-suave); }
+
+/* ---------- Totales grandes ---------- */
+
+.cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+
+.cifra {
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--texto-suave);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.cifra--entra { border-left-color: var(--verde); }
+.cifra--sale { border-left-color: var(--tierra); }
+.cifra--saldo { border-left-color: var(--bordo); }
+.cifra__que { display: block; font-size: 13px; color: var(--texto-suave); }
+.cifra__cuanto { display: block; font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cifra__cuanto.negativo { color: var(--error); }
+
+/* ---------- Renglones de lista ---------- */
+
+.renglones { list-style: none; margin: 0 0 16px; padding: 0; }
+
+.renglon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-left: 5px solid var(--bordo);
+  border-radius: var(--radio);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.renglon--entra { border-left-color: var(--verde); }
+.renglon--sale { border-left-color: var(--tierra); }
+
+.renglon__texto { flex: 1; min-width: 0; }
+.renglon__que { display: block; font-weight: 600; }
+.renglon__detalle {
+  display: block;
+  font-size: 14px;
+  color: var(--texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.renglon__cuanto { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.vacio { color: var(--texto-suave); font-style: italic; padding: 14px 0; margin: 0 0 8px; }
+
+/* La pastilla dice si el registro ya llegó a la planilla o sigue solo acá. */
+.pastilla {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: #7a5a1e;
+  background: #fdf6e6;
+  border: 1px solid #d8a53c;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.pastilla--ok { color: var(--verde); background: var(--verde-suave); border-color: var(--verde-claro); }
+
+/* ---------- Pantalla de activación ---------- */
+
+.portada { text-align: center; padding: 8px 0 4px; }
+.portada img { width: 150px; height: auto; }
+
+/* ---------- Espaciados sueltos ----------
+   Van acá y no como atributo "style" en el HTML: la política de contenido no
+   admite estilos sueltos en la página, justamente para que nada que se cuele
+   pueda pintar la pantalla. */
+
+.separado { margin-top: 20px; }
+.al-final { margin: 16px 0 0; }
+.nota--pie { margin-top: 24px; }
+
+/* ---------- Pie ---------- */
+
+.pie {
+  background: var(--bordo);
+  color: rgba(255, 255, 255, .85);
+  text-align: center;
+  font-size: 13px;
+  padding: 18px 16px;
+  margin-top: auto;
+}
+.pie p { margin: 2px 0; }
+.pie__version { opacity: .6; font-size: 12px; margin-top: 8px; }
+
+/* ---------- Mensaje flotante ---------- */
+
+.brindis {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  background: var(--texto);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 24px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .3);
+  z-index: 50;
+}

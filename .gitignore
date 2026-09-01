@@ -1,0 +1,7 @@
+# Direcciones, códigos y claves del proyecto. Nunca al repositorio.
+IDS.txt
+
+# Basura del sistema
+Thumbs.db
+desktop.ini
+.DS_Store
