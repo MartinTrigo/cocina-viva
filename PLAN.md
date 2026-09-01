@@ -19,16 +19,19 @@ cuando todavía es barato cambiarlo.
       **263 unidades** y **$2.060.950**, que es exactamente lo que decía la
       planilla vieja al 21/8/2026.
 
+- [x] Publicada en GitHub Pages: <https://martintrigo.github.io/cocina-viva/>
+- [x] Comprobado ahí mismo: el service worker registra, deja los 14 archivos en
+      caché y la consola no tira un solo error. (En el navegador embebido con el
+      que se desarrolla el service worker falla, pero falla igual el de
+      Semillas, que anda publicado: es del navegador, no del código.)
+
 ### Lo que queda de la fase 0, y necesita a Martín
 
 - [ ] Crear el libro «Cocina Viva · Gestión» en la carpeta `CocinaViva_App` de
       Drive y correr `prepararLibro()` ([INSTALACION.md](INSTALACION.md)).
 - [ ] Publicar el Apps Script y pegar la dirección en `docs/js/sincro.js`.
-- [ ] Publicar el repositorio en GitHub Pages.
+      Al hacerlo, subir el número de caché en `docs/sw.js`.
 - [ ] Correr `crearInvitaciones()` y activar un teléfono de prueba.
-- [ ] Comprobar que el service worker registra bien ya publicado. En el
-      navegador embebido con el que se probó acá falla, pero falla igual el de
-      Semillas, que anda publicado: es del navegador, no del código.
 
 ## Fase 1 — Productos y Stock · **falta**
 
