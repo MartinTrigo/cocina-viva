@@ -120,8 +120,14 @@ nada y cuenta en castellano qué encontró y qué falta.
 
 Cuando cambie `Code.gs`:
 
-**Implementar → Administrar implementaciones → ✏ (editar) → Versión: Nueva
-versión → Implementar.**
+1. Pegar el `Code.gs` nuevo en el editor y guardar.
+2. **Implementar → Administrar implementaciones → ✏ (editar) → Versión: Nueva
+   versión → Implementar.**
+3. Si el cambio toca el formato, los desplegables o el ancho de las columnas,
+   ejecutar además **`reaplicarFormato()`** a mano. `darFormato()` corre una
+   sola vez, la primera; si corriera siempre pisaría los retoques que ellas le
+   hayan hecho a la planilla. Esa función es la puerta para forzarlo, y no toca
+   ni una fila de datos.
 
 Así la URL `/exec` **no cambia**. Si en cambio se hace una *implementación
 nueva*, sale una URL distinta y hay que actualizarla en `sincro.js` y subir el

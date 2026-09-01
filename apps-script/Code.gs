@@ -743,6 +743,24 @@ function cargarStockInicial() {
 
 /* ================= Formato de las hojas ================= */
 
+// Se ejecuta A MANO cuando se actualiza este código y el cambio toca el
+// formato, los desplegables o el ancho de las columnas.
+//
+// Hace falta porque darFormato() corre una sola vez, la primera: si corriera en
+// cada sincronización, pisaría cualquier ancho de columna o color que hubieran
+// ajustado a mano. Pero entonces un libro ya armado nunca se entera de un
+// desplegable nuevo. Esta función es la puerta para eso, y se aprieta a
+// propósito, sabiendo que pisa los retoques manuales de formato.
+//
+// No toca ni una fila de datos.
+function reaplicarFormato() {
+  darFormato();
+  var texto = 'Formato, desplegables y anchos reaplicados en las cinco hojas de datos '
+            + 'y en listas. Los datos no se tocaron.';
+  Logger.log(texto);
+  return texto;
+}
+
 function darFormato() {
   formatoDatos('productos', COLOR.verde, COLOR.verdeSuave);
   formatoDatos('clientes', COLOR.gris, '#efedea');
