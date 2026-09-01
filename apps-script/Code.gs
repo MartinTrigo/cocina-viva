@@ -34,20 +34,21 @@
    Acá son dos cosas distintas: la ENTREGA mueve mercadería y no toca la plata;
    la LIQUIDACIÓN es la que cobra.
 
-   PARA EMPEZAR (una sola vez)
-     1. Abrir el libro → Extensiones → Apps Script.
-     2. Borrar lo que haya en Código.gs y pegar todo este archivo. Guardar.
-     3. Ejecutar prepararLibro(). Crea las hojas y carga productos, clientes y
-        el stock inicial. Correrla dos veces no rompe ni duplica nada.
-     4. Ejecutar crearInvitaciones(). Deja los códigos en el registro de
-        ejecución y en la hoja "invitaciones".
-     5. Implementar → Nueva implementación → Aplicación web:
-          Ejecutar como: Yo    ·    Quién tiene acceso: Cualquier persona
-        Copiar la URL que termina en /exec y pegarla en docs/js/sincro.js.
+   LAS FUNCIONES QUE SE EJECUTAN A MANO, DESDE EL EDITOR
 
-   AL ACTUALIZAR ESTE CÓDIGO usar Implementar → Administrar implementaciones →
-   ✏ → Nueva versión. Si se hace una implementación NUEVA cambia la URL y hay
-   que actualizarla en sincro.js y subir el número de caché del service worker.
+     prepararLibro()      arma las hojas y carga productos, clientes y el stock
+                          inicial. Correrla dos veces no rompe ni duplica nada.
+     crearInvitaciones()  saca códigos de acceso nuevos.
+     reaplicarFormato()   reaplica formato y desplegables a un libro ya armado,
+                          cuando este código cambió. No toca los datos.
+     revisar()            diagnóstico. No toca nada: cuenta qué encontró.
+
+   El procedimiento completo de instalación, en orden y con los pasos que hay
+   que hacer fuera del editor, está en INSTALACION.md del repositorio. NO se
+   repite acá a propósito: cuando la lista estaba en los dos lados, los números
+   se corrieron y el paso 4 de un archivo era el 5 del otro.
+
+   https://github.com/MartinTrigo/cocina-viva/blob/main/INSTALACION.md
    ========================================================================== */
 
 // Versión del protocolo. La app rechaza una respuesta que no la traiga o que
@@ -465,8 +466,14 @@ function crearInvitaciones() {
     h.appendRow([codigo, '', 'Nueva', new Date(), '', '']);
     salida.push(codigo);
   }
-  var texto = 'Códigos creados (anotá en la columna «para quién» a quién le tocó cada uno):\n\n'
-            + salida.join('\n');
+  // El aviso de dónde están importa: la hoja "invitaciones" se crea OCULTA, y
+  // sin decirlo parece que la función no hubiera hecho nada.
+  var texto = 'Se crearon ' + cuantas + ' códigos:\n\n' + salida.join('\n')
+    + '\n\nQuedan en la hoja «invitaciones», que está OCULTA a propósito. Para '
+    + 'verla: clic derecho sobre cualquier pestaña de abajo → «Ver hojas '
+    + 'ocultas» → invitaciones.\n\nAnotá ahí, en la columna «para quién», a '
+    + 'quién le tocó cada uno. Cada código sirve una sola vez y en un solo '
+    + 'teléfono.';
   Logger.log(texto);
   return texto;
 }

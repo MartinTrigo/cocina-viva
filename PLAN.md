@@ -25,13 +25,24 @@ cuando todavía es barato cambiarlo.
       que se desarrolla el service worker falla, pero falla igual el de
       Semillas, que anda publicado: es del navegador, no del código.)
 
-### Lo que queda de la fase 0, y necesita a Martín
+- [x] Libro «Cocina Viva · Gestión» creado en `CocinaViva_App` y armado con
+      `prepararLibro()`: 19 productos, 46 clientes, el stock inicial y la hoja
+      `resumen`, que calcula $2.060.950 de depósito con sus propias fórmulas.
+- [x] Apps Script publicado (implementación v1, 1/9/2026) y conectado en
+      `docs/js/sincro.js`.
+- [x] **Prueba de punta a punta hecha.** Canje de un código, rechazo del mismo
+      código en un segundo teléfono, bajada del estado completo, subida de un
+      movimiento, aparición en la planilla, y borrado desde la app que también
+      lo saca de la planilla. El depósito quedó de nuevo en $2.060.950.
+      Es lo que en Semillas estuvo meses sin comprobarse.
 
-- [ ] Crear el libro «Cocina Viva · Gestión» en la carpeta `CocinaViva_App` de
-      Drive y correr `prepararLibro()` ([INSTALACION.md](INSTALACION.md)).
-- [ ] Publicar el Apps Script y pegar la dirección en `docs/js/sincro.js`.
-      Al hacerlo, subir el número de caché en `docs/sw.js`.
-- [ ] Correr `crearInvitaciones()` y activar un teléfono de prueba.
+### Lo que queda de la fase 0
+
+- [ ] Dar de baja el teléfono de prueba: escribir `no` en la columna `activo`
+      de la hoja oculta `dispositivos`, fila `prueba-claude`.
+- [ ] Anotar en la hoja `invitaciones`, columna «para quién», a quién le toca
+      cada uno de los tres códigos que quedan.
+- [ ] Activar los teléfonos de Luna y Melí.
 
 ## Fase 1 — Productos y Stock · **falta**
 

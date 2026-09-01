@@ -40,8 +40,15 @@ script en el paso siguiente.
    `productos`, `clientes`, `ingresos`, `egresos`, `movimientos` y `listas`.
    Las de acceso quedan ocultas a propósito.
 5. En el editor, elegir **`crearInvitaciones`** y **Ejecutar**. Deja cuatro
-   códigos en el Registro de ejecución y en la hoja `invitaciones`.
-   **Copiarlos a `IDS.txt`**, y anotar en la planilla a quién le tocó cada uno.
+   códigos en el Registro de ejecución.
+
+   > **La hoja `invitaciones` no va a aparecer entre las pestañas: se crea
+   > oculta a propósito.** Para verla, clic derecho sobre cualquier pestaña de
+   > abajo → **Ver hojas ocultas** → `invitaciones`. Lo mismo vale para
+   > `dispositivos` y `borrados`.
+
+   **Copiar los códigos a `IDS.txt`**, y anotar en la columna «para quién» de
+   esa hoja a quién le tocó cada uno.
 
 ### Publicar el servicio
 
@@ -101,15 +108,22 @@ celular, se le da otro.
 
 ## Comprobar que quedó bien
 
-Antes de repartir los códigos conviene hacer una prueba entera con uno de los de
-repuesto:
+**Hecho el 1/9/2026 sobre esta instalación**, con el cuarto código de repuesto:
+se canjeó, se comprobó que el mismo código rechaza un segundo teléfono, se bajó
+el estado (19 productos, 46 clientes, 12 movimientos), se subió un movimiento de
+prueba, apareció en la planilla, y se borró desde la app dejando el depósito de
+nuevo en $2.060.950. Anda de punta a punta.
 
-1. Activar la app con ese código.
-2. Cargar cualquier cosa —un ingreso de stock de una unidad, por ejemplo—.
+Para repetirlo alguna vez —al cambiar de implementación, por ejemplo—:
+
+1. Activar la app con un código de repuesto.
+2. Cargar cualquier cosa: un ingreso de stock de una unidad, por ejemplo.
 3. Tocar **↻** y esperar el aviso de que subió.
 4. Abrir la planilla y ver la fila nueva en `movimientos`.
-5. Borrar esa fila y darle de baja al código de prueba escribiendo `anulado` en
-   la columna «estado» de la hoja `invitaciones`.
+5. Borrar esa fila desde la app, sincronizar de nuevo, y comprobar que se fue
+   también de la planilla.
+6. Dar de baja el teléfono de prueba escribiendo `no` en la columna `activo` de
+   la hoja oculta `dispositivos`.
 
 Si algo no arranca, ejecutar **`revisar()`** en el editor de Apps Script: no toca
 nada y cuenta en castellano qué encontró y qué falta.
