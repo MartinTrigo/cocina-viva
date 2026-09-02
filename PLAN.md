@@ -90,6 +90,24 @@ desarrolla no tiene `navigator.share`, así que acá siempre cae en la descarga.
 En el celular de Luna tiene que abrir el menú de siempre y ofrecer WhatsApp.
 Es lo primero que conviene mirar.
 
+## Clientes · **hecha** (pedido sobre la marcha)
+
+No estaba en el plan: lo pidieron al ver que varios clientes de la lista ya no
+van. Es la misma pantalla que Productos, con una diferencia importante.
+
+- [x] Lista con buscador por nombre o localidad, alta, edición y bajas en masa.
+- [x] **El nombre sí se puede cambiar**, al revés que el código de un producto.
+      Al renombrar se reescriben también todas las filas de la historia que lo
+      nombran: la columna `cliente` de las ventas, el `desde` y el `hacia` de
+      los movimientos de consignación, y las observaciones de los movimientos
+      de venta. La pantalla dice cuántas son antes de tocarlas.
+- [x] Avisa si el cliente que se está por dar de baja todavía tiene mercadería
+      en consignación, con cuántas unidades y cuánta plata.
+- [x] Probado: renombrar un local de consignación mueve su stock al nombre
+      nuevo y lo deja en cero en el viejo; renombrar un cliente con una venta
+      corrige las dos filas que lo nombran; un nombre repetido se rechaza y uno
+      sin historia se borra de verdad.
+
 ## Fase 3 — Consignación · **falta**
 
 - [ ] Lista de locales con lo que tiene cada uno, y el total de plata en la calle.

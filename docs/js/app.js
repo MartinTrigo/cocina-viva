@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "0.3.0 · fase 2";
+  const VERSION = "0.4.0 · clientes";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -69,6 +69,13 @@
       subtitulo: "Catálogo",
       listo: true,          // la atiende js/productos.js
     },
+    clientes: {
+      icono: "📓",
+      titulo: "Clientes",
+      detalle: "A quién le vendemos y cómo trabaja",
+      subtitulo: "A quién le vendemos",
+      listo: true,          // la atiende js/clientes.js
+    },
     resumen: {
       icono: "📊",
       titulo: "Resumen",
@@ -115,6 +122,7 @@
     const MODULOS = {
       ingresos: window.Ingresos,
       productos: window.Productos,
+      clientes: window.Clientes,
       stock: window.Stock,
     };
     if (MODULOS[base]) {

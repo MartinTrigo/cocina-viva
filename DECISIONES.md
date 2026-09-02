@@ -222,3 +222,27 @@ que ya pasó.
 Lo mismo con los clientes de consignación: si se elige uno en la pantalla de
 Ingresos, avisa que las entregas van por Consignación, pero deja seguir. Un
 local que trabaja a consignación también compra de vez en cuando.
+
+## El nombre de un cliente sí se puede cambiar
+
+Al revés que el código de un producto. Cambiarlo reescribe también todas las
+filas que lo nombran: la columna `cliente` de las ventas, el `desde` y el
+`hacia` de los movimientos de consignación, y las observaciones de los
+movimientos de venta, donde el nombre va escrito para que la hoja se entienda
+sin cruzarla con otra.
+
+**Por qué la diferencia:** el código de un producto es una sigla que se elige
+una vez y no se lee en voz alta. El nombre de un cliente es cómo se lo llama,
+sale impreso en cada remito y es de lo más fácil de escribir mal. Prohibir el
+renombre dejaría un error a la vista para siempre.
+
+**Costo, y es real:** si otra persona tiene ventas cargadas sin sincronizar con
+el nombre viejo, al subirlas van a quedar con el nombre viejo y ese cliente
+aparecerá dos veces. Se arregla renombrando de nuevo. Con dos o tres personas
+que sincronizan seguido es poco probable; si alguna vez pasa, ahora se sabe por
+qué.
+
+**Dar de baja a un local que todavía tiene mercadería avisa.** No la trae de
+vuelta —eso se hace desde Consignación—, pero dice cuántas unidades y cuánta
+plata quedan ahí. Dar de baja al cliente sin traerse los frascos sería perder
+de vista plata que está en la calle.

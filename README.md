@@ -20,6 +20,7 @@ Reemplaza la planilla `2026 ventas gastos stock`, que hacía todo eso mezclado.
 | **Consignación** | Qué tiene hoy cada local, cuánta plata hay en la calle, y los tres movimientos: entregar, liquidar y devolver. |
 | **Stock** | Cargar lo que envasaron y ver el depósito al día, producto por producto. |
 | **Productos** | El catálogo completo, con alta, edición y actualización de precios en masa. |
+| **Clientes** | La libreta: quién compra y quién trabaja a consignación, con alta, edición y bajas. |
 | **Resumen** | Balance por mes, por medio de pago y por rubro, con gráficos y descarga. |
 
 Todo se guarda también en un libro de Google, así que se puede abrir, filtrar,
