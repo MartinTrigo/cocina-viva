@@ -44,8 +44,8 @@ body {
   background: var(--fondo);
   color: var(--texto);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.45;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -67,26 +67,26 @@ body {
   gap: 10px;
   max-width: var(--ancho);
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 9px 12px;
 }
 
 /* El logotipo es blanco sobre el bordó de la barra: así viene el original.
    Solo se muestra en el inicio; en las demás pantallas manda el título. */
-.marca { flex: none; height: 26px; width: auto; }
+.marca { flex: none; height: 23px; width: auto; }
 .marca[hidden] { display: none; }
 
 .barra__texto { min-width: 0; flex: 1; }
-.barra h1 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.2; }
-.barra p { margin: 2px 0 0; font-size: 13px; opacity: .85; }
+.barra h1 { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.2; }
+.barra p { margin: 1px 0 0; font-size: 12px; opacity: .85; }
 
 /* Cuando se ve el logotipo, el nombre repetido al lado sobra. */
 .barra--inicio h1 { display: none; }
 
 .volver, .sincro {
   flex: none;
-  width: 44px;
-  height: 44px;
-  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
   color: #fff;
   background: rgba(255, 255, 255, .15);
   border: 0;
@@ -109,35 +109,35 @@ body {
   width: 100%;
   max-width: var(--ancho);
   margin: 0 auto;
-  padding: 16px 16px 40px;
+  padding: 12px 12px 32px;
 }
 
 .cargando { color: var(--texto-suave); text-align: center; padding: 40px 0; }
 
-h2 { font-size: 19px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0 0 3px; }
 
 .tarjeta {
   background: var(--papel);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  padding: 16px;
-  margin-bottom: 16px;
+  padding: 12px 13px;
+  margin-bottom: 12px;
 }
 .tarjeta h2 { margin-top: 0; }
 
-.nota { color: var(--texto-suave); font-size: 15px; margin: 4px 0 0; }
+.nota { color: var(--texto-suave); font-size: 14px; margin: 3px 0 0; }
 
 /* ---------- Menú del inicio ---------- */
 
-.menu { display: grid; gap: 12px; }
+.menu { display: grid; gap: 8px; }
 
 .menu__boton {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  min-height: 68px;
-  padding: 14px 16px;
+  min-height: 54px;
+  padding: 9px 12px;
   text-align: left;
   font: inherit;
   color: var(--texto);
@@ -160,28 +160,28 @@ h2 { font-size: 19px; margin: 0 0 4px; }
 .menu__boton--entra { border-left-color: var(--verde); }
 .menu__boton--sale { border-left-color: var(--tierra); }
 
-.menu__icono { font-size: 26px; flex: none; width: 34px; text-align: center; }
+.menu__icono { font-size: 22px; flex: none; width: 28px; text-align: center; }
 .menu__titulo { font-weight: 600; display: block; }
-.menu__detalle { display: block; font-size: 14px; color: var(--texto-suave); }
+.menu__detalle { display: block; font-size: 13px; color: var(--texto-suave); }
 
 /* ---------- Avisos ---------- */
 
-.aviso { border-radius: var(--radio); padding: 12px 14px; margin: 0 0 16px; font-size: 15px; }
+.aviso { border-radius: var(--radio); padding: 10px 12px; margin: 0 0 12px; font-size: 14px; }
 .aviso--info { background: #fdf6e6; border: 1px solid #d8a53c; }
 .aviso--error { background: var(--error-suave); border: 1px solid var(--error); color: var(--error); }
 .aviso--ok { background: var(--verde-suave); border: 1px solid var(--verde-claro); }
 
 /* ---------- Formularios ---------- */
 
-.campo { margin-bottom: 16px; }
-.campo > label { display: block; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.campo { margin-bottom: 12px; }
+.campo > label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 3px; }
 
 .campo .ayuda {
   display: block;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--texto-suave);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
  /* Los campos se alinean por abajo, no por arriba: cuando una etiqueta ocupa
@@ -192,8 +192,8 @@ h2 { font-size: 19px; margin: 0 0 4px; }
 
 input, select, textarea {
   width: 100%;
-  min-height: 48px;
-  padding: 10px 12px;
+  min-height: 44px;
+  padding: 8px 11px;
   font: inherit;
   color: var(--texto);
   background: var(--papel);
@@ -209,7 +209,7 @@ input:focus, select:focus, textarea:focus {
 
 input.mal, select.mal, textarea.mal { border-color: var(--error); background: var(--error-suave); }
 .campo__error { display: block; color: var(--error); font-size: 14px; margin-top: 4px; }
-textarea { resize: vertical; min-height: 70px; }
+textarea { resize: vertical; min-height: 58px; }
 
 /* Los importes y las cantidades se leen mejor tabulados y a la derecha. */
 .numero { text-align: right; font-variant-numeric: tabular-nums; }
@@ -221,8 +221,8 @@ textarea { resize: vertical; min-height: 70px; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 50px;
-  padding: 12px 20px;
+  min-height: 44px;
+  padding: 10px 16px;
   font: inherit;
   font-weight: 600;
   color: #fff;
@@ -259,7 +259,7 @@ a.boton { text-decoration: none; }
    cuatro columnas no entra: se desliza sola en vez de romper el ancho de la
    página. */
 
-.tabla-envoltorio { overflow-x: auto; margin-bottom: 16px; }
+.tabla-envoltorio { overflow-x: auto; margin-bottom: 12px; }
 
 .tabla {
   width: 100%;
@@ -268,9 +268,9 @@ a.boton { text-decoration: none; }
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   overflow: hidden;
-  font-size: 15px;
+  font-size: 14px;
 }
-.tabla th, .tabla td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--borde); }
+.tabla th, .tabla td { padding: 6px 9px; text-align: left; border-bottom: 1px solid var(--borde); }
 .tabla th { background: var(--bordo-suave); font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
 
 /* Las columnas de números se achican hasta lo que ocupa su contenido y no se
@@ -298,25 +298,25 @@ a.boton { text-decoration: none; }
 
 /* ---------- Totales grandes ---------- */
 
-.cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 
 .cifra {
   background: var(--papel);
   border: 1px solid var(--borde);
   border-left: 4px solid var(--texto-suave);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 9px 11px;
 }
 .cifra--entra { border-left-color: var(--verde); }
 .cifra--sale { border-left-color: var(--tierra); }
 .cifra--saldo { border-left-color: var(--bordo); }
-.cifra__que { display: block; font-size: 13px; color: var(--texto-suave); }
-.cifra__cuanto { display: block; font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cifra__que { display: block; font-size: 12px; color: var(--texto-suave); }
+.cifra__cuanto { display: block; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cifra__cuanto.negativo { color: var(--error); }
 
 /* ---------- Renglones de lista ---------- */
 
-.renglones { list-style: none; margin: 0 0 16px; padding: 0; }
+.renglones { list-style: none; margin: 0 0 12px; padding: 0; }
 
 .renglon {
   display: flex;
@@ -326,8 +326,8 @@ a.boton { text-decoration: none; }
   border: 1px solid var(--borde);
   border-left: 5px solid var(--bordo);
   border-radius: var(--radio);
-  padding: 12px 14px;
-  margin-bottom: 10px;
+  padding: 9px 11px;
+  margin-bottom: 7px;
 }
 .renglon--entra { border-left-color: var(--verde); }
 .renglon--sale { border-left-color: var(--tierra); }
@@ -336,7 +336,7 @@ a.boton { text-decoration: none; }
 .renglon__que { display: block; font-weight: 600; }
 .renglon__detalle {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--texto-suave);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -344,7 +344,7 @@ a.boton { text-decoration: none; }
 }
 .renglon__cuanto { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.vacio { color: var(--texto-suave); font-style: italic; padding: 14px 0; margin: 0 0 8px; }
+.vacio { color: var(--texto-suave); font-style: italic; padding: 10px 0; margin: 0 0 6px; }
 
 /* La pastilla dice si el registro ya llegó a la planilla o sigue solo acá. */
 .pastilla {
@@ -371,9 +371,9 @@ a.boton { text-decoration: none; }
    admite estilos sueltos en la página, justamente para que nada que se cuele
    pueda pintar la pantalla. */
 
-.separado { margin-top: 20px; }
-.al-final { margin: 16px 0 0; }
-.nota--pie { margin-top: 24px; }
+.separado { margin-top: 14px; }
+.al-final { margin: 12px 0 0; }
+.nota--pie { margin-top: 18px; }
 
 /* ---------- Pie ---------- */
 
@@ -381,8 +381,8 @@ a.boton { text-decoration: none; }
   background: var(--bordo);
   color: rgba(255, 255, 255, .85);
   text-align: center;
-  font-size: 13px;
-  padding: 18px 16px;
+  font-size: 12px;
+  padding: 13px 14px;
   margin-top: auto;
 }
 .pie p { margin: 2px 0; }
@@ -410,12 +410,12 @@ a.boton { text-decoration: none; }
 
 /* ---------- Fila de acciones arriba de una lista ---------- */
 
-.acciones { display: flex; gap: 10px; margin-bottom: 16px; }
+.acciones { display: flex; gap: 8px; margin-bottom: 12px; }
 
 /* Padding y cuerpo más chicos que un botón suelto: son dos en una fila y en un
    teléfono de 375 px, con el padding normal, «+ Producto nuevo» cae en dos
    renglones. */
-.acciones .boton { flex: 1; min-width: 0; padding: 12px 8px; font-size: 16px; }
+.acciones .boton { flex: 1; min-width: 0; padding: 10px 8px; font-size: 15px; }
 
 /* ---------- Celdas de dos renglones ----------
    El nombre arriba y el código abajo: en un teléfono no entran uno al lado del
@@ -424,7 +424,7 @@ a.boton { text-decoration: none; }
 .celda__que { display: block; font-weight: 600; }
 .celda__detalle {
   display: block;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--texto-suave);
   white-space: nowrap;
   overflow: hidden;
@@ -476,8 +476,8 @@ a.boton { text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 60px;
-  padding: 12px 14px;
+  min-height: 52px;
+  padding: 10px 12px;
   cursor: pointer;
   list-style: none;              /* saca el triangulito de Firefox */
   user-select: none;
@@ -488,7 +488,7 @@ a.boton { text-decoration: none; }
 
 .grupo__texto { flex: 1; min-width: 0; }
 .grupo__nombre { display: block; font-weight: 600; }
-.grupo__cuenta { display: block; font-size: 14px; color: var(--texto-suave); }
+.grupo__cuenta { display: block; font-size: 13px; color: var(--texto-suave); }
 .grupo__cuerpo { padding: 12px 14px 4px; }
 
 /* ---------- Lista para marcar varios ---------- */
@@ -498,9 +498,9 @@ a.boton { text-decoration: none; }
 .chequeo {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 52px;
-  padding: 8px 10px;
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 9px;
   border: 1px solid var(--borde);
   border-radius: 8px;
   margin-bottom: 8px;
@@ -527,9 +527,9 @@ a.boton { text-decoration: none; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 76px;
-  padding: 8px 4px;
+  gap: 3px;
+  min-height: 58px;
+  padding: 6px 4px;
   text-align: center;
   background: var(--papel);
   border: 1px solid var(--borde);
@@ -548,8 +548,8 @@ a.boton { text-decoration: none; }
   pointer-events: none;
 }
 
-.opcion__icono { font-size: 22px; line-height: 1; }
-.opcion__texto { font-size: 12px; line-height: 1.15; color: var(--texto-suave); }
+.opcion__icono { font-size: 18px; line-height: 1; }
+.opcion__texto { font-size: 11.5px; line-height: 1.12; color: var(--texto-suave); }
 
 .opcion.elegida {
   color: #fff;
@@ -564,9 +564,9 @@ a.boton { text-decoration: none; }
    cargar veinticinco donde iban dos. */
 
 .resumen-vivo {
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  font-size: 15px;
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  font-size: 14px;
   background: var(--verde-suave);
   border: 1px solid var(--verde-claro);
   border-left: 4px solid var(--verde);
@@ -582,42 +582,72 @@ a.boton { text-decoration: none; }
    Componentes de la pantalla de ventas
    ========================================================================== */
 
-/* Cuando las opciones son dos y no tres, ocupan la mitad cada una. */
+/* Cuando las opciones son dos y no tres, ocupan la mitad cada una. Y como son
+   dos, no hace falta apilar el dibujo sobre la palabra: van uno al lado del
+   otro y el bloque ocupa la mitad de alto. */
 .opciones--dos { grid-template-columns: repeat(2, 1fr); }
+.opciones--dos .opcion {
+  flex-direction: row;
+  gap: 7px;
+  min-height: 42px;
+  padding: 6px 8px;
+}
+.opciones--dos .opcion__icono { font-size: 16px; }
+.opciones--dos .opcion__texto { font-size: 13.5px; }
 
 /* ---------- Renglón de producto de una venta ----------
-   El producto arriba a lo ancho —los nombres son largos— y abajo la cantidad,
-   el subtotal y la cruz de quitar. En un teléfono, los tres en una sola fila
-   no entran sin achicar el desplegable hasta no poder leerlo. */
+   Producto, cantidad y la cruz de quitar en UNA sola línea. Antes iban en dos
+   y cada renglón ocupaba unos 130 px: con cinco productos había que bajar toda
+   la pantalla para llegar al botón de agregar. Así son unos 70 px, y el
+   subtotal solo aparece cuando hay algo que mostrar. */
 
 .renglon-venta {
-  padding: 12px 0;
+  padding: 7px 0;
   border-bottom: 1px solid var(--borde);
 }
 .renglon-venta:first-child { padding-top: 0; }
-.renglon-venta .campo { margin-bottom: 8px; }
+.renglon-venta:last-of-type { border-bottom: 0; }
 
-.renglon-venta__pie { display: flex; align-items: center; gap: 10px; }
-.renglon-venta__pie .v-cant { width: 90px; flex: none; }
+.renglon-venta__linea { display: flex; align-items: center; gap: 6px; }
+.renglon-venta__linea select { flex: 1; min-width: 0; }
+.renglon-venta__linea input { width: 62px; flex: none; }
+
+/* La cruz: angosta pero de alto completo, para que se acierte con el dedo sin
+   robarle ancho al desplegable, que es lo que hay que poder leer. */
+.quitar {
+  flex: none;
+  width: 30px;
+  height: 44px;
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto-suave);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.quitar:active { color: var(--error); }
 
 .renglon-venta__sub {
-  flex: 1;
-  min-width: 0;
-  font-size: 15px;
+  display: block;
+  margin-top: 2px;
+  padding-right: 36px;         /* queda alineado sobre la cantidad, no sobre la cruz */
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--verde);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.renglon-venta__sub[hidden] { display: none; }
 
 .renglon-venta__aviso {
-  margin: 8px 0 0;
-  font-size: 13px;
+  margin: 5px 0 0;
+  font-size: 12.5px;
   color: #7a5a1e;
   background: #fdf6e6;
   border: 1px solid #d8a53c;
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 8px;
 }
 
 /* ---------- El total de la venta ---------- */
@@ -627,13 +657,13 @@ a.boton { text-decoration: none; }
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 2px solid var(--bordo);
 }
 .total__que { font-weight: 600; }
 .total__cuanto {
-  font-size: 26px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--bordo);
   font-variant-numeric: tabular-nums;
@@ -672,8 +702,8 @@ a.boton { text-decoration: none; }
 .cuenta {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 0;
+  gap: 9px;
+  padding: 7px 0;
   border-bottom: 1px solid var(--borde);
 }
 .cuenta:last-child { border-bottom: 0; }
@@ -717,8 +747,8 @@ h3.subtitulo {
 /* ---------- Gráficos ---------- */
 
 .grafico {
-  margin: 0 0 16px;
-  padding: 14px;
+  margin: 0 0 12px;
+  padding: 10px;
   background: var(--papel);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
@@ -770,9 +800,9 @@ h3.subtitulo {
 .desglose__fila {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  font-size: 15px;
+  gap: 9px;
+  padding: 5px 0;
+  font-size: 14px;
 }
 
 .desglose__que {
@@ -831,4 +861,48 @@ h3.subtitulo {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   .tarjeta, .grafico, .cifra { box-shadow: none; }
+}
+
+/* Un botón secundario que acompaña, no que manda: el de agregar otro producto
+   no compite con el de guardar. */
+.boton--chico { min-height: 38px; padding: 8px 12px; font-size: 14px; }
+
+/* ==========================================================================
+   Aviso de versión nueva
+
+   El service worker se actualiza solo, pero la pantalla que ya está abierta
+   sigue con los archivos viejos hasta que se recargue. Sin este aviso, la única
+   forma de enterarse era que algo no estuviera donde tenía que estar —le pasó a
+   Marto con Egresos, que su teléfono seguía anunciando para «la fase 4»—.
+   ========================================================================== */
+
+.version-nueva {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #fff;
+  background: var(--bordo);
+  border-radius: var(--radio);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, .3);
+}
+.version-nueva span { flex: 1; min-width: 0; }
+
+.version-nueva button {
+  flex: none;
+  min-height: 36px;
+  padding: 7px 14px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--bordo);
+  background: #fff;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
 }

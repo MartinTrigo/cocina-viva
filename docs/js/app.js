@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.0.0 · fase 4";
+  const VERSION = "1.1.0 · mas compacta";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -231,7 +231,7 @@
           <span class="cifra__cuanto">${dinero(window.Datos.valorDe(deposito))}</span>
         </div>
         <div class="cifra cifra--saldo">
-          <span class="cifra__que">En la calle</span>
+          <span class="cifra__que">En consignación</span>
           <span class="cifra__cuanto">${dinero(enCalle)}</span>
         </div>
       </div>`;
@@ -314,4 +314,56 @@
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
   }
+
+  // ---------- Aviso de versión nueva ----------
+  //
+  // A Marto le pasó que su teléfono seguía anunciando Egresos para «la fase 4»
+  // cuando ya estaba hecho: la app instalada había quedado abierta en segundo
+  // plano y al volver a ella no vuelve a pedir nada. No hay forma de darse
+  // cuenta salvo que algo no esté donde tendría que estar.
+  //
+  // Lo que NO sirve para detectarlo es escuchar el cambio de service worker.
+  // Como los archivos se piden a la red primero, quien abre la app con señal ya
+  // recibe los nuevos, y el service worker se actualiza igual: el cartel
+  // aparecería anunciando algo que ya está puesto. Lo que sí sirve es
+  // preguntarle al servidor qué versión tiene y compararla con la que está
+  // corriendo, que es exactamente la pregunta que importa.
+  async function hayVersionNueva() {
+    try {
+      const respuesta = await fetch("js/app.js", { cache: "no-store" });
+      if (!respuesta.ok) return false;
+      const texto = await respuesta.text();
+      const dice = texto.match(/const VERSION = "([^"]+)"/);
+      return !!dice && dice[1] !== VERSION;
+    } catch (err) {
+      return false;      // sin señal no se avisa nada: no es una novedad
+    }
+  }
+
+  let ultimaMirada = 0;
+  async function mirarSiHayVersionNueva() {
+    if (document.querySelector(".version-nueva")) return;
+    if (Date.now() - ultimaMirada < 120000) return;    // no en cada vistazo
+    ultimaMirada = Date.now();
+    if (await hayVersionNueva()) avisarVersionNueva();
+  }
+
+  function avisarVersionNueva() {
+    if (document.querySelector(".version-nueva")) return;
+    const caja = document.createElement("div");
+    caja.className = "version-nueva";
+    caja.setAttribute("role", "status");
+    caja.innerHTML = `<span>Hay una versión nueva de la app.</span>
+      <button type="button">Actualizar</button>`;
+    // Recargar y ya: no se pierde nada a medio escribir, porque lo que se carga
+    // se guarda en el teléfono al tocar guardar, no al sincronizar.
+    caja.querySelector("button").onclick = () => location.reload();
+    document.body.appendChild(caja);
+  }
+
+  // Al volver a la app después de tenerla en segundo plano, que es justo cuando
+  // se queda vieja sin que nada avise.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") mirarSiHayVersionNueva();
+  });
 })();

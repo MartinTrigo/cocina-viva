@@ -322,3 +322,47 @@ verdad, porque eso el navegador lo sabe hacer solo.
 
 Hay que insistirle al navegador con `print-color-adjust: exact`: por defecto no
 imprime fondos, y sin los fondos las barras y la torta salen en blanco.
+
+## La escala es compacta, pero nada se toca con menos de 44 px
+
+Los cuerpos de letra y los espaciados bajaron un escalón en toda la app: el
+texto base de 17 a 16 px, las tarjetas de 16 a 12 px de aire, los botones de 50
+a 44 px de alto, los renglones del menú de 68 a 54.
+
+**Por qué:** lo pidieron ellas. «Son chicas jóvenes» y la app estaba pensada con
+una holgura que no necesitan; en Ingresos, que es lo que más usan, había que
+bajar media pantalla para llegar al botón de agregar otro producto.
+
+**El piso son 44 px** de alto para cualquier cosa que se toque con el dedo, que
+es el mínimo razonable en un teléfono. Los campos, los botones y las opciones
+quedaron ahí; lo que se achicó es el aire alrededor y el tamaño del texto, no el
+área para acertarle.
+
+**El renglón de producto de una venta pasó de dos líneas a una.** Antes eran
+unos 130 px cada uno y con cinco productos el botón de agregar quedaba fuera de
+la pantalla. Ahora son 51 px, el subtotal aparece solo cuando hay algo que
+mostrar, y con cinco productos cargados el botón sigue a la vista.
+
+## «En la calle» pasó a decir «en consignación»
+
+**Por qué:** en el inicio decía «En la calle» al lado de «En depósito» y no se
+entendía qué era. La palabra que sí se entiende es la que le da nombre a la
+sección. En el código y en los comentarios la expresión queda, porque ahí
+describe bien la idea; en la pantalla no.
+
+## El aviso de versión nueva pregunta, no escucha
+
+La app compara la versión que está corriendo contra la que declara el
+`js/app.js` del servidor, al volver a la app desde segundo plano y como mucho
+una vez cada dos minutos.
+
+**Por qué así y no escuchando el cambio de service worker:** como los archivos
+se piden a la red primero, quien abre la app con señal ya recibe los nuevos, y
+el service worker se actualiza igual. Escuchar ese cambio haría aparecer el
+cartel anunciando algo que ya está puesto. El caso real que hay que cubrir es
+otro: la app instalada que quedó abierta en segundo plano y al volver a ella no
+vuelve a pedir nada. Ahí la pregunta «¿qué versión tenés vos?» es exactamente la
+que corresponde.
+
+**Sin señal no avisa nada**, que es lo correcto: no tener novedades no es una
+novedad.

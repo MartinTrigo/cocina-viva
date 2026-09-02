@@ -146,7 +146,7 @@ window.Resumen = (function () {
           <span class="cifra__cuanto">${dinero(window.Datos.valorDe(deposito))}</span>
         </div>
         <div class="cifra cifra--sale">
-          <span class="cifra__que">En la calle</span>
+          <span class="cifra__que">En consignación</span>
           <span class="cifra__cuanto">${dinero(window.Datos.valorDe(calle))}</span>
         </div>
       </div>

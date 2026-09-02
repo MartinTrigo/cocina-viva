@@ -86,7 +86,7 @@ window.Consignacion = (function () {
     vista.innerHTML = `
       <div class="cifras">
         <div class="cifra cifra--saldo">
-          <span class="cifra__que">Plata en la calle</span>
+          <span class="cifra__que">En consignación</span>
           <span class="cifra__cuanto">${dinero(total)}</span>
         </div>
         <div class="cifra cifra--sale">
@@ -116,7 +116,7 @@ window.Consignacion = (function () {
            como «consignación» en <strong>Clientes</strong> y va a aparecer acá.</p>`}
 
       ${unidades ? `
-        <h2 class="separado">Qué hay en la calle, en total</h2>
+        <h2 class="separado">Qué hay en consignación, en total</h2>
         <p class="nota">Sumando todos los locales, a precio mayorista.</p>
         ${tabla(window.Datos.renglonesDe(enLaCalle), total)}` : ""}`;
 
@@ -224,19 +224,17 @@ window.Consignacion = (function () {
           const n = aNumero(l.cantidad);
           return `
           <div class="renglon-venta" data-i="${i}">
-            <div class="campo">
-              <select class="cg-cod" data-i="${i}">
+            <div class="renglon-venta__linea">
+              <select class="cg-cod" data-i="${i}" aria-label="Producto">
                 <option value="">Elegí un producto…</option>
                 ${productos.map((p) => `
                   <option value="${esc(p.cod)}"${p.cod === l.cod ? " selected" : ""}>${esc(p.producto)}${p.presentacion ? " · " + esc(p.presentacion) : ""}</option>`).join("")}
               </select>
-            </div>
-            <div class="renglon-venta__pie">
               <input type="text" class="cg-cant numero" data-i="${i}" inputmode="numeric"
                      placeholder="0" value="${esc(l.cantidad)}" aria-label="Cantidad">
-              <span class="renglon-venta__sub" id="cg-sub-${i}">—</span>
-              <button class="boton--peligro" data-quitar="${i}" aria-label="Quitar">&#10005;</button>
+              <button class="quitar" data-quitar="${i}" aria-label="Quitar">&#10005;</button>
             </div>
+            <span class="renglon-venta__sub" id="cg-sub-${i}" hidden></span>
             ${l.cod && Number.isFinite(n) && n > hay ? `
               <p class="renglon-venta__aviso">En el depósito hay ${numero(hay)}.
                  Va a quedar en ${numero(hay - n)}.</p>` : ""}
@@ -244,7 +242,7 @@ window.Consignacion = (function () {
         }).join("")}
       </div>
 
-      <button class="boton boton--secundario boton--ancho" id="cg-mas">+ Agregar producto</button>
+      <button class="boton boton--secundario boton--chico boton--ancho" id="cg-mas">+ Agregar producto</button>
       <div class="total" id="cg-total"></div>
 
       <p class="campo__error" id="cg-error" hidden></p>
@@ -320,7 +318,11 @@ window.Consignacion = (function () {
         const sub = Number.isFinite(n) ? n * precio : 0;
         total += sub;
         const c = document.getElementById("cg-sub-" + i);
-        if (c) c.textContent = l.cod && Number.isFinite(n) && n ? dinero(sub) + "  (" + dinero(precio) + " c/u)" : "—";
+        if (c) {
+          const hayQueMostrar = !!(l.cod && Number.isFinite(n) && n);
+          c.textContent = hayQueMostrar ? dinero(sub) + " · " + dinero(precio) + " c/u" : "";
+          c.hidden = !hayQueMostrar;
+        }
       });
       caja.innerHTML = `<span class="total__que">Valor de lo que dejás</span>
         <span class="total__cuanto">${dinero(total)}</span>`;

@@ -114,7 +114,7 @@ window.Ingresos = (function () {
         <div id="v-lineas">
           ${borrador.lineas.map((l, i) => renglon(l, i, productos)).join("")}
         </div>
-        <button class="boton boton--secundario boton--ancho" id="btn-mas">+ Agregar producto</button>
+        <button class="boton boton--secundario boton--chico boton--ancho" id="btn-mas">+ Agregar producto</button>
 
         <div class="total" id="v-total"></div>
       </div>
@@ -140,19 +140,17 @@ window.Ingresos = (function () {
   function renglon(l, i, productos) {
     return `
       <div class="renglon-venta" data-i="${i}">
-        <div class="campo">
-          <select class="v-cod" data-i="${i}">
+        <div class="renglon-venta__linea">
+          <select class="v-cod" data-i="${i}" aria-label="Producto">
             <option value="">Elegí un producto…</option>
             ${productos.map((p) => `
               <option value="${esc(p.cod)}"${p.cod === l.cod ? " selected" : ""}>${esc(p.producto)}${p.presentacion ? " · " + esc(p.presentacion) : ""}</option>`).join("")}
           </select>
-        </div>
-        <div class="renglon-venta__pie">
           <input type="text" class="v-cant numero" data-i="${i}" inputmode="numeric"
                  placeholder="0" value="${esc(l.cantidad)}" aria-label="Cantidad">
-          <span class="renglon-venta__sub" id="v-sub-${i}">—</span>
-          <button class="boton--peligro" data-quitar="${i}" aria-label="Quitar este producto">&#10005;</button>
+          <button class="quitar" data-quitar="${i}" aria-label="Quitar este producto">&#10005;</button>
         </div>
+        <span class="renglon-venta__sub" id="v-sub-${i}" hidden></span>
         <p class="renglon-venta__aviso" id="v-aviso-${i}" hidden></p>
       </div>`;
   }
@@ -169,9 +167,9 @@ window.Ingresos = (function () {
 
       const caja = document.getElementById("v-sub-" + i);
       if (caja) {
-        caja.textContent = l.cod && Number.isFinite(n) && n
-          ? dinero(sub) + "  (" + dinero(precio) + " c/u)"
-          : "—";
+        const hayQueMostrar = !!(l.cod && Number.isFinite(n) && n);
+        caja.textContent = hayQueMostrar ? dinero(sub) + " · " + dinero(precio) + " c/u" : "";
+        caja.hidden = !hayQueMostrar;
       }
 
       // Aviso de stock: no impide vender, avisa. A veces la venta es real y lo
