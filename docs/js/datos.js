@@ -126,6 +126,31 @@ window.Datos = (function () {
     return Object.keys(vistos).sort((a, b) => a.localeCompare(b, "es"));
   }
 
+  // Todo lo que está en la calle, sin importar en qué local: lo que entró a
+  // cualquier ubicación que no sea reservada, menos lo que salió de ella.
+  //
+  // No se calcula sumando los locales uno por uno a propósito: así un local que
+  // quedó fuera de la lista de clientes —renombrado, dado de baja— no
+  // desaparece del total. La plata en la calle es la que es.
+  function stockEnLaCalle() {
+    const cuenta = {};
+    if (!cache) return cuenta;
+    const afuera = (u) => {
+      const n = String(u || "").trim();
+      return n && RESERVADAS.indexOf(n) < 0;
+    };
+
+    cache.movimientos.forEach((m) => {
+      const n = Number(m.cantidad) || 0;
+      if (!n || !m.cod) return;
+      if (afuera(m.hacia)) cuenta[m.cod] = (cuenta[m.cod] || 0) + n;
+      if (afuera(m.desde)) cuenta[m.cod] = (cuenta[m.cod] || 0) - n;
+    });
+
+    Object.keys(cuenta).forEach((cod) => { if (!cuenta[cod]) delete cuenta[cod]; });
+    return cuenta;
+  }
+
   // Cuánto vale un { COD: cantidad } a precio mayorista.
   function valorDe(cuenta, lista) {
     return Object.keys(cuenta).reduce(
@@ -198,7 +223,7 @@ window.Datos = (function () {
     cargar, hay, todo,
     producto, productosActivos, clientesActivos, localesDeConsignacion,
     nombreDe, precioDe,
-    stockEn, stockDeposito, localesConMercaderia, valorDe, renglonesDe,
+    stockEn, stockDeposito, stockEnLaCalle, localesConMercaderia, valorDe, renglonesDe,
     movimiento, ajuste,
   };
 })();

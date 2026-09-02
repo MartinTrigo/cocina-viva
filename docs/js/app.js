@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "0.4.0 · clientes";
+  const VERSION = "0.5.0 · fase 3";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -48,11 +48,7 @@
       titulo: "Consignación",
       detalle: "Lo que hay en cada local y cuánto vale",
       subtitulo: "Mercadería en la calle",
-      fase: 3,
-      queVa: `La lista de los locales con lo que cada uno tiene, y abajo el
-        total de plata que hay en la calle. Entrando a un local podés dejarle
-        más mercadería, registrar lo que vendió y te pagó, o traerte de vuelta
-        lo que no salió.`,
+      listo: true,          // la atiende js/consignacion.js
     },
     stock: {
       icono: "📦",
@@ -121,6 +117,7 @@
     // devuelven qué poner en la cabecera, que cambia según dónde se esté.
     const MODULOS = {
       ingresos: window.Ingresos,
+      consignacion: window.Consignacion,
       productos: window.Productos,
       clientes: window.Clientes,
       stock: window.Stock,

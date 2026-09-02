@@ -367,6 +367,25 @@ window.Ingresos = (function () {
 
   const buscarVenta = (id) => ventasArmadas().find((v) => v.id === id) || null;
 
+  // Los movimientos de mercadería de esta venta. Se encuentran por su columna
+  // "referencia", que guarda el id de la venta.
+  const movimientosDe = (v) =>
+    (window.Datos.todo().movimientos || []).filter((m) => m.ref === v.id);
+
+  // Una liquidación de consignación entra por la misma puerta que una venta
+  // —es plata que entró— pero la mercadería no salió del depósito: salió del
+  // local. Al borrarla, vuelve ahí. Decir "vuelven al depósito" sería mentir, y
+  // justo sobre el punto que esta app vino a separar.
+  function deDondeSalio(v) {
+    const lugares = [...new Set(movimientosDe(v).map((m) => m.desde).filter(Boolean))];
+    if (!lugares.length) return { esLiquidacion: false, texto: "al depósito" };
+    const esLiquidacion = lugares.some((l) => window.Datos.RESERVADAS.indexOf(l) < 0);
+    return {
+      esLiquidacion: esLiquidacion,
+      texto: esLiquidacion ? "a " + lugares.join(" y ") : "al depósito",
+    };
+  }
+
   function ultimasVentas() {
     const ventas = ventasArmadas().slice(0, 8);
     if (!ventas.length) return "";
@@ -379,7 +398,8 @@ window.Ingresos = (function () {
             <span class="renglon__texto">
               <span class="renglon__que">${esc(v.cliente)}</span>
               <span class="renglon__detalle">${fecha(v.fecha)} · ${v.lineas.length}
-                producto${v.lineas.length === 1 ? "" : "s"} · ${esc(v.medio_pago)}</span>
+                producto${v.lineas.length === 1 ? "" : "s"} · ${esc(v.medio_pago)}${
+                  deDondeSalio(v).esLiquidacion ? " · liquidación" : ""}</span>
             </span>
             <span class="renglon__cuanto">${dinero(v.total)}</span>
           </li>`).join("")}
@@ -389,6 +409,9 @@ window.Ingresos = (function () {
   // ---------- Detalle de una venta ----------
 
   function detalle(v) {
+    const salio = deDondeSalio(v);
+    const unidades = v.lineas.reduce((n, l) => n + l.cantidad, 0);
+
     vista.innerHTML = `
       <div class="cifras">
         <div class="cifra cifra--entra">
@@ -397,7 +420,7 @@ window.Ingresos = (function () {
         </div>
         <div class="cifra cifra--saldo">
           <span class="cifra__que">${esc(v.medio_pago)}</span>
-          <span class="cifra__cuanto">${numero(v.lineas.reduce((n, l) => n + l.cantidad, 0))} u.</span>
+          <span class="cifra__cuanto">${numero(unidades)} u.</span>
         </div>
       </div>
 
@@ -426,17 +449,20 @@ window.Ingresos = (function () {
 
       ${v.obs ? `<p class="aviso aviso--info">${esc(v.obs)}</p>` : ""}
 
-      <p class="nota">Lista ${esc(v.lista)} · ${fecha(v.fecha)}</p>
+      <p class="nota">${salio.esLiquidacion
+        ? "Liquidación de consignación · lo que vendió y pagó " + esc(v.cliente)
+        : "Lista " + esc(v.lista)} · ${fecha(v.fecha)}</p>
 
       <button class="boton boton--ancho separado" id="btn-remito">Generar remito</button>
       <div id="v-remito"></div>
 
       <div class="tarjeta separado">
-        <h2>Borrar esta venta</h2>
-        <p class="nota">Se van las ${v.lineas.length} fila${v.lineas.length === 1 ? "" : "s"}
-           de la planilla y vuelven al depósito las
-           ${numero(v.lineas.reduce((n, l) => n + l.cantidad, 0))} unidades.</p>
-        <button class="boton--peligro separado" id="btn-borrar">Borrar la venta entera</button>
+        <h2>Borrar esta ${salio.esLiquidacion ? "liquidación" : "venta"}</h2>
+        <p class="nota">Se ${v.lineas.length === 1 ? "va la fila" : "van las " + v.lineas.length + " filas"}
+           de la planilla y ${unidades === 1 ? "vuelve" : "vuelven"} ${esc(salio.texto)}
+           ${unidades === 1 ? "la unidad" : "las " + numero(unidades) + " unidades"}.</p>
+        <button class="boton--peligro separado" id="btn-borrar">Borrar
+          ${salio.esLiquidacion ? "la liquidación entera" : "la venta entera"}</button>
       </div>`;
 
     document.getElementById("btn-remito").onclick = () => generarRemito(v);
@@ -487,13 +513,14 @@ window.Ingresos = (function () {
   // Borra la venta entera: sus filas de plata y sus movimientos de mercadería.
   // Los movimientos se encuentran por su "ref", que guarda el id de la venta.
   async function borrarVenta(v) {
+    const salio = deDondeSalio(v);
+    const suyos = movimientosDe(v);
     for (const l of v.lineas) await window.CVDB.borrar("ingresos", l.id);
-    const suyos = (window.Datos.todo().movimientos || []).filter((m) => m.ref === v.id);
     for (const m of suyos) await window.CVDB.borrar("movimientos", m.id);
 
     await window.Datos.cargar();
     window.Sincro.sincronizar(true);
-    window.Util.brindis("Venta borrada.");
+    window.Util.brindis(salio.esLiquidacion ? "Liquidación borrada." : "Venta borrada.");
     ir("ingresos");
   }
 

@@ -108,12 +108,26 @@ van. Es la misma pantalla que Productos, con una diferencia importante.
       corrige las dos filas que lo nombran; un nombre repetido se rechaza y uno
       sin historia se borra de verdad.
 
-## Fase 3 — Consignación · **falta**
+## Fase 3 — Consignación · **hecha**
 
-- [ ] Lista de locales con lo que tiene cada uno, y el total de plata en la calle.
-- [ ] Ficha de cada local con los tres botones: **entregar**, **liquidar** y
-      **devolver**. La liquidación es la que genera el ingreso cobrado.
-- [ ] Remito de entrega, igual que en ingresos.
+- [x] Lista de locales con lo que tiene cada uno y cuánto vale, más el total de
+      plata en la calle y el resumen por producto sumando todos los locales.
+      Aparecen también los locales sin mercadería: a esos hay que poder entrarles
+      para dejarles la primera caja.
+- [x] Ficha de cada local con los tres modos: **entregar**, **liquidar** y
+      **devolver**. La liquidación es la única que genera ingreso, y pide con
+      qué pagó.
+- [x] Remito de entrega, con la leyenda «mercadería en consignación · se paga a
+      medida que se vende».
+- [x] Historial de los últimos movimientos del local, en castellano
+      («Entregado», «Vendido y cobrado», «Devuelto al depósito»).
+- [x] Probado de punta a punta con humus: entregar 10 kimchi y 6 chucrut baja el
+      depósito de 60 a 50 y de 40 a 34 **sin generar ni un ingreso**; liquidar 4
+      y 2 cobra $47.600, descuenta del local y **no toca el depósito**; devolver
+      4 chucrut lo sube de 34 a 38. Del chucrut, 40 = 38 en depósito + 0 en el
+      local + 2 vendidos.
+- [x] La liquidación aparece después en las últimas ventas de Ingresos y se
+      puede borrar desde ahí: la mercadería vuelve **al local**, no al depósito.
 
 ## Fase 4 — Egresos y Resumen · **falta**
 

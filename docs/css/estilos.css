@@ -653,3 +653,44 @@ a.boton { text-decoration: none; }
   overflow: hidden;
 }
 .remito img { display: block; width: 100%; height: auto; }
+
+/* ==========================================================================
+   Componentes de consignación
+   ========================================================================== */
+
+/* ---------- Renglón con casillero de cantidad ----------
+   Para liquidar y para devolver: la lista de lo que hay en el local, cada uno
+   con su casillero al lado. Se usa parado en el mostrador, mirando la
+   estantería, así que el nombre y lo que hay tienen que leerse de un vistazo y
+   el casillero tiene que ser grande. */
+
+.cuenta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--borde);
+}
+.cuenta:last-child { border-bottom: 0; }
+
+.cuenta__texto { flex: 1; min-width: 0; }
+.cuenta input { width: 78px; flex: none; }
+
+/* Un casillero con más de lo que el local tiene se marca en rojo mientras se
+   escribe, no recién al guardar. */
+.cuenta input.mal { border-color: var(--error); background: var(--error-suave); }
+
+.cuenta__todo {
+  flex: none;
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bordo);
+  background: var(--papel);
+  border: 1px solid var(--bordo);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cuenta__todo:active { background: var(--bordo-suave); }

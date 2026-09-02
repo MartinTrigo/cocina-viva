@@ -246,3 +246,44 @@ qué.
 vuelta —eso se hace desde Consignación—, pero dice cuántas unidades y cuánta
 plata quedan ahí. Dar de baja al cliente sin traerse los frascos sería perder
 de vista plata que está en la calle.
+
+## Los tres formularios de consignación no son iguales
+
+Para **entregar** hay un desplegable con todo el catálogo y un botón de agregar,
+como en una venta. Para **liquidar** y para **devolver** se listan los productos
+que ese local tiene, cada uno con un casillero al lado y un botón «Todo».
+
+**Por qué:** entregar es elegir de todo lo que hay; liquidar y devolver es mirar
+la estantería del local y anotar. Con un desplegable habría que buscar producto
+por producto lo que ya se sabe que está ahí, y encima se podría elegir uno que
+el local no tiene.
+
+## Liquidar sí frena cuando la cantidad no alcanza; vender, no
+
+En una venta, pedir más de lo que hay en el depósito avisa y deja guardar,
+porque puede ser que la venta sea real y el stock esté mal cargado.
+
+En una liquidación **no se puede pasar** de lo que el local tiene. La diferencia
+es que ese número no salió de un conteo: salió de una entrega que está anotada
+fila por fila. Si el local dice que vendió más de lo que se le entregó, lo que
+falta es una entrega, y cargarla es lo que corresponde.
+
+## Una liquidación es una venta, y se borra como una venta
+
+Liquidar escribe las mismas filas de `ingresos` que una venta —con el local como
+cliente y la lista mayorista— más un movimiento de tipo `liquidacion`. Por eso
+aparece después en las últimas ventas de Ingresos y se borra desde ahí.
+
+**Al borrarla, la mercadería vuelve al local, no al depósito**, porque de ahí
+había salido. La pantalla lo dice con esas palabras: decir «vuelven al depósito»
+sería mentir justo sobre lo que esta app vino a separar.
+
+## La plata en la calle no se calcula sumando los locales
+
+Se calcula de una: todo lo que entró a cualquier ubicación que no sea reservada,
+menos todo lo que salió de ella.
+
+**Por qué:** si se sumaran los locales de la lista de clientes, un local
+renombrado o dado de baja desaparecería del total y la plata en la calle daría
+menos de lo que es. La plata en la calle es la que es, esté el cliente en la
+libreta o no.
