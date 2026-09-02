@@ -75,6 +75,11 @@ docs/                     la app (esto es lo que publica GitHub Pages)
   js/db.js                IndexedDB y qué falta subir
   js/datos.js             el modelo: catálogo y cálculo del stock
   js/sincro.js            canje del código y sincronización
+  js/remito.js            el remito en canvas, para Ingresos y Consignación
+  js/productos.js         catálogo: alta, edición y precios en masa
+  js/ingresos.js          la venta, el detalle y el remito
+  js/clientes.js          la libreta, con renombre que arrastra la historia
+  js/stock.js             producción, mermas, conteo y el depósito al día
   js/app.js               armazón, navegación e inicio
   sw.js                   funcionamiento sin señal
 apps-script/Code.gs       el servicio y la estructura del libro de Google
@@ -87,6 +92,10 @@ cd "C:/MARTO/INFORMATICA/Cocina Viva/docs" && python -m http.server 8611
 ```
 
 y abrir <http://127.0.0.1:8611>.
+
+> Si al editar un `.js` el navegador sigue mostrando el viejo, es el caché.
+> Conviene levantarlo con `Cache-Control: no-store` mientras se desarrolla, o
+> cambiar de puerto.
 
 ## Instalarla de cero
 
