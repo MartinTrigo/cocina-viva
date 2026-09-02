@@ -79,6 +79,9 @@ docs/                     la app (esto es lo que publica GitHub Pages)
   js/productos.js         catálogo: alta, edición y precios en masa
   js/ingresos.js          la venta, el detalle y el remito
   js/clientes.js          la libreta, con renombre que arrastra la historia
+  js/consignacion.js      entregar, liquidar y devolver, local por local
+  js/egresos.js           los gastos
+  js/resumen.js           balance, gráficos en SVG, CSV e impresión
   js/stock.js             producción, mermas, conteo y el depósito al día
   js/app.js               armazón, navegación e inicio
   sw.js                   funcionamiento sin señal

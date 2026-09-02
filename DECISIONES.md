@@ -126,14 +126,20 @@ la coma es el decimal.
 un `<input type="number">` y lo deja vacío **sin avisar**. La gente escribe con
 coma.
 
-## Los gráficos del resumen van a ser SVG a mano
+## Los gráficos del resumen son SVG a mano
 
 **Por qué:** una librería de gráficos es la primera dependencia externa, y con
-eso se cae la CSP estricta y el «sin build». Un gráfico de barras y uno de torta
-son treinta líneas de SVG.
+eso se cae la CSP estricta y el «sin build». El gráfico de barras mes a mes y la
+torta de rubros son unas líneas de SVG, y encima salen bien impresos.
 
-**Costo:** no va a haber gráficos interactivos ni animados. Para mirar un balance
+**Costo:** no hay gráficos interactivos ni animados. Para mirar un balance
 mensual no hacen falta.
+
+**El ancho de las barras horizontales lo pone el JavaScript, no un atributo
+`style`.** La política de contenido no admite estilos sueltos en el HTML, así
+que el porcentaje viaja en un `data-ancho` y una función lo aplica por CSSOM
+después de dibujar, que sí está permitido. Los colores van por atributo
+(`data-tono`, `data-i`) con sus reglas en la hoja de estilos.
 
 ## El PDF sale por el diálogo de impresión
 
@@ -287,3 +293,32 @@ menos todo lo que salió de ella.
 renombrado o dado de baja desaparecería del total y la plata en la calle daría
 menos de lo que es. La plata en la calle es la que es, esté el cliente en la
 libreta o no.
+
+## La cantidad de un egreso es texto, no un número
+
+**Por qué:** en la planilla vieja esa columna dice «5,4», «9,5 l», «2 k»,
+«7 turnos», «433 frascos 660 y 100 tapas». Obligarla a número perdería la
+unidad, que es justo lo que hace que el dato sirva para algo seis meses después.
+Lo que sí es número es el monto.
+
+## El CSV se arma desde los datos, no desde la pantalla
+
+Trae todas las columnas, no las que se están mostrando, y los números van con
+punto decimal y sin separador de miles: es lo que cualquier planilla entiende.
+El formateo lindo —`$12.300`— es cosa de la pantalla.
+
+**Lleva un BOM al principio.** Sin él, «almíbar» llega como «almÃ­bar» al abrir
+el archivo en una planilla. Son tres bytes que evitan una pregunta segura.
+
+## El PDF sale por el diálogo de impresión
+
+Hay una hoja de estilos de impresión que saca la cabecera, el pie y los botones,
+agrega el título con el período, y evita que un gráfico o una tabla se partan
+entre dos hojas. Desde ahí, «guardar como PDF» del teléfono o de la PC.
+
+**Por qué:** generar un PDF de verdad significa meter una librería, que es
+exactamente lo que este proyecto no hace. La descarga en CSV sí es un archivo de
+verdad, porque eso el navegador lo sabe hacer solo.
+
+Hay que insistirle al navegador con `print-color-adjust: exact`: por defecto no
+imprime fondos, y sin los fondos las barras y la torta salen en blanco.

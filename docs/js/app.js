@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "0.5.0 · fase 3";
+  const VERSION = "1.0.0 · fase 4";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -20,9 +20,8 @@
 
   let instalador = null;   // evento de instalación que ofrece Android
 
-  // Las secciones que todavía no están programadas se muestran igual, con la
-  // fase en la que llegan: así se sabe qué va a poder hacerse y no parece que
-  // la app estuviera rota.
+  // Las siete secciones del menú. Cada una la atiende su propio módulo; el
+  // armazón solo sabe cómo se llaman y de qué color va su borde.
   const SECCIONES = {
     ingresos: {
       icono: "💵",
@@ -38,10 +37,7 @@
       detalle: "Insumos, honorarios, gastos fijos",
       subtitulo: "Gastos del emprendimiento",
       clase: "menu__boton--sale",
-      fase: 4,
-      queVa: `Fecha, rubro, detalle, cantidad, monto y medio de pago. Los
-        rubros son los mismos cinco que vienen usando: insumos, gastos fijos,
-        honorarios, otros gastos e inversión.`,
+      listo: true,          // la atiende js/egresos.js
     },
     consignacion: {
       icono: "🏪",
@@ -77,10 +73,7 @@
       titulo: "Resumen",
       detalle: "Balance por mes y descargas",
       subtitulo: "Números del emprendimiento",
-      fase: 4,
-      queVa: `Elegís un mes y ves el balance: qué entró, qué salió, por medio
-        de pago y por rubro, con gráficos. Se puede descargar en planilla o
-        imprimir para guardar en PDF.`,
+      listo: true,          // la atiende js/resumen.js
     },
   };
 
@@ -117,7 +110,9 @@
     // devuelven qué poner en la cabecera, que cambia según dónde se esté.
     const MODULOS = {
       ingresos: window.Ingresos,
+      egresos: window.Egresos,
       consignacion: window.Consignacion,
+      resumen: window.Resumen,
       productos: window.Productos,
       clientes: window.Clientes,
       stock: window.Stock,
@@ -141,10 +136,15 @@
       return;
     }
 
+    // Una sección del menú cuyo módulo no está cargado solo puede querer decir
+    // que ese archivo no llegó o no parseó. Antes acá había un cartel de «llega
+    // en la fase 3», que ya no le corresponde a ninguna y habría mentido.
     if (SECCIONES[base]) {
-      const s = SECCIONES[base];
-      encabezado(s.titulo, s.subtitulo);
-      enConstruccion(s);
+      encabezado(SECCIONES[base].titulo, SECCIONES[base].subtitulo);
+      vista.innerHTML = `<p class="aviso aviso--error">Esta pantalla no se pudo cargar.
+        Probá cerrar y volver a abrir la app; si sigue igual, avisale a Martín.</p>
+        <button class="boton boton--ancho" data-ir="inicio">Volver al inicio</button>`;
+      vista.querySelectorAll("[data-ir]").forEach((b) => { b.onclick = () => ir(b.dataset.ir); });
       return;
     }
 
@@ -235,22 +235,6 @@
           <span class="cifra__cuanto">${dinero(enCalle)}</span>
         </div>
       </div>`;
-  }
-
-  // ---------- Secciones que todavía no están ----------
-
-  function enConstruccion(s) {
-    vista.innerHTML = `
-      <div class="tarjeta">
-        <h2>${s.icono} ${esc(s.titulo)}</h2>
-        <p>${s.queVa}</p>
-        <p class="aviso aviso--info al-final">
-          Esta sección llega en la <strong>fase ${s.fase}</strong> del desarrollo.
-        </p>
-      </div>
-      <button class="boton boton--ancho" data-ir="inicio">Volver al inicio</button>`;
-
-    vista.querySelectorAll("[data-ir]").forEach((b) => { b.onclick = () => ir(b.dataset.ir); });
   }
 
   // ---------- Botón de sincronizar ----------

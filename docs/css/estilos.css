@@ -699,3 +699,136 @@ a.boton { text-decoration: none; }
   cursor: pointer;
 }
 .cuenta__todo:active { background: var(--bordo-suave); }
+
+/* ==========================================================================
+   Componentes del resumen
+   ========================================================================== */
+
+.cifras--tres { grid-template-columns: repeat(3, 1fr); }
+.cifras--tres .cifra__cuanto { font-size: 17px; }
+
+h3.subtitulo {
+  font-size: 15px;
+  color: var(--texto-suave);
+  margin: 16px 0 8px;
+  font-weight: 600;
+}
+
+/* ---------- Gráficos ---------- */
+
+.grafico {
+  margin: 0 0 16px;
+  padding: 14px;
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+.grafico svg { display: block; width: 100%; height: auto; }
+
+.grafico figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.grafico--dona { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.grafico--dona svg { width: 180px; flex: none; }
+.dona__claves { flex: 1; min-width: 190px; flex-direction: column; gap: 6px; }
+
+.clave { display: flex; align-items: center; gap: 6px; }
+.clave__pct { color: var(--texto-suave); }
+.clave__tope { margin-left: auto; font-style: italic; }
+
+.clave__color {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--texto-suave);
+}
+
+/* Los colores van por atributo y no por un style suelto: la política de
+   contenido no admite estilos en el HTML, y de paso quedan declarados en un
+   solo lugar. Son los mismos que usa la torta, en el mismo orden. */
+.clave__color[data-color="verde"] { background: var(--verde); }
+.clave__color[data-color="tierra"] { background: var(--tierra); }
+.clave__color[data-i="0"] { background: #8c0730; }
+.clave__color[data-i="1"] { background: #a9722f; }
+.clave__color[data-i="2"] { background: #4a6b3a; }
+.clave__color[data-i="3"] { background: #6b6560; }
+.clave__color[data-i="4"] { background: #b4143f; }
+.clave__color[data-i="5"] { background: #7a6a3f; }
+.clave__color[data-i="6"] { background: #5b7f8c; }
+
+/* ---------- Barras horizontales del desglose ---------- */
+
+.desglose { list-style: none; margin: 0 0 16px; padding: 0; }
+
+.desglose__fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 15px;
+}
+
+.desglose__que {
+  flex: 0 0 34%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desglose__pista {
+  flex: 1;
+  min-width: 40px;
+  height: 14px;
+  background: var(--fondo);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+/* El ancho lo pone el JavaScript después de dibujar (ver pintarBarras). */
+.desglose__barra { display: block; height: 100%; border-radius: 7px; width: 0; }
+.desglose__barra[data-tono="verde"] { background: var(--verde-claro); }
+.desglose__barra[data-tono="tierra"] { background: #d9a860; }
+.desglose__barra[data-tono="bordo"] { background: var(--bordo-claro); }
+
+.desglose__cuanto {
+  flex: 0 0 auto;
+  min-width: 108px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.desglose__pct { font-weight: 400; color: var(--texto-suave); font-size: 13px; }
+
+/* ==========================================================================
+   Impresión
+   Se usa para guardar el resumen en PDF: el diálogo del teléfono y el de la PC
+   ofrecen «guardar como PDF». Se va todo lo que no sirve en papel.
+   ========================================================================== */
+
+.solo-imprimir { display: none; }
+
+@media print {
+  .cabecera, .pie, .no-imprimir, .brindis { display: none !important; }
+  .solo-imprimir { display: block; }
+
+  body { background: #fff; font-size: 12pt; }
+  .vista { max-width: none; padding: 0; }
+
+  /* Que un gráfico o una tabla no se parta en dos hojas. */
+  .grafico, .tabla-envoltorio, .cifras { break-inside: avoid; page-break-inside: avoid; }
+  h2 { break-after: avoid; page-break-after: avoid; }
+
+  /* Los navegadores no imprimen fondos salvo que se les insista, y sin los
+     fondos las barras y la torta salen en blanco. */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .tarjeta, .grafico, .cifra { box-shadow: none; }
+}

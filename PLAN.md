@@ -129,11 +129,24 @@ van. Es la misma pantalla que Productos, con una diferencia importante.
 - [x] La liquidación aparece después en las últimas ventas de Ingresos y se
       puede borrar desde ahí: la mercadería vuelve **al local**, no al depósito.
 
-## Fase 4 — Egresos y Resumen · **falta**
+## Fase 4 — Egresos y Resumen · **hecha**
 
-- [ ] Egresos: fecha, rubro, detalle, cantidad, monto, medio de pago.
-- [ ] Resumen: filtro por mes, balance, desglose por medio de pago y por rubro,
-      gráficos en SVG dibujados a mano, descarga en CSV e impresión a PDF.
+- [x] **Egresos.** Fecha, rubro, detalle, cantidad, monto, medio de pago y
+      observaciones, con sugerencias de los detalles ya usados y el total
+      gastado en el mes. La cantidad es texto —«15 kg», «7 turnos»—, como en la
+      planilla vieja.
+- [x] **Resumen.** Filtro por mes o todo, balance, gráfico de barras mes a mes,
+      torta de egresos por rubro, desgloses por medio de pago, lo más vendido y
+      por cliente, más el stock de hoy.
+- [x] Descarga en CSV de ingresos, egresos y movimientos del período, con BOM
+      para que los acentos se vean bien en cualquier planilla.
+- [x] Hoja de impresión para guardar el resumen en PDF: se van la cabecera, el
+      pie y los botones, y los gráficos no se parten entre hojas.
+- [x] Probado: los totales dan $280.700 de ingresos y $422.176 de egresos sobre
+      catorce filas cargadas a mano; filtrando julio dan $113.600 y $273.926.
+      Las trece pantallas de la app responden sin un error en consola.
+
+**Con esto la app está completa.** Las siete secciones del menú funcionan.
 
 ## Fase 5 — Puesta en marcha · **falta**
 

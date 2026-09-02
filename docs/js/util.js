@@ -33,7 +33,14 @@ window.Util = (function () {
   // Los pesos se muestran sin centavos. No es una simplificación: los precios
   // del catálogo son todos redondos y mostrar ",00" en cada renglón solo hace
   // más difícil leer la columna de un vistazo.
-  const dinero = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("es-AR");
+  //
+  // El menos va ANTES del signo: "-$160.326" y no "$-160.326", que es como sale
+  // si uno pega el "$" adelante sin mirar y se lee raro justo en el número que
+  // más importa mirar, el balance en rojo.
+  function dinero(n) {
+    const r = Math.round(Number(n) || 0);
+    return (r < 0 ? "-$" : "$") + Math.abs(r).toLocaleString("es-AR");
+  }
 
   // Los campos de número son de texto, no <input type="number">.
   //
