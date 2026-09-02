@@ -572,3 +572,84 @@ a.boton { text-decoration: none; }
   border-color: #ddb87a;
   border-left-color: var(--tierra);
 }
+
+/* ==========================================================================
+   Componentes de la pantalla de ventas
+   ========================================================================== */
+
+/* Cuando las opciones son dos y no tres, ocupan la mitad cada una. */
+.opciones--dos { grid-template-columns: repeat(2, 1fr); }
+
+/* ---------- Renglón de producto de una venta ----------
+   El producto arriba a lo ancho —los nombres son largos— y abajo la cantidad,
+   el subtotal y la cruz de quitar. En un teléfono, los tres en una sola fila
+   no entran sin achicar el desplegable hasta no poder leerlo. */
+
+.renglon-venta {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--borde);
+}
+.renglon-venta:first-child { padding-top: 0; }
+.renglon-venta .campo { margin-bottom: 8px; }
+
+.renglon-venta__pie { display: flex; align-items: center; gap: 10px; }
+.renglon-venta__pie .v-cant { width: 90px; flex: none; }
+
+.renglon-venta__sub {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--verde);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.renglon-venta__aviso {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #7a5a1e;
+  background: #fdf6e6;
+  border: 1px solid #d8a53c;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+/* ---------- El total de la venta ---------- */
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid var(--bordo);
+}
+.total__que { font-weight: 600; }
+.total__cuanto {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--bordo);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Renglón de lista que se puede tocar ---------- */
+
+.renglon[role="button"] { cursor: pointer; }
+.renglon[role="button"]:active { background: var(--bordo-suave); }
+.renglon[role="button"]:focus-visible { outline: 3px solid var(--bordo-claro); outline-offset: 2px; }
+
+/* ---------- Vista previa del remito ----------
+   Se muestra antes de mandarlo. Mirar el remito que se va a mandar es la única
+   forma de darse cuenta de que el cliente estaba mal elegido. */
+
+.remito {
+  margin: 16px 0;
+  padding: 0;
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+.remito img { display: block; width: 100%; height: auto; }

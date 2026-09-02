@@ -104,6 +104,19 @@ teléfono.
 alternativa sería una librería de PDF o de captura de pantalla. Un canvas es
 parte del navegador, no pesa nada, funciona sin señal y no agrega dependencias.
 
+**Si el navegador no sabe compartir archivos, se descarga.** En el celular
+`navigator.share` abre el menú de siempre y se elige WhatsApp; en una PC no
+existe, así que baja el `.jpg`. Las dos cosas terminan en un archivo en la mano,
+y no hace falta explicarle a nadie cuál de las dos le va a tocar.
+
+**Cancelar el menú de compartir no es un error.** Se distingue el `AbortError`
+—cambiaron de idea— de una falla de verdad. Si no se distinguiera, cerrar el
+menú dispararía una descarga que nadie pidió.
+
+**Se muestra antes de mandarlo.** Mirar el remito es la única forma de darse
+cuenta de que el cliente estaba mal elegido, y eso pasa después de guardar, no
+antes.
+
 ## Los campos de número son de texto
 
 Se reciben como texto y se interpretan a la argentina: el punto separa miles y
@@ -176,3 +189,36 @@ no de 100 ($6.150 el kale). Redondear sin mostrarlo haría aparecer números que
 nadie pidió; mostrarlo primero convierte el redondeo en una decisión y no en una
 sorpresa. Los productos cuyo precio no cambia después de redondear no se tocan,
 para no gastar una sincronización de gusto.
+
+## Una venta es varias filas con el mismo id
+
+Cada producto vendido es una fila de la hoja `ingresos`, y todas las de la misma
+venta comparten la columna `venta`, que va oculta en la planilla.
+
+**Por qué:** el pedido pedía una fila por producto, que es lo que sirve para
+filtrar y sumar en la planilla. Pero para armar el remito, para mostrar la venta
+y para borrarla entera hay que poder volver a juntarlas. El id común es lo que
+lo permite sin duplicar información.
+
+**Al guardar se juntan los renglones repetidos.** Si alguien carga dos veces el
+mismo producto en la misma venta, se suman en uno: dos filas iguales en la
+planilla parecen un error de carga aunque no lo sean.
+
+**Borrar una venta borra las dos cosas**, las filas de plata y los movimientos
+de mercadería, que se encuentran por el mismo id guardado en su columna
+`referencia`. Si borrara solo una de las dos, la plata y el stock dejarían de
+contar la misma historia.
+
+## Vender más de lo que hay avisa, no impide
+
+Si la cantidad deja el depósito en negativo, el renglón lo dice y el guardado
+sigue adelante.
+
+**Por qué:** a veces la venta es real y lo que está mal es el stock —se envasó y
+no se cargó—. En ese caso lo que hay que corregir es el stock, no la venta.
+Impedirlo obligaría a inventar una carga de producción para poder registrar algo
+que ya pasó.
+
+Lo mismo con los clientes de consignación: si se elige uno en la pantalla de
+Ingresos, avisa que las entregas van por Consignación, pero deja seguir. Un
+local que trabaja a consignación también compra de vez en cuando.

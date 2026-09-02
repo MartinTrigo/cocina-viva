@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "0.2.0 · fase 1";
+  const VERSION = "0.3.0 · fase 2";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -30,12 +30,7 @@
       detalle: "Cargar una venta y sacar el remito",
       subtitulo: "Ventas cobradas",
       clase: "menu__boton--entra",
-      fase: 2,
-      queVa: `Una venta por vez, con todos los productos que lleve. Elegís el
-        cliente y el medio de pago, vas agregando productos con el botón + y el
-        precio sale solo del catálogo, según sea mayorista o minorista. Al
-        guardar entra una fila por producto en la planilla, se descuenta el
-        stock del depósito y podés generar el remito para mandar por WhatsApp.`,
+      listo: true,          // la atiende js/ingresos.js
     },
     egresos: {
       icono: "🧾",
@@ -117,7 +112,11 @@
 
     // Las secciones ya programadas manejan sus propias sub-pantallas y
     // devuelven qué poner en la cabecera, que cambia según dónde se esté.
-    const MODULOS = { productos: window.Productos, stock: window.Stock };
+    const MODULOS = {
+      ingresos: window.Ingresos,
+      productos: window.Productos,
+      stock: window.Stock,
+    };
     if (MODULOS[base]) {
       const cabecera = await MODULOS[base].render(vista, ruta, ir);
       encabezado(cabecera.titulo, cabecera.subtitulo);

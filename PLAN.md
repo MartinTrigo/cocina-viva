@@ -67,14 +67,28 @@ cuando todavía es barato cambiarlo.
 - La **corrección pide el total contado**, no la diferencia: nadie cuenta
   diferencias, se cuentan frascos.
 
-## Fase 2 — Ingresos · **falta**
+## Fase 2 — Ingresos · **hecha**
 
-- [ ] Venta con varios productos: botón **+** para ir sumando renglones,
-      selector mayorista/minorista que decide el precio, total automático.
-- [ ] Al guardar: una fila por producto en `ingresos` y un movimiento de venta
-      por producto, que descuenta el depósito.
-- [ ] **Remito** en `.jpg`, dibujado en un `<canvas>` y compartido con el botón
-      nativo del teléfono. Sin librerías y sin conexión.
+- [x] Venta con varios productos: botón **+**, selector mayorista/minorista que
+      decide el precio, subtotal por renglón y total automático.
+- [x] Al guardar: una fila por producto en `ingresos`, todas con el mismo id de
+      venta, y un movimiento de venta por producto que descuenta el depósito.
+- [x] **Remito** en `.jpg`, dibujado en un `<canvas>`, con vista previa antes de
+      mandarlo. Sin librerías y sin conexión.
+- [x] Detalle de cada venta, con el remito a un toque y el borrado entero:
+      se van las filas y vuelve el stock.
+- [x] Avisa cuando el cliente elegido trabaja a consignación, y cuando la
+      cantidad vendida deja el depósito en negativo. Ninguna de las dos cosas
+      impide guardar.
+- [x] Probado: 3 kimchi + 2 chucrut dan $40.800 a mayorista y $54.900 a
+      minorista; guardar baja el depósito de 29 a 26 y de 9 a 7; borrar la venta
+      lo devuelve exacto. El nombre del archivo sale sin acentos
+      (`remito-lima-limon-20260901.jpg`).
+
+**Sin probar todavía:** el botón nativo de compartir. El navegador con el que se
+desarrolla no tiene `navigator.share`, así que acá siempre cae en la descarga.
+En el celular de Luna tiene que abrir el menú de siempre y ofrecer WhatsApp.
+Es lo primero que conviene mirar.
 
 ## Fase 3 — Consignación · **falta**
 
