@@ -71,6 +71,20 @@ activar. **Lo que hubiera cargado ese teléfono y no hubiera subido todavía sig
 en el teléfono:** cuando el servicio contesta que no hay permiso, la app borra
 la credencial pero nunca los datos.
 
+## Lo que se escribe en la planilla va como texto
+
+Un valor que empieza con `=` o con `+` **no se guarda como texto**: la planilla
+lo toma como fórmula. Una observación tan inocente como «=2 frascos rotos»
+quedaría en `#NAME?`, y una fórmula puesta a propósito —`=IMPORTXML(...)`—
+podría leer el libro entero o mandar datos afuera.
+
+El servicio le pone una comilla simple adelante a esos textos antes de
+escribirlos. No se ve en la celda, no viene al leerla de vuelta, y la fórmula
+nunca se evalúa.
+
+No es un agujero abierto a cualquiera —hay que tener credencial para escribir—
+pero sí es la clase de cosa que rompe sola, sin que nadie la ataque.
+
 ## La política de contenido
 
 El `index.html` declara de dónde puede venir cada cosa. La app no carga

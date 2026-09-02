@@ -28,7 +28,7 @@ window.Productos = (function () {
     ir = navegar;
 
     const partes = ruta.split("/");          // productos / nuevo | masa | KIM340
-    const que = partes[1] || "";
+    const que = decodeURIComponent(partes[1] || "");
 
     if (que === "nuevo") { formulario(null); return cab("Producto nuevo", "Alta en el catálogo"); }
     if (que === "masa") { enMasa(); return cab("Editar en masa", "Precios y bajas"); }
@@ -101,7 +101,7 @@ window.Productos = (function () {
                 <td class="numero">${dinero(p.pmayor)}</td>
                 <td class="numero">${dinero(p.pminor)}</td>
                 <td class="numero">
-                  <button class="lapiz" data-ir="productos/${esc(p.cod)}"
+                  <button class="lapiz" data-ir="productos/${encodeURIComponent(p.cod)}"
                           aria-label="Editar ${esc(p.producto)}">&#9998;</button>
                 </td>
               </tr>`).join("")}
@@ -218,7 +218,12 @@ window.Productos = (function () {
     };
 
     if (nuevo && !cod) return mal("Falta el código.");
-    if (nuevo && /\s/.test(cod)) return mal("El código no puede llevar espacios.");
+    // Letras, números, guiones y nada más. El código viaja en la dirección de
+    // la pantalla de edición, así que una barra o un espacio la romperían; y
+    // además es lo que ellas ya usan: KIM340, CRT600, VIM500.
+    if (nuevo && !/^[A-Z0-9_-]+$/.test(cod)) {
+      return mal("El código va con letras y números, sin espacios ni signos raros. Por ejemplo: KIM340.");
+    }
     if (nuevo && window.Datos.producto(cod)) {
       return mal("Ya existe un producto con el código " + cod + ". Los códigos no se repiten.");
     }

@@ -255,7 +255,14 @@ window.Ingresos = (function () {
     document.getElementById("btn-guardar").onclick = () => guardar(false);
     document.getElementById("btn-guardar-remito").onclick = () => guardar(true);
 
-    vista.querySelectorAll("[data-ir]").forEach((b) => { b.onclick = () => ir(b.dataset.ir); });
+    // Los renglones de las últimas ventas son <li> con role="button": el
+    // teclado los enfoca pero, sin esto, Enter no hace nada.
+    vista.querySelectorAll("[data-ir]").forEach((b) => {
+      b.onclick = () => ir(b.dataset.ir);
+      b.onkeydown = (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ir(b.dataset.ir); }
+      };
+    });
   }
 
   // ---------- Guardar ----------
@@ -378,10 +385,16 @@ window.Ingresos = (function () {
   // justo sobre el punto que esta app vino a separar.
   function deDondeSalio(v) {
     const lugares = [...new Set(movimientosDe(v).map((m) => m.desde).filter(Boolean))];
-    if (!lugares.length) return { esLiquidacion: false, texto: "al depósito" };
+
+    // Una fila escrita a mano en la planilla no tiene movimiento de mercadería:
+    // registró la plata y nada más. Al borrarla no vuelve stock a ningún lado,
+    // y decir que sí sería inventar.
+    if (!lugares.length) return { esLiquidacion: false, sinStock: true, texto: "" };
+
     const esLiquidacion = lugares.some((l) => window.Datos.RESERVADAS.indexOf(l) < 0);
     return {
       esLiquidacion: esLiquidacion,
+      sinStock: false,
       texto: esLiquidacion ? "a " + lugares.join(" y ") : "al depósito",
     };
   }
@@ -459,8 +472,10 @@ window.Ingresos = (function () {
       <div class="tarjeta separado">
         <h2>Borrar esta ${salio.esLiquidacion ? "liquidación" : "venta"}</h2>
         <p class="nota">Se ${v.lineas.length === 1 ? "va la fila" : "van las " + v.lineas.length + " filas"}
-           de la planilla y ${unidades === 1 ? "vuelve" : "vuelven"} ${esc(salio.texto)}
-           ${unidades === 1 ? "la unidad" : "las " + numero(unidades) + " unidades"}.</p>
+           de la planilla${salio.sinStock
+             ? ". Esta venta no tiene movimiento de mercadería asociado —seguramente se cargó a mano en la planilla—, así que el stock no cambia."
+             : ` y ${unidades === 1 ? "vuelve" : "vuelven"} ${esc(salio.texto)}
+                ${unidades === 1 ? "la unidad" : "las " + numero(unidades) + " unidades"}.`}</p>
         <button class="boton--peligro separado" id="btn-borrar">Borrar
           ${salio.esLiquidacion ? "la liquidación entera" : "la venta entera"}</button>
       </div>`;

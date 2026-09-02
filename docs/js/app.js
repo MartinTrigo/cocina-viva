@@ -123,8 +123,21 @@
       stock: window.Stock,
     };
     if (MODULOS[base]) {
-      const cabecera = await MODULOS[base].render(vista, ruta, ir);
-      encabezado(cabecera.titulo, cabecera.subtitulo);
+      // Si una pantalla falla en el medio de dibujarse, sin este catch queda a
+      // la vista lo que hubiera quedado a medias —o lo de la pantalla
+      // anterior— y no hay forma de saber que algo se rompió. Lo cargado no se
+      // pierde nunca: está en el teléfono, no en la pantalla.
+      try {
+        const cabecera = await MODULOS[base].render(vista, ruta, ir);
+        encabezado(cabecera.titulo, cabecera.subtitulo);
+      } catch (err) {
+        encabezado(SECCIONES[base].titulo, SECCIONES[base].subtitulo);
+        vista.innerHTML = `<p class="aviso aviso--error">No se pudo mostrar esta pantalla.
+          Lo que tengas cargado sigue guardado en el teléfono.<br><br>
+          Detalle: ${esc(err.message || err)}</p>
+          <button class="boton boton--ancho" data-ir="inicio">Volver al inicio</button>`;
+        vista.querySelectorAll("[data-ir]").forEach((b) => { b.onclick = () => ir(b.dataset.ir); });
+      }
       return;
     }
 

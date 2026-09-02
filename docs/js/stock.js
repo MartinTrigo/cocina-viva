@@ -49,6 +49,10 @@ window.Stock = (function () {
   async function render(contenedor, ruta, navegar) {
     vista = contenedor;
     ir = navegar;
+    // "Cargado recién" es lo de esta visita. Al volver a entrar a la pantalla
+    // se limpia: si no, quedaba una lista vieja con botones de deshacer que ya
+    // no deshacían nada, porque esos movimientos podían estar borrados.
+    cargadosRecien = [];
     pintar();
     return { titulo: "Stock", subtitulo: "Depósito" };
   }

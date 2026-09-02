@@ -330,6 +330,20 @@ function leerListas() {
 
 /* ================= Escritura ================= */
 
+// Un texto que empieza con "=" o con "+" NO se guarda como texto: la planilla
+// lo toma como fórmula. Una observación como «=2 frascos rotos» queda en
+// #NAME?, y una fórmula puesta a propósito podría leer o sacar datos del libro
+// entero. La comilla simple adelante le dice a la planilla «esto es texto»: no
+// se ve en la celda y al leerla de vuelta no viene, así que el dato va y
+// vuelve igual.
+//
+// Solo aplica a los textos. Los números y las fechas se escriben como son.
+function comoTexto(v) {
+  if (v == null) return '';
+  if (typeof v !== 'string') return v;
+  return /^[=+]/.test(v) ? "'" + v : v;
+}
+
 function escribirFilas(nombre, objetos) {
   var h = hoja(nombre);
   var cols = COLUMNAS[nombre];
@@ -342,7 +356,7 @@ function escribirFilas(nombre, objetos) {
       var v = o[c];
       if (c === 'fecha') return aFecha(v);
       if (c === 'activo') return v === false ? 'no' : 'sí';
-      return v == null ? '' : v;
+      return comoTexto(v);
     });
   });
   asegurarFilas(h, filas.length + 1);

@@ -291,6 +291,11 @@ a.boton { text-decoration: none; }
    viene a mirar: se apaga sin esconderla. */
 .tabla tr.en-cero td { color: var(--texto-suave); }
 
+/* La misma idea para un renglón de lista: un local sin mercadería se sigue
+   pudiendo tocar —hay que entrar para dejarle la primera caja— pero no compite
+   por la atención con los que sí tienen algo. */
+.renglon.en-cero { opacity: .6; box-shadow: none; }
+
 /* ---------- Totales grandes ---------- */
 
 .cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
