@@ -95,6 +95,45 @@ frecuente.
 productos», pero en la hoja hay dos columnas de precio. Sin elegir cuál, la app
 tendría que adivinar.
 
+## El remito es un ticket de 58 mm, en blanco y negro
+
+Se dibuja sobre una grilla de **384 puntos de ancho** y crece hacia abajo lo que
+haga falta. No es una hoja: es un ticket largo y angosto.
+
+**Por qué:** van a sumar una impresora térmica portátil chica, de esas «de
+gatito». Casi todas usan papel de 58 mm e imprimen 384 puntos a 203 dpi. Un
+remito de 720 px no entra, y reducirlo dejaría el texto ilegible.
+
+**Se dibuja al doble, 768 px reales.** En la pantalla de un teléfono un canvas a
+tamaño real se ve borroso, y como 768 es exactamente el doble de 384, la app de
+la impresora lo reduce sin ensuciar ni un punto.
+
+**Va en blanco y negro a propósito.** El papel térmico es de un solo tono: cada
+punto se quema o no se quema, no hay grises ni colores. Una banda bordó como la
+de la app saldría como un rectángulo negro macizo: gasta batería, gasta el papel
+y se ve peor. Negro sobre blanco imprime perfecto y en WhatsApp se lee como lo
+que es, un remito.
+
+**Cada producto ocupa dos renglones**, el nombre a lo ancho y debajo la cuenta
+con el subtotal a la derecha. En 384 puntos no entran cuatro columnas sin partir
+el nombre en tres pedazos, que es justo lo que hay que leer.
+
+## Compartir e imprimir son dos botones distintos
+
+**Compartir** es también el camino a la impresora térmica: esas impresoras no se
+manejan desde el navegador, se manejan desde su propia app, y esa app aparece en
+el menú de compartir como una más. Se elige WhatsApp o se elige la impresora;
+para nuestra app es lo mismo.
+
+**Imprimir** abre el diálogo del sistema con el ticket a 58 mm de ancho y alto
+automático, para cualquier impresora que el teléfono o la computadora ya vean.
+
+**Por qué los dos y no uno:** mientras la térmica portátil no traiga complemento
+de impresión de Android —la mayoría no lo trae—, el diálogo del sistema no la
+ve. Cuando llegue la impresora vamos a saber cuál de los dos caminos usa, y ahí
+se puede evaluar hablarle directo por Web Bluetooth. Hasta entonces, tener los
+dos cubre las dos posibilidades sin adivinar.
+
 ## El remito se dibuja en un canvas
 
 Se arma en un `<canvas>`, sale como `.jpg` y se comparte con el botón nativo del

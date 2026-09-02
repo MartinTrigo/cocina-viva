@@ -505,12 +505,16 @@ window.Consignacion = (function () {
       const url = await window.Remito.vistaPrevia(datos);
       caja.innerHTML = `
         <figure class="remito"><img src="${url}" alt="Remito de entrega para ${esc(datos.cliente)}"></figure>
-        <button class="boton boton--ancho" id="cg-compartir">Compartir o descargar</button>`;
+        <div class="acciones">
+          <button class="boton" id="cg-compartir">Compartir</button>
+          <button class="boton boton--secundario" id="cg-imprimir">Imprimir</button>
+        </div>`;
       document.getElementById("cg-compartir").onclick = async () => {
         const r = await window.Remito.compartir(datos);
         if (r.como === "descargado") window.Util.brindis("Descargado: " + r.nombre);
         if (r.como === "compartido") window.Util.brindis("Enviado.");
       };
+      document.getElementById("cg-imprimir").onclick = () => window.Remito.imprimir(datos);
       caja.scrollIntoView({ block: "start" });
     } catch (err) {
       caja.innerHTML = `<p class="aviso aviso--error">No se pudo armar el remito.

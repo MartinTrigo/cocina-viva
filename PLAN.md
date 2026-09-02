@@ -148,6 +148,20 @@ van. Es la misma pantalla que Productos, con una diferencia importante.
 
 **Con esto la app está completa.** Las siete secciones del menú funcionan.
 
+## Cuando llegue la impresora térmica
+
+El remito ya sale en formato ticket de 58 mm, negro sobre blanco, listo para
+imprimir. Falta ver cómo se le habla al aparato.
+
+- [ ] Probar el camino de **compartir** a la app de la impresora, que es el que
+      funciona con casi todas.
+- [ ] Si esa app resulta incómoda, evaluar hablarle directo por **Web
+      Bluetooth**. Estas impresoras usan protocolos propios y hay que tenerla en
+      la mano para averiguar el suyo, así que no tiene sentido escribir nada
+      antes.
+- [ ] Comprobar que el ancho es 58 mm y no 80 mm. Si fuera de 80, el ancho pasa
+      de 384 a 576 en `docs/js/remito.js` y no hay que tocar nada más.
+
 ## Fase 5 — Puesta en marcha · **falta**
 
 - [ ] Prueba de punta a punta con las dos, cargando cosas de verdad.

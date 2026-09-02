@@ -680,14 +680,13 @@ a.boton { text-decoration: none; }
    forma de darse cuenta de que el cliente estaba mal elegido. */
 
 .remito {
-  margin: 16px 0;
-  padding: 0;
+  margin: 12px 0;
+  padding: 10px;
   background: var(--papel);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   overflow: hidden;
 }
-.remito img { display: block; width: 100%; height: auto; }
 
 /* ==========================================================================
    Componentes de consignación
@@ -906,3 +905,28 @@ h3.subtitulo {
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* ==========================================================================
+   Imprimir un remito
+
+   Sale a 58 mm de ancho, que es el papel de las térmicas portátiles chicas. Se
+   imprime SOLO el remito: mientras el cuerpo tiene la clase, todo lo demás
+   —cabecera, menú, pie, botones— desaparece de la hoja.
+   ========================================================================== */
+
+.remito-a-imprimir { display: none; }
+
+@media print {
+  body.imprimiendo-remito > *:not(.remito-a-imprimir) { display: none !important; }
+
+  body.imprimiendo-remito { background: #fff; margin: 0; padding: 0; }
+  body.imprimiendo-remito .remito-a-imprimir { display: block; }
+  body.imprimiendo-remito .remito-a-imprimir img { display: block; width: 100%; height: auto; }
+
+  /* Alto automático: el ticket mide lo que mide y no se parte en hojas. */
+  @page { size: 58mm auto; margin: 2mm; }
+}
+
+/* La vista previa del remito, que ahora es angosta y alta: se muestra a su
+   ancho real y centrada, no estirada a todo lo ancho de la pantalla. */
+.remito img { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }

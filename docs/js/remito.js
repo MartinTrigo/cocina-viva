@@ -1,43 +1,50 @@
 // ==========================================================================
 // Cocina Viva — el remito
 //
-// Dibuja un remito en un <canvas> y lo entrega como .jpg para mandar por
-// WhatsApp. Sin librerías: el canvas es parte del navegador, no pesa nada y
-// funciona sin señal, que es cuando más falta hace —parado en el local, con el
-// pedido recién entregado—.
+// Dibuja un remito en un <canvas> y lo entrega como .jpg. Sin librerías: el
+// canvas es parte del navegador, no pesa nada y funciona sin señal, que es
+// cuando más falta hace —parado en el local, con el pedido recién entregado—.
+//
+// FORMATO TICKET, 58 mm.
+//
+// Está pensado para las impresoras térmicas portátiles chicas, esas «de
+// gatito» que se llevan en la mochila. Casi todas son de 58 mm de papel y
+// imprimen 384 puntos de ancho a 203 dpi. Por eso el remito se dibuja sobre una
+// grilla de 384 y crece hacia abajo lo que haga falta: es un ticket largo y
+// angosto, no una hoja.
+//
+// Se dibuja al doble (768 px reales) para que en la pantalla de un teléfono no
+// se vea borroso. Como 768 es exactamente el doble de 384, la app de la
+// impresora lo reduce sin ensuciar ni un punto.
+//
+// VA EN BLANCO Y NEGRO, A PROPÓSITO. El papel térmico es de un solo tono: no
+// hay grises ni colores, cada punto se quema o no se quema. Una banda bordó
+// como la de la app saldría como un rectángulo negro macizo, que gasta batería,
+// gasta el papel y se ve peor. Negro sobre blanco imprime perfecto y en
+// WhatsApp se lee como lo que es: un remito.
 //
 // Lo usan dos pantallas: las ventas de Ingresos y las entregas de
 // Consignación. Por eso recibe una estructura genérica y no sabe nada de
 // ninguna de las dos.
-//
-// CÓMO SE COMPARTE
-// Si el teléfono sabe compartir archivos (navigator.share con files), se abre
-// el menú de siempre y se elige WhatsApp. Si no —una PC, un navegador viejo—,
-// se descarga el archivo. Las dos cosas terminan en lo mismo: un .jpg en la
-// mano.
 // ==========================================================================
 
 window.Remito = (function () {
   const { dinero, numero, fecha } = window.Util;
 
-  // Se dibuja al doble de tamaño y se muestra a la mitad: en la pantalla de un
-  // teléfono, un canvas a tamaño real se ve borroso.
-  const ESCALA = 2;
-  const ANCHO = 720;
-  const MARGEN = 40;
+  const ANCHO = 384;          // los puntos que imprime una térmica de 58 mm
+  const ESCALA = 2;           // 768 px reales: nítido en pantalla, exacto al reducir
+  const MARGEN = 16;
+  const UTIL = ANCHO - MARGEN * 2;
 
-  const BORDO = "#8c0730";
-  const CREMA = "#faf6f0";
-  const TEXTO = "#2a2124";
-  const SUAVE = "#6b6560";
-  const BORDE = "#e5ddd4";
+  const NEGRO = "#000000";
+  const GRIS = "#555555";     // lo más claro que una térmica todavía distingue
 
   const FUENTE = '-apple-system, "Segoe UI", Roboto, system-ui, sans-serif';
   const letra = (tam, peso) => (peso || "400") + " " + tam + "px " + FUENTE;
 
-  // El logotipo se carga una vez y se reusa. Si no se pudiera cargar —un
-  // navegador que no dibuja SVG en canvas—, el remito sale igual con el nombre
-  // escrito en letras: un remito sin logo sirve, uno que no sale no.
+  // El logotipo se carga una vez y se reusa. Si no se pudiera cargar, el remito
+  // sale igual con el nombre escrito en letras: un remito sin logo sirve, uno
+  // que no sale no.
   let logo = null;
   let logoIntentado = false;
 
@@ -48,7 +55,7 @@ window.Remito = (function () {
       const img = new Image();
       img.onload = () => { logo = img; resolver(logo); };
       img.onerror = () => { logo = null; resolver(null); };
-      img.src = "img/logotipo.svg";
+      img.src = "img/logotipo-negro.svg";
     });
   }
 
@@ -59,186 +66,197 @@ window.Remito = (function () {
   //   numero:   "A3F9C1"
   //   fecha:    "2026-09-01"
   //   cliente:  "humus"
-  //   leyenda:  texto opcional bajo el cliente (p. ej. "Mercadería en consignación")
+  //   leyenda:  texto opcional bajo el cliente
   //   lineas:   [{ nombre, cod, cantidad, precio, subtotal }]
   //   conPrecios: true | false
   //   total:    número
   //   obs:      texto opcional
   // }
+  //
+  // Se dibuja dos veces: la primera sobre un canvas descartable, solo para
+  // saber cuánto alto va a necesitar. Medir por adelantado obligaría a repetir
+  // toda la lógica de los saltos de renglón en una función aparte, y esas dos
+  // copias se desincronizan al primer cambio.
   async function dibujar(datos) {
     await cargarLogo();
 
+    const medidor = document.createElement("canvas").getContext("2d");
+    const alto = pintar(medidor, datos, false);
+
     const lienzo = document.createElement("canvas");
-    const c = lienzo.getContext("2d");
-
-    // Primera pasada en un canvas descartable, solo para medir cuánto alto
-    // necesitan los renglones: los nombres largos ocupan dos y no se sabe
-    // cuántos son hasta escribirlos.
-    const alto = medirAlto(c, datos);
-
     lienzo.width = ANCHO * ESCALA;
-    lienzo.height = alto * ESCALA;
+    lienzo.height = Math.ceil(alto) * ESCALA;
+    const c = lienzo.getContext("2d");
     c.scale(ESCALA, ESCALA);
-
-    c.fillStyle = CREMA;
-    c.fillRect(0, 0, ANCHO, alto);
-
-    let y = cabecera(c, datos);
-    y = cuerpo(c, datos, y);
-    pie(c, alto);
-
+    pintar(c, datos, true);
     return lienzo;
   }
 
-  function cabecera(c, datos) {
-    const altoBanda = 108;
-    c.fillStyle = BORDO;
-    c.fillRect(0, 0, ANCHO, altoBanda);
-
-    if (logo) {
-      // El logotipo original es blanco: va tal cual sobre el bordó.
-      const alto = 34;
-      const ancho = alto * (582 / 172);          // la proporción del viewBox
-      c.drawImage(logo, MARGEN, 26, ancho, alto);
-    } else {
-      c.fillStyle = "#fff";
-      c.font = letra(30, "700");
-      c.fillText("Cocina Viva", MARGEN, 52);
-    }
-
-    c.fillStyle = "rgba(255,255,255,.85)";
-    c.font = letra(14);
-    c.fillText("Fermentos y conservas · Comarca Andina del Paralelo 42", MARGEN, 82);
-
-    c.fillStyle = "#fff";
-    c.font = letra(20, "700");
-    c.textAlign = "right";
-    c.fillText(datos.titulo || "REMITO", ANCHO - MARGEN, 48);
-    c.font = letra(13);
-    c.fillStyle = "rgba(255,255,255,.85)";
-    c.fillText("N° " + datos.numero, ANCHO - MARGEN, 68);
-    c.fillText(fecha(datos.fecha), ANCHO - MARGEN, 86);
-    c.textAlign = "left";
-
-    return altoBanda + 34;
-  }
-
-  function cuerpo(c, datos, y) {
+  // Devuelve el alto usado. Con dibuja=false no escribe nada: solo mide.
+  function pintar(c, datos, dibuja) {
     const conPrecios = datos.conPrecios !== false;
 
-    c.fillStyle = SUAVE;
-    c.font = letra(13);
-    c.fillText("ENTREGADO A", MARGEN, y);
-    y += 26;
-    c.fillStyle = TEXTO;
-    c.font = letra(24, "700");
-    c.fillText(datos.cliente || "—", MARGEN, y);
-    y += 24;
-
-    if (datos.leyenda) {
-      c.fillStyle = SUAVE;
-      c.font = letra(14);
-      c.fillText(datos.leyenda, MARGEN, y);
-      y += 22;
+    if (dibuja) {
+      c.fillStyle = "#ffffff";
+      c.fillRect(0, 0, ANCHO, 10000);
+      c.textBaseline = "alphabetic";
     }
-    y += 16;
 
-    // Encabezado de la tabla
-    const xCant = ANCHO - MARGEN - (conPrecios ? 300 : 60);
-    const xPrecio = ANCHO - MARGEN - 150;
-    const xTotal = ANCHO - MARGEN;
+    const centro = ANCHO / 2;
+    let y = 22;
 
-    c.fillStyle = SUAVE;
-    c.font = letra(12, "700");
-    c.fillText("PRODUCTO", MARGEN, y);
-    c.textAlign = "right";
-    c.fillText("CANT.", xCant, y);
-    if (conPrecios) {
-      c.fillText("PRECIO", xPrecio, y);
-      c.fillText("SUBTOTAL", xTotal, y);
-    }
-    c.textAlign = "left";
-    y += 10;
-    linea(c, y);
-    y += 22;
-
-    // Renglones
-    (datos.lineas || []).forEach((l) => {
-      const partes = partir(c, l.nombre, xCant - MARGEN - 70, letra(16));
-      c.fillStyle = TEXTO;
-      c.font = letra(16);
-      partes.forEach((parte, i) => { c.fillText(parte, MARGEN, y + i * 20); });
-
-      c.font = letra(16, "600");
-      c.textAlign = "right";
-      c.fillText(numero(l.cantidad), xCant, y);
-      if (conPrecios) {
-        c.font = letra(16);
-        c.fillText(dinero(l.precio), xPrecio, y);
-        c.font = letra(16, "600");
-        c.fillText(dinero(l.subtotal), xTotal, y);
+    // ---- Cabecera ----
+    if (logo) {
+      const alto = 26;
+      const ancho = alto * (582 / 172);       // la proporción del viewBox
+      if (dibuja) c.drawImage(logo, centro - ancho / 2, y - 18, ancho, alto);
+      y += 18;
+    } else {
+      if (dibuja) {
+        c.fillStyle = NEGRO;
+        c.font = letra(24, "700");
+        c.textAlign = "center";
+        c.fillText("Cocina Viva", centro, y);
       }
-      c.textAlign = "left";
+      y += 6;
+    }
 
-      c.fillStyle = SUAVE;
-      c.font = letra(12);
-      c.fillText(l.cod, MARGEN, y + partes.length * 20 - 2);
+    y = escribirCentrado(c, dibuja, "Fermentos y conservas", letra(10), GRIS, y + 16);
+    y = escribirCentrado(c, dibuja, "Comarca Andina del Paralelo 42", letra(10), GRIS, y + 12);
 
-      y += partes.length * 20 + 16;
-      linea(c, y - 10, BORDE);
+    y += 12;
+    y = raya(c, dibuja, y, NEGRO, 1.5);
+
+    y = escribirCentrado(c, dibuja, datos.titulo || "REMITO", letra(15, "700"), NEGRO, y + 18);
+    y = escribirCentrado(c, dibuja, "N° " + datos.numero + "  ·  " + fecha(datos.fecha),
+                         letra(11), GRIS, y + 14);
+    y += 10;
+    y = raya(c, dibuja, y, NEGRO, 1.5);
+
+    // ---- A quién ----
+    y = escribir(c, dibuja, "ENTREGADO A", letra(9, "700"), GRIS, MARGEN, y + 16);
+    y = escribir(c, dibuja, datos.cliente || "—", letra(17, "700"), NEGRO, MARGEN, y + 20);
+    if (datos.leyenda) {
+      partir(c, datos.leyenda, UTIL, letra(10)).forEach((parte) => {
+        y = escribir(c, dibuja, parte, letra(10), GRIS, MARGEN, y + 13);
+      });
+    }
+
+    y += 12;
+    y = raya(c, dibuja, y, NEGRO, 1);
+
+    // ---- Los renglones ----
+    //
+    // Cada producto ocupa dos líneas: el nombre a lo ancho, y debajo la cuenta
+    // con el subtotal a la derecha. En 384 puntos no entran cuatro columnas sin
+    // que el nombre quede en tres pedazos, que es justo lo que hay que leer.
+    (datos.lineas || []).forEach((l) => {
+      y += 13;
+      partir(c, l.nombre, UTIL - 40, letra(12, "600")).forEach((parte, i) => {
+        escribir(c, dibuja, parte, letra(12, "600"), NEGRO, MARGEN, y + i * 14);
+      });
+      y += (partir(c, l.nombre, UTIL - 40, letra(12, "600")).length - 1) * 14;
+
+      if (dibuja) {
+        c.fillStyle = GRIS;
+        c.font = letra(9);
+        c.textAlign = "right";
+        c.fillText(l.cod, ANCHO - MARGEN, y);
+        c.textAlign = "left";
+      }
+
+      y += 15;
+      const cuenta = conPrecios
+        ? numero(l.cantidad) + " × " + dinero(l.precio)
+        : numero(l.cantidad) + (l.cantidad === 1 ? " unidad" : " unidades");
+      escribir(c, dibuja, cuenta, letra(12), NEGRO, MARGEN + 8, y);
+      if (conPrecios) {
+        escribirDerecha(c, dibuja, dinero(l.subtotal), letra(13, "700"), NEGRO, y);
+      }
+      y += 8;
+      y = raya(c, dibuja, y, "#bbbbbb", 1);
     });
 
-    y += 14;
-
+    // ---- Total ----
+    y += 4;
+    y = raya(c, dibuja, y, NEGRO, 1.5);
+    y += 20;
     if (conPrecios) {
-      c.fillStyle = BORDO;
-      c.font = letra(15, "700");
-      c.textAlign = "right";
-      c.fillText("TOTAL", xPrecio, y + 6);
-      c.font = letra(26, "700");
-      c.fillText(dinero(datos.total), xTotal, y + 8);
-      c.textAlign = "left";
-      y += 40;
+      escribir(c, dibuja, "TOTAL", letra(13, "700"), NEGRO, MARGEN, y);
+      escribirDerecha(c, dibuja, dinero(datos.total), letra(20, "700"), NEGRO, y + 2);
+      y += 10;
     } else {
-      c.fillStyle = BORDO;
-      c.font = letra(15, "700");
-      c.textAlign = "right";
-      c.fillText(numero(totalUnidades(datos.lineas)) + " unidades", xTotal, y + 6);
-      c.textAlign = "left";
-      y += 28;
+      escribir(c, dibuja, "TOTAL", letra(13, "700"), NEGRO, MARGEN, y);
+      escribirDerecha(c, dibuja, numero(totalUnidades(datos.lineas)) + " u.",
+                      letra(17, "700"), NEGRO, y + 1);
+      y += 8;
+    }
+    y = raya(c, dibuja, y, NEGRO, 1.5);
+
+    // ---- Observaciones ----
+    if (datos.obs) {
+      y = escribir(c, dibuja, "OBSERVACIONES", letra(9, "700"), GRIS, MARGEN, y + 16);
+      partir(c, datos.obs, UTIL, letra(11)).forEach((parte) => {
+        y = escribir(c, dibuja, parte, letra(11), NEGRO, MARGEN, y + 14);
+      });
     }
 
-    if (datos.obs) {
-      y += 10;
-      c.fillStyle = SUAVE;
-      c.font = letra(12, "700");
-      c.fillText("OBSERVACIONES", MARGEN, y);
-      y += 20;
-      c.fillStyle = TEXTO;
-      c.font = letra(15);
-      partir(c, datos.obs, ANCHO - MARGEN * 2, letra(15)).forEach((parte, i) => {
-        c.fillText(parte, MARGEN, y + i * 20);
-      });
+    // ---- Pie ----
+    y = escribirCentrado(c, dibuja, "cocinavivacomarca@gmail.com", letra(9), GRIS, y + 26);
+
+    // El aire de abajo importa de verdad: estas impresoras cortan pegado al
+    // último punto y sin margen el texto queda contra el borde del papel.
+    return y + 26;
+  }
+
+  // ---------- Ayudas de dibujo ----------
+  //
+  // Todas devuelven la y donde quedaron, así el cuerpo del remito se lee como
+  // una sucesión de renglones y no como una cuenta de píxeles.
+
+  function escribir(c, dibuja, texto, fuente, color, x, y) {
+    if (dibuja) {
+      c.fillStyle = color;
+      c.font = fuente;
+      c.textAlign = "left";
+      c.fillText(texto, x, y);
     }
     return y;
   }
 
-  function pie(c, alto) {
-    c.fillStyle = SUAVE;
-    c.font = letra(12);
-    c.textAlign = "center";
-    c.fillText("Cocina Viva · cocinavivacomarca@gmail.com", ANCHO / 2, alto - 22);
-    c.textAlign = "left";
+  function escribirCentrado(c, dibuja, texto, fuente, color, y) {
+    if (dibuja) {
+      c.fillStyle = color;
+      c.font = fuente;
+      c.textAlign = "center";
+      c.fillText(texto, ANCHO / 2, y);
+      c.textAlign = "left";
+    }
+    return y;
   }
 
-  const linea = (c, y, color) => {
-    c.strokeStyle = color || BORDO;
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(MARGEN, y);
-    c.lineTo(ANCHO - MARGEN, y);
-    c.stroke();
-  };
+  function escribirDerecha(c, dibuja, texto, fuente, color, y) {
+    if (dibuja) {
+      c.fillStyle = color;
+      c.font = fuente;
+      c.textAlign = "right";
+      c.fillText(texto, ANCHO - MARGEN, y);
+      c.textAlign = "left";
+    }
+    return y;
+  }
+
+  function raya(c, dibuja, y, color, grosor) {
+    if (dibuja) {
+      c.strokeStyle = color;
+      c.lineWidth = grosor || 1;
+      c.beginPath();
+      c.moveTo(MARGEN, y + 0.5);
+      c.lineTo(ANCHO - MARGEN, y + 0.5);
+      c.stroke();
+    }
+    return y + (grosor || 1);
+  }
 
   const totalUnidades = (lineas) =>
     (lineas || []).reduce((n, l) => n + (Number(l.cantidad) || 0), 0);
@@ -258,24 +276,9 @@ window.Remito = (function () {
     return salida.length ? salida : [""];
   }
 
-  // Mide sin dibujar, para saber de qué alto tiene que ser el canvas.
-  function medirAlto(c, datos) {
-    let alto = 108 + 34 + 26 + 24 + (datos.leyenda ? 22 : 0) + 16 + 32;
-    const xCant = ANCHO - MARGEN - (datos.conPrecios !== false ? 300 : 60);
-    (datos.lineas || []).forEach((l) => {
-      alto += partir(c, l.nombre, xCant - MARGEN - 70, letra(16)).length * 20 + 16;
-    });
-    alto += 14 + (datos.conPrecios !== false ? 40 : 28);
-    if (datos.obs) {
-      alto += 30 + partir(c, datos.obs, ANCHO - MARGEN * 2, letra(15)).length * 20;
-    }
-    return alto + 60;
-  }
-
   // ---------- Entrega ----------
 
-  const aBlob = (lienzo) =>
-    new Promise((r) => lienzo.toBlob(r, "image/jpeg", 0.92));
+  const aBlob = (lienzo) => new Promise((r) => lienzo.toBlob(r, "image/jpeg", 0.92));
 
   function nombreArchivo(datos) {
     const limpio = String(datos.cliente || "cliente").toLowerCase()
@@ -284,7 +287,10 @@ window.Remito = (function () {
     return "remito-" + limpio + "-" + String(datos.fecha).replace(/-/g, "") + ".jpg";
   }
 
-  // Devuelve qué pasó, para poder decirlo en castellano en la pantalla.
+  // Compartir es también el camino a la impresora: las térmicas portátiles no
+  // se manejan desde el navegador, se manejan desde su propia app, y esa app
+  // aparece en el menú de compartir como una más. Se elige WhatsApp o se elige
+  // la impresora; para la app es lo mismo.
   async function compartir(datos) {
     const lienzo = await dibujar(datos);
     const blob = await aBlob(lienzo);
@@ -300,14 +306,17 @@ window.Remito = (function () {
         });
         return { como: "compartido" };
       } catch (err) {
-        // Cancelar el menú de compartir no es un error: es que cambiaron de
-        // idea. No hay que avisar nada ni ofrecer la descarga como si algo
-        // hubiera fallado.
+        // Cancelar el menú no es un error: es que cambiaron de idea. No hay que
+        // avisar nada ni disparar una descarga que nadie pidió.
         if (err && err.name === "AbortError") return { como: "cancelado" };
-        // Cualquier otra cosa sí es una falla: se cae a la descarga.
       }
     }
 
+    descargar(blob, nombre);
+    return { como: "descargado", nombre: nombre };
+  }
+
+  function descargar(blob, nombre) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -316,7 +325,45 @@ window.Remito = (function () {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    return { como: "descargado", nombre: nombre };
+  }
+
+  // ---------- Imprimir ----------
+  //
+  // Manda el remito al diálogo de impresión del sistema, a 58 mm de ancho. Sirve
+  // para cualquier impresora que el teléfono o la computadora ya vean. Para la
+  // térmica portátil, mientras no tenga complemento de impresión de Android, el
+  // camino sigue siendo compartir a su app: por eso están los dos botones.
+  async function imprimir(datos) {
+    const lienzo = await dibujar(datos);
+    const url = lienzo.toDataURL("image/png");   // sin pérdida: el texto chico se lee mejor
+
+    const caja = document.createElement("div");
+    caja.className = "remito-a-imprimir";
+    caja.innerHTML = '<img alt="Remito">';
+    caja.querySelector("img").src = url;
+    document.body.appendChild(caja);
+    document.body.classList.add("imprimiendo-remito");
+
+    const limpiar = () => {
+      document.body.classList.remove("imprimiendo-remito");
+      caja.remove();
+      window.removeEventListener("afterprint", limpiar);
+    };
+    window.addEventListener("afterprint", limpiar);
+
+    // Que la imagen esté cargada antes de abrir el diálogo: si no, algunos
+    // navegadores imprimen la hoja en blanco.
+    await new Promise((listo) => {
+      const img = caja.querySelector("img");
+      if (img.complete) { listo(); return; }
+      img.onload = listo;
+      img.onerror = listo;
+    });
+
+    window.print();
+    // Safari en iOS no dispara afterprint. La red de seguridad evita que el
+    // remito quede pegado en la página para siempre.
+    setTimeout(limpiar, 60000);
   }
 
   // Para mostrarlo en pantalla antes de mandarlo.
@@ -326,5 +373,5 @@ window.Remito = (function () {
     return URL.createObjectURL(blob);
   }
 
-  return { dibujar, compartir, vistaPrevia };
+  return { dibujar, compartir, imprimir, vistaPrevia };
 })();

@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.1.0 · mas compacta";
+  const VERSION = "1.2.0 · remito ticket";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
