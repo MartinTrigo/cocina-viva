@@ -26,11 +26,11 @@ window.Consignacion = (function () {
   const { esc, dinero, numero, aNumero, hoy, fecha } = window.Util;
 
   const MODOS = {
-    entregar: { icono: "📦", titulo: "Entregar", verbo: "Entregar",
+    entregar: { icono: "📦", titulo: "Entregar", verbo: "Entregar", corto: "Entregar",
                 ayuda: "Sale del depósito y queda en el local. Todavía no se cobra." },
-    liquidar: { icono: "💵", titulo: "Liquidar", verbo: "Registrar el cobro",
+    liquidar: { icono: "💵", titulo: "Liquidar", verbo: "Registrar el cobro", corto: "Cobrar",
                 ayuda: "Lo que el local vendió y pagó. Entra como ingreso." },
-    devolver: { icono: "↩️", titulo: "Devolver", verbo: "Traer de vuelta",
+    devolver: { icono: "↩️", titulo: "Devolver", verbo: "Traer de vuelta", corto: "Devolver",
                 ayuda: "Lo que no se vendió y vuelve al depósito." },
   };
 
@@ -246,9 +246,11 @@ window.Consignacion = (function () {
       <div class="total" id="cg-total"></div>
 
       <p class="campo__error" id="cg-error" hidden></p>
-      <button class="boton boton--ancho separado" id="cg-guardar">Guardar la entrega</button>
-      <button class="boton boton--secundario boton--ancho separado" id="cg-guardar-remito">
-        Guardar y generar remito
+      <button class="boton boton--ancho separado" id="cg-guardar-remito">
+        Entregar y generar remito
+      </button>
+      <button class="boton boton--secundario boton--ancho separado" id="cg-guardar">
+        Entregar sin remito
       </button>`;
   }
 
@@ -301,7 +303,12 @@ window.Consignacion = (function () {
 
       <div class="total" id="cg-total"></div>
       <p class="campo__error" id="cg-error" hidden></p>
-      <button class="boton boton--ancho separado" id="cg-guardar">${esc(m.verbo)}</button>`;
+      <button class="boton boton--ancho separado" id="cg-guardar-remito">
+        ${esc(m.corto)} y dar comprobante
+      </button>
+      <button class="boton boton--secundario boton--ancho separado" id="cg-guardar">
+        ${esc(m.corto)} sin comprobante
+      </button>`;
   }
 
   // ---------- Cuentas vivas ----------
@@ -364,7 +371,7 @@ window.Consignacion = (function () {
     cuando = (document.getElementById("cg-fecha") || {}).value || hoy();
 
     if (modo === "entregar") return guardarEntrega(local, conRemito);
-    return guardarSalida(local);
+    return guardarSalida(local, conRemito);
   }
 
   async function guardarEntrega(local, conRemito) {
@@ -406,7 +413,7 @@ window.Consignacion = (function () {
     if (conRemito) mostrarRemito(datos);
   }
 
-  async function guardarSalida(local) {
+  async function guardarSalida(local, conComprobante) {
     const elegidas = [];
     let hayExceso = false;
 
@@ -466,12 +473,41 @@ window.Consignacion = (function () {
 
     const unidades = elegidas.reduce((n, l) => n + l.cantidad, 0);
     const plata = elegidas.reduce((n, l) => n + l.cantidad * l.precio, 0);
+    const comprobante = datosDelComprobante(local, elegidas, ref);
+    const eraLiquidacion = modo === "liquidar";
 
-    ficha(local, modo === "liquidar"
+    ficha(local, eraLiquidacion
       ? `<p class="aviso aviso--ok">Cobrado: ${dinero(plata)} por ${numero(unidades)}
          unidades que vendió ${esc(local)}. Entró como ingreso en ${esc(medioPago)}.</p>`
       : `<p class="aviso aviso--ok">Volvieron al depósito ${numero(unidades)} unidades
          de ${esc(local)}.</p>`);
+
+    if (conComprobante) mostrarRemito(comprobante);
+  }
+
+  // El comprobante de una liquidación es un recibo: le queda al local como
+  // constancia de lo que pagó. El de una devolución es al revés, la constancia
+  // de lo que se llevaron: por eso no lleva plata, lleva unidades.
+  function datosDelComprobante(local, elegidas, ref) {
+    const liquidacion = modo === "liquidar";
+    const lineas = elegidas.map((l) => ({
+      nombre: window.Datos.nombreDe(l.cod), cod: l.cod,
+      cantidad: l.cantidad, precio: l.precio, subtotal: l.cantidad * l.precio,
+    }));
+    return {
+      titulo: liquidacion ? "RECIBO" : "DEVOLUCIÓN",
+      numero: ref.slice(0, 6).toUpperCase(),
+      fecha: cuando,
+      cliente: local,
+      etiquetaCliente: liquidacion ? "RECIBIMOS DE" : "DEVUELTO POR",
+      leyenda: liquidacion
+        ? "Liquidación de consignación · pagó con " + medioPago
+        : "Mercadería devuelta al depósito",
+      conPrecios: liquidacion,
+      lineas: lineas,
+      total: lineas.reduce((n, l) => n + l.subtotal, 0),
+      obs: "",
+    };
   }
 
   // ---------- Remito de entrega ----------
@@ -608,8 +644,6 @@ window.Consignacion = (function () {
         const todos = vista.querySelectorAll(".cg-cod");
         if (todos.length) todos[todos.length - 1].focus();
       };
-      const conRemito = document.getElementById("cg-guardar-remito");
-      if (conRemito) conRemito.onclick = () => { leerEntrega(); guardar(local, true); };
     } else {
       vista.querySelectorAll(".cg-sacar").forEach((c) => { c.oninput = () => recalcular(local); });
       vista.querySelectorAll("[data-todo]").forEach((b) => {
@@ -627,6 +661,12 @@ window.Consignacion = (function () {
     if (guardarlo) guardarlo.onclick = () => {
       if (modo === "entregar") leerEntrega();
       guardar(local, false);
+    };
+
+    const conComprobante = document.getElementById("cg-guardar-remito");
+    if (conComprobante) conComprobante.onclick = () => {
+      if (modo === "entregar") leerEntrega();
+      guardar(local, true);
     };
 
     recalcular(local);

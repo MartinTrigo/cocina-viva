@@ -66,6 +66,7 @@ window.Remito = (function () {
   //   numero:   "A3F9C1"
   //   fecha:    "2026-09-01"
   //   cliente:  "humus"
+  //   etiquetaCliente: "ENTREGADO A" (por defecto) | "RECIBIMOS DE" | ...
   //   leyenda:  texto opcional bajo el cliente
   //   lineas:   [{ nombre, cod, cantidad, precio, subtotal }]
   //   conPrecios: true | false
@@ -134,7 +135,12 @@ window.Remito = (function () {
     y = raya(c, dibuja, y, NEGRO, 1.5);
 
     // ---- A quién ----
-    y = escribir(c, dibuja, "ENTREGADO A", letra(9, "700"), GRIS, MARGEN, y + 16);
+    // Quién es el otro cambia según el papel: en un remito se le entrega, en un
+    // recibo se le cobra y en una devolución es él quien devuelve. Poner
+    // «entregado a» en los tres estaría mal en dos de ellos, y son documentos
+    // que quedan en manos del cliente.
+    y = escribir(c, dibuja, datos.etiquetaCliente || "ENTREGADO A",
+                 letra(9, "700"), GRIS, MARGEN, y + 16);
     y = escribir(c, dibuja, datos.cliente || "—", letra(17, "700"), NEGRO, MARGEN, y + 20);
     if (datos.leyenda) {
       partir(c, datos.leyenda, UTIL, letra(10)).forEach((parte) => {

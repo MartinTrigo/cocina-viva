@@ -114,41 +114,41 @@ window.Resumen = (function () {
       ${!p.ingresos.length && !p.egresos.length ? `
         <p class="vacio">No hay nada cargado en este período.</p>` : ""}
 
-      ${listaMeses.length > 1 ? `
-        <h2 class="separado">Mes a mes</h2>
-        <p class="nota">Lo que entró y lo que salió, todos los meses con datos.</p>
-        ${graficoMeses()}` : ""}
+      <div class="tablero">
+        ${listaMeses.length > 1 ? bloque("Mes a mes",
+          "Lo que entró y lo que salió, todos los meses con datos.",
+          graficoMeses(), true) : ""}
 
-      ${p.ingresos.length ? `
-        <h2 class="separado">De dónde entró la plata</h2>
-        ${barras(agrupar(p.ingresos, (f) => f.medio_pago, (f) => f.subtotal), p.totalIngresos, VERDE)}
-      ` : ""}
+        ${p.ingresos.length || p.egresos.length ? bloque("Cuánto quedó, y dónde",
+          "Lo que entró menos lo que salió, medio de pago por medio de pago.",
+          balancePorMedio(p), true) : ""}
 
-      ${p.egresos.length ? `
-        <h2 class="separado">En qué se fue</h2>
-        ${dona(agrupar(p.egresos, (e) => e.rubro, (e) => e.monto), p.totalEgresos)}
-        ${barras(agrupar(p.egresos, (e) => e.medio_pago, (e) => e.monto), p.totalEgresos, TIERRA, "Por medio de pago")}
-      ` : ""}
+        ${p.egresos.length ? bloque("En qué se fue",
+          "Los egresos por rubro.",
+          dona(agrupar(p.egresos, (e) => e.rubro, (e) => e.monto), p.totalEgresos)) : ""}
 
-      ${p.ingresos.length ? `
-        <h2 class="separado">Lo que más se vendió</h2>
-        ${tablaProductos(p.ingresos)}
+        ${p.ingresos.length ? bloque("Qué se vendió",
+          "Los ingresos por producto.",
+          dona(porProducto(p.ingresos), p.totalIngresos)) : ""}
 
-        <h2 class="separado">Por cliente</h2>
-        ${barras(agrupar(p.ingresos, (f) => f.cliente, (f) => f.subtotal).slice(0, 12), p.totalIngresos, BORDO)}
-      ` : ""}
+        ${p.ingresos.length ? bloque("Lo que más se vendió", "",
+          tablaProductos(p.ingresos)) : ""}
 
-      <h2 class="separado">Stock hoy</h2>
-      <p class="nota">No depende del período: es lo que hay en este momento.</p>
-      <div class="cifras">
-        <div class="cifra cifra--entra">
-          <span class="cifra__que">En depósito</span>
-          <span class="cifra__cuanto">${dinero(window.Datos.valorDe(deposito))}</span>
-        </div>
-        <div class="cifra cifra--sale">
-          <span class="cifra__que">En consignación</span>
-          <span class="cifra__cuanto">${dinero(window.Datos.valorDe(calle))}</span>
-        </div>
+        ${p.ingresos.length ? bloque("Por cliente", "",
+          barras(agrupar(p.ingresos, (f) => f.cliente, (f) => f.subtotal).slice(0, 12),
+                 p.totalIngresos, BORDO)) : ""}
+
+        ${bloque("Stock hoy", "No depende del período: es lo que hay en este momento.", `
+          <div class="cifras">
+            <div class="cifra cifra--entra">
+              <span class="cifra__que">En depósito</span>
+              <span class="cifra__cuanto">${dinero(window.Datos.valorDe(deposito))}</span>
+            </div>
+            <div class="cifra cifra--sale">
+              <span class="cifra__que">En consignación</span>
+              <span class="cifra__cuanto">${dinero(window.Datos.valorDe(calle))}</span>
+            </div>
+          </div>`, true)}
       </div>
 
       <div class="tarjeta no-imprimir separado">
@@ -169,6 +169,91 @@ window.Resumen = (function () {
     vista.querySelectorAll("[data-bajar]").forEach((b) => {
       b.onclick = () => bajar(b.dataset.bajar);
     });
+  }
+
+  // Un bloque del tablero. En el teléfono van uno abajo del otro; en una
+  // pantalla grande se acomodan de a dos, y los que piden fila entera lo dicen.
+  function bloque(titulo, nota, contenido, ancho) {
+    if (!contenido) return "";
+    return `
+      <section class="bloque${ancho ? " bloque--ancho" : ""}">
+        <h2>${esc(titulo)}</h2>
+        ${nota ? `<p class="nota">${esc(nota)}</p>` : ""}
+        ${contenido}
+      </section>`;
+  }
+
+  // ---------- Cuánto quedó, y dónde ----------
+  //
+  // Por cada medio de pago: lo que entró, lo que salió y la diferencia. Es la
+  // pregunta que de verdad se hace uno a fin de mes —«¿cuánta plata tendría que
+  // haber en efectivo?»— y la que la planilla vieja contestaba con tres filas
+  // sueltas que había que restar a mano.
+  //
+  // Ojo con lo que NO dice: es el movimiento del período, no un saldo de caja.
+  // Si se elige un mes, la diferencia es la de ese mes; el saldo real arrastra
+  // lo que venía de antes. Eligiendo «todo lo cargado» sí es el saldo desde que
+  // empezaron a usar la app.
+  function balancePorMedio(p) {
+    const medios = {};
+    const sumar = (lista, campo, cual) => lista.forEach((f) => {
+      const k = String(f.medio_pago || "—");
+      if (!medios[k]) medios[k] = { entro: 0, salio: 0 };
+      medios[k][cual] += Number(f[campo]) || 0;
+    });
+    sumar(p.ingresos, "subtotal", "entro");
+    sumar(p.egresos, "monto", "salio");
+
+    const filas = Object.keys(medios)
+      .map((k) => ({ que: k, entro: medios[k].entro, salio: medios[k].salio,
+                     saldo: medios[k].entro - medios[k].salio }))
+      .sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
+    if (!filas.length) return "";
+
+    const total = filas.reduce((t, f) => ({
+      entro: t.entro + f.entro, salio: t.salio + f.salio, saldo: t.saldo + f.saldo,
+    }), { entro: 0, salio: 0, saldo: 0 });
+
+    return `
+      <div class="tabla-envoltorio">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Medio de pago</th>
+              <th class="numero">Entró</th>
+              <th class="numero">Salió</th>
+              <th class="numero">Diferencia</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filas.map((f) => `
+              <tr>
+                <td><span class="celda__que">${esc(f.que)}</span></td>
+                <td class="numero entra">${f.entro ? dinero(f.entro) : "—"}</td>
+                <td class="numero sale">${f.salio ? dinero(f.salio) : "—"}</td>
+                <td class="numero saldo${f.saldo < 0 ? " negativo" : ""}">${dinero(f.saldo)}</td>
+              </tr>`).join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td class="numero">${dinero(total.entro)}</td>
+              <td class="numero">${dinero(total.salio)}</td>
+              <td class="numero saldo${total.saldo < 0 ? " negativo" : ""}">${dinero(total.saldo)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+  }
+
+  // Los ingresos agrupados por producto, para la torta. Más de seis tajadas no
+  // se distinguen: de ahí para abajo van todas juntas en «otros».
+  function porProducto(ingresos) {
+    const grupos = agrupar(ingresos, (f) => window.Datos.nombreDe(f.cod), (f) => f.subtotal);
+    if (grupos.length <= 7) return grupos;
+    const primeros = grupos.slice(0, 6);
+    const resto = grupos.slice(6).reduce((n, g) => n + g.cuanto, 0);
+    return primeros.concat([{ que: "otros " + (grupos.length - 6) + " productos", cuanto: resto }]);
   }
 
   // ---------- Gráfico de barras por mes ----------

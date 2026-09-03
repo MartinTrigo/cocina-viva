@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.2.0 · remito ticket";
+  const VERSION = "1.3.0 · notebook y balance";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -92,6 +92,12 @@
     botonVolver.hidden = ruta === "inicio";
     marca.hidden = ruta !== "inicio";
     barra.classList.toggle("barra--inicio", ruta === "inicio");
+
+    // En qué sección estamos, para la hoja de estilos. Lo usa el resumen, que
+    // en una notebook se ensancha más que el resto: es un tablero y no un
+    // formulario, y ahí el ancho se aprovecha. Como el ancho es una variable
+    // que se hereda, la cabecera y el pie acompañan solos.
+    document.body.dataset.seccion = base;
     window.scrollTo(0, 0);
     pintarBotonSincro();
 

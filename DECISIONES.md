@@ -405,3 +405,62 @@ que corresponde.
 
 **Sin señal no avisa nada**, que es lo correcto: no tener novedades no es una
 novedad.
+
+## La notebook se resuelve con un solo punto de quiebre
+
+Todo lo del escritorio vive detrás de `min-width: 900px`. En el teléfono no
+cambia ni un píxel: la app se sigue diseñando para el celular, y lo de arriba de
+900 es lo que evita que en una notebook se vea como un teléfono perdido en el
+medio de la pantalla.
+
+**La columna crece a 880 px, no más.** Un desplegable de mil píxeles de ancho es
+peor de usar que uno de cuatrocientos: los formularios se leen en columna.
+
+**El resumen es la excepción y llega a 1140.** Es un tablero, no un formulario,
+y ahí el ancho se aprovecha de verdad. Se resuelve poniéndole al `body` en qué
+sección está y redefiniendo la variable `--ancho`: como se hereda, la cabecera y
+el pie acompañan solos, sin una regla más.
+
+**Los bloques del resumen dicen si quieren media pantalla o entera.** En el
+teléfono van todos uno abajo del otro; arriba de 900 se acomodan de a dos, salvo
+el gráfico de meses, el balance y el stock, que piden la fila completa.
+
+## El balance por medio de pago
+
+Por cada medio: lo que entró, lo que salió y la diferencia. Es la pregunta que
+de verdad se hace uno a fin de mes —«¿cuánta plata tendría que haber en
+efectivo?»— y la que la planilla vieja contestaba con filas sueltas que había
+que restar a mano.
+
+**Ojo con lo que NO dice, y está escrito en el código:** es el movimiento del
+período, no un saldo de caja. Eligiendo un mes, la diferencia es la de ese mes;
+el saldo real arrastra lo que venía de antes. Eligiendo «todo lo cargado» sí es
+el saldo desde que empezaron a usar la app.
+
+Con esta tabla sobran las dos listas de barras por medio de pago que había
+antes: decían lo mismo por separado y sin restarlo.
+
+## Consignación también da comprobante
+
+Liquidar y devolver generan su papel, no solo entregar.
+
+- **Liquidar → RECIBO**, con precios y total: le queda al local como constancia
+  de lo que pagó.
+- **Devolver → DEVOLUCIÓN**, sin precios y con unidades: es la constancia de lo
+  que se llevaron de vuelta.
+
+**Y la etiqueta de quién es el otro cambia según el papel**: «entregado a» en un
+remito, «recibimos de» en un recibo, «devuelto por» en una devolución. Poner la
+misma en los tres estaría mal en dos, y son documentos que quedan en manos del
+cliente.
+
+## El botón con comprobante va primero y pintado
+
+En Ingresos y en Consignación, el botón que además genera el papel es el
+principal —bordó, arriba— y el que solo guarda queda abajo, sin pintar y
+diciendo «sin remito» o «sin comprobante».
+
+**Por qué:** generar el remito es lo que hacen casi siempre. Cuando el botón
+pintado era el otro, la mano iba sola al que no correspondía, y darse cuenta
+implicaba volver a entrar a la venta. Decir «sin remito» en vez de solo
+«guardar» hace visible la diferencia en el momento de elegir.

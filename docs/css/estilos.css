@@ -930,3 +930,70 @@ h3.subtitulo {
 /* La vista previa del remito, que ahora es angosta y alta: se muestra a su
    ancho real y centrada, no estirada a todo lo ancho de la pantalla. */
 .remito img { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
+
+/* ==========================================================================
+   Pantallas grandes
+
+   Todo lo de acá adentro vive detrás de min-width: 900px, así que en el
+   teléfono no cambia absolutamente nada. La app se sigue diseñando para el
+   celular; esto es lo que hace que en una notebook no se vea como un teléfono
+   perdido en el medio de la pantalla.
+   ========================================================================== */
+
+@media (min-width: 900px) {
+  /* La columna crece, pero no tanto: un desplegable de mil píxeles de ancho es
+     peor de usar que uno de cuatrocientos. Los formularios se leen en columna. */
+  :root { --ancho: 880px; }
+
+  /* El resumen es la excepción: es un tablero, no un formulario, y ahí el ancho
+     se aprovecha de verdad. Como --ancho se hereda, la cabecera y el pie
+     acompañan solos. */
+  body[data-seccion="resumen"] { --ancho: 1140px; }
+
+  .vista { padding: 18px 20px 40px; }
+  .barra { padding: 11px 20px; }
+
+  /* El menú del inicio en dos columnas: las ocho secciones de una mirada. */
+  .menu { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .cifras { grid-template-columns: repeat(4, 1fr); }
+  .cifras--tres { grid-template-columns: repeat(3, 1fr); }
+
+  /* Con lugar de sobra, los números importantes pueden respirar. */
+  .cifra { padding: 12px 14px; }
+  .cifra__cuanto { font-size: 22px; }
+
+  /* En el remito la vista previa no tiene por qué achicarse. */
+  .remito img { max-width: 384px; }
+
+  /* Con la columna ancha, un gráfico que se estira a lo ancho se estira
+     también a lo alto: con dos meses de datos quedaban dos barras solas en
+     medio de una hoja. El techo lo deja del alto de siempre. */
+  .grafico svg { max-height: 240px; }
+  .grafico--dona svg { max-height: none; }
+}
+
+/* ---------- El tablero del resumen ----------
+   Dos columnas en pantalla grande, una sola en el teléfono. Cada bloque decide
+   si ocupa media pantalla o entera; el gráfico de meses y las tablas anchas
+   piden la fila completa. */
+
+.tablero { display: block; }
+.bloque { margin-bottom: 14px; }
+
+@media (min-width: 900px) {
+  .tablero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 22px;
+    align-items: start;
+  }
+  .bloque--ancho { grid-column: 1 / -1; }
+}
+
+/* ---------- Tabla de balance por medio de pago ---------- */
+
+.tabla td.entra { color: var(--verde); font-weight: 600; }
+.tabla td.sale { color: var(--tierra); font-weight: 600; }
+.tabla td.saldo { font-weight: 700; }
+.tabla td.saldo.negativo { color: var(--error); }

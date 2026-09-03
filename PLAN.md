@@ -148,6 +148,21 @@ van. Es la misma pantalla que Productos, con una diferencia importante.
 
 **Con esto la app está completa.** Las siete secciones del menú funcionan.
 
+## Ajustes pedidos sobre la marcha · **hechos**
+
+- [x] **Se usa desde una notebook.** Un solo punto de quiebre en 900 px: la
+      columna crece a 880, el menú del inicio va en dos columnas y el resumen
+      se ensancha a 1140 con los bloques de a dos. En el teléfono no cambia
+      nada.
+- [x] **Balance por medio de pago** en el resumen: entró, salió y diferencia,
+      con el total abajo. Reemplaza las dos listas de barras que decían lo mismo
+      sin restarlo.
+- [x] **Dos tortas**: los egresos por rubro y los ingresos por producto.
+- [x] **Comprobante en Consignación** para liquidar (RECIBO) y para devolver
+      (DEVOLUCIÓN), además del remito de entrega.
+- [x] **El botón con comprobante va primero y pintado**, y el que solo guarda
+      queda abajo diciendo «sin remito» o «sin comprobante».
+
 ## Cuando llegue la impresora térmica
 
 El remito ya sale en formato ticket de 58 mm, negro sobre blanco, listo para

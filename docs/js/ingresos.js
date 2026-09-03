@@ -125,9 +125,11 @@ window.Ingresos = (function () {
           <textarea id="v-obs" placeholder="opcional">${esc(borrador.obs)}</textarea>
         </div>
         <p class="campo__error" id="v-error" hidden></p>
-        <button class="boton boton--ancho" id="btn-guardar">Guardar la venta</button>
-        <button class="boton boton--secundario boton--ancho separado" id="btn-guardar-remito">
+        <button class="boton boton--ancho" id="btn-guardar-remito">
           Guardar y generar remito
+        </button>
+        <button class="boton boton--secundario boton--ancho separado" id="btn-guardar">
+          Guardar sin remito
         </button>
       </div>
 
