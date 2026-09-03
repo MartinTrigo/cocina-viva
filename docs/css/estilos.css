@@ -997,3 +997,69 @@ h3.subtitulo {
 .tabla td.sale { color: var(--tierra); font-weight: 600; }
 .tabla td.saldo { font-weight: 700; }
 .tabla td.saldo.negativo { color: var(--error); }
+
+
+/* ==========================================================================
+   Pantalla de arranque
+   ==========================================================================
+
+   Fondo negro y el disco de bacterias en su forma redonda, sin el recuadro
+   bordo del ícono. Está en el HTML, no la dibuja el JavaScript: aparece en el
+   primer pintado y se va cuando la app terminó de levantar.
+
+   Los colores van escritos y no salen de las variables de la paleta: esta
+   pantalla es negra siempre, no acompaña al resto. */
+
+.arranque {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #000000;
+  opacity: 1;
+  transition: opacity .3s ease;
+}
+
+/* Se le pone al terminar de arrancar. Deja de recibir toques enseguida, así
+   nadie le pega a un botón a través del télon mientras se desvanece. */
+.arranque--listo {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.arranque__disco {
+  width: min(44vw, 190px);
+  height: auto;
+}
+
+.arranque__nombre {
+  width: min(64vw, 250px);
+  height: auto;
+  margin-top: 26px;
+}
+
+.arranque__version {
+  margin: 12px 0 0;
+  font-size: .78rem;
+  letter-spacing: .04em;
+  color: #8d8d8d;
+}
+
+/* La firma va abajo de todo, separada del logo: es de quien hizo la app, no
+   de Cocina Viva. */
+.arranque__firma {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  margin: 0;
+  font-size: .8rem;
+  letter-spacing: .14em;
+  color: #6e6e6e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arranque { transition: none; }
+}

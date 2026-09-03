@@ -37,6 +37,16 @@
 </head>
 <body>
 
+  <!-- Pantalla de arranque. Va escrita en el HTML y no la dibuja el JavaScript:
+       así aparece en el primer pintado, antes de que cargue nada, que es
+       justamente para lo que sirve. Se va sola cuando la app está lista. -->
+  <div class="arranque" id="arranque">
+    <img class="arranque__disco" src="img/icono-redondo.svg" alt="" width="283" height="283">
+    <img class="arranque__nombre" src="img/logotipo.svg" alt="Cocina Viva">
+    <p class="arranque__version" id="arranque-version"></p>
+    <p class="arranque__firma">M[a]rT&ouml;</p>
+  </div>
+
   <header class="cabecera">
     <div class="barra">
       <button class="volver" id="btn-volver" hidden aria-label="Volver">&#8592;</button>

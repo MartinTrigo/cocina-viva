@@ -182,6 +182,15 @@ van. Es la misma pantalla que Productos, con una diferencia importante.
       la mercadería **al local**, borrar una venta la devuelve **al depósito**, y
       renombrar un cliente arrastra su historia y su stock en consignación.
 
+## Pantalla de arranque · **hecha**
+
+- [x] Fondo negro, el disco de bacterias en su forma redonda —sin el recuadro—,
+      el logotipo de la marca, la versión y la firma **M[a]rTö**.
+- [x] También la pantalla que arma Android con el manifiesto, que era la que se
+      veía primero y estaba en crema con el ícono cuadrado.
+- [x] Íconos redondos con las esquinas transparentes para el fondo negro, y los
+      cuadrados conservados como `maskable`.
+
 ## Cuando llegue la impresora térmica
 
 El remito ya sale en formato ticket de 58 mm, negro sobre blanco, listo para

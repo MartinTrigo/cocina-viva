@@ -16,7 +16,7 @@
 // IMPORTANTE: al cambiar un archivo de la lista, subir el número de CACHE.
 // ==========================================================================
 
-const CACHE = "cocinaviva-v11";
+const CACHE = "cocinaviva-v12";
 
 // Cuánto se espera a la red antes de usar lo guardado en el teléfono.
 const ESPERA_MS = 3000;
@@ -41,6 +41,9 @@ const ARCHIVOS = [
   "js/stock.js",
   "js/app.js",
   "img/icono-192.png",
+  "img/icono-redondo.svg",
+  "img/icono-redondo-192.png",
+  "img/icono-redondo-512.png",
   "img/icono-512.png",
   "img/logotipo.svg",
   "img/logotipo-negro.svg",

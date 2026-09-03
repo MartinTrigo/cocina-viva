@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.3.1 · bajas, doble toque y ticket";
+  const VERSION = "1.3.2 · pantalla de arranque";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -284,6 +284,30 @@
   });
 
   document.getElementById("pie-version").textContent = "versión " + VERSION;
+  // En el arranque va solo el número, sin el nombre de la versión: ahí abajo
+  // del logo, «1.3.1 · bajas, doble toque y ticket» sería un renglón de ruido.
+  document.getElementById("arranque-version").textContent = "versión " + VERSION.split(" · ")[0];
+
+  // El télon se levanta cuando la app está lista, salga bien o salga mal: si
+  // algo falló, lo que hay que ver es el cartel del error y no el logo.
+  // Se mide desde que arrancó la página, no desde acá: si bajar los archivos ya
+  // tardó más que esto —que es lo normal la primera vez y con poca señal— no se
+  // espera ni un milisegundo de más. Solo le pone piso a la carga instantánea,
+  // donde si no la pantalla sería un destello que nadie llega a ver.
+  const PISO_MS = 600;
+
+  function levantarElTelon() {
+    const telon = document.getElementById("arranque");
+    if (!telon) return;
+    const falta = PISO_MS - performance.now();
+    if (falta > 0) { setTimeout(levantarElTelon, falta); return; }
+    telon.classList.add("arranque--listo");
+    telon.addEventListener("transitionend", () => telon.remove(), { once: true });
+    // Si la transición no corre —movimiento reducido, o una pestaña en segundo
+    // plano que no anima— el evento no llega nunca y el télon quedaría tapando
+    // la app para siempre.
+    setTimeout(() => telon.remove(), 900);
+  }
 
   async function arrancar() {
     // Abrir el almacenamiento se prueba aparte del resto. Si todo colgara del
@@ -301,6 +325,7 @@
     }
 
     await mostrar();
+    levantarElTelon();
 
     // Al abrir se sincroniza sola y en silencio: si hay señal, los números ya
     // están al día antes de que nadie toque nada; si no hay, no molesta.
@@ -315,6 +340,7 @@
     vista.innerHTML = `<p class="aviso aviso--error">Algo falló al arrancar la app.
       Lo que tengas cargado no se perdió: sigue guardado en el teléfono.<br><br>
       Detalle: ${esc(err.message || err)}</p>`;
+    levantarElTelon();
   });
 
   if ("serviceWorker" in navigator) {

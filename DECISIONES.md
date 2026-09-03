@@ -560,3 +560,48 @@ que traen `<img onerror=…>` y no ejecutan nada, se ven como texto), el parseo 
 números a la argentina (`6.800`, `6,50`, `$1.250.000`), la fecha local en vez de
 UTC, el CSV con BOM y comillas dobladas, y toda la aritmética del resumen y del
 stock, verificada a mano contra catorce movimientos y cinco ventas.
+
+## La pantalla de arranque, y las DOS que hay
+
+Al abrir la app no aparece una pantalla de carga sino dos, y conviene saberlo
+porque se configuran en lugares distintos.
+
+**La primera la arma Android**, antes de que corra una sola línea de código, con
+lo que dice `manifest.webmanifest`: el `background_color` y el ícono. Estaba en
+crema con el ícono cuadrado, así que lo primero que se veía era justo lo
+contrario de lo que se quería. Ahora el fondo es negro.
+
+**La segunda es la de la app**, en `index.html` y `estilos.css`. Está escrita en
+el HTML y no la dibuja el JavaScript a propósito: así aparece en el primer
+pintado, que es exactamente para lo que sirve. Fondo negro, el disco, el
+logotipo de la marca, la versión y la firma.
+
+**El logo redondo se construyó, no se recortó a ojo.** El ícono es un cuadrado
+bordó con el círculo apenas insinuado por un aro fino. Se midió el dibujo: las
+piezas circulares están centradas en (531, 544.5) del `viewBox` de `marca.svg` y
+llegan hasta un radio de 253. De los 90 caminos del archivo, los primeros diez
+son el logotipo y el once es el aro —no una bacteria, aunque esté en el mismo
+grupo—, cosa que se descubrió al ver dos circunferencias concéntricas en la
+primera versión. El disco quedó con radio 282,8, que deja el aro al 89 % del
+radio: la misma proporción que tiene el ícono original.
+
+Para los PNG no hizo falta rasterizar nada: el ícono cuadrado ya tiene el dibujo
+bien proporcionado, así que alcanzó con recortarle las esquinas en círculo, con
+la máscara dibujada al cuádruple y reducida para que el borde no quede
+escalonado.
+
+**Los cuadrados no se tiraron: quedaron como `maskable`.** Son ideales para eso,
+porque tienen color a sangre y el dibujo entra entero en la zona segura del
+recorte que cada lanzador de Android le aplica al ícono. Los redondos, con las
+esquinas transparentes, son los que se ven sobre el negro.
+
+**El télon tiene un piso de 600 ms, medido desde que arrancó la página y no
+desde que termina de cargar.** Si bajar los archivos ya tardó más que eso —que
+es lo normal la primera vez y con poca señal— no se espera ni un milisegundo de
+más. El piso es solo para la carga instantánea, donde si no la pantalla sería un
+destello que nadie llega a ver. Y se levanta salga bien o salga mal: si algo
+falló, lo que hay que ver es el cartel del error y no el logo.
+
+**En el arranque va solo el número de versión**, sin el nombre: ahí abajo del
+logo, «1.3.2 · pantalla de arranque» sería un renglón de ruido. El nombre
+completo sigue en el pie.
