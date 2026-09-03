@@ -21,7 +21,7 @@
 // ==========================================================================
 
 window.Clientes = (function () {
-  const { esc, dinero, numero } = window.Util;
+  const { esc, dinero, numero, unaVez } = window.Util;
 
   let vista = null;
   let ir = null;
@@ -129,7 +129,13 @@ window.Clientes = (function () {
     const uso = nuevo ? { total: 0, ventas: 0, movimientos: 0 } : cuantoSeUso(c.nombre);
     const enCalle = nuevo ? {} : window.Datos.stockEn(c.nombre);
     const unidades = Object.keys(enCalle).reduce((n, k) => n + enCalle[k], 0);
-    const medios = window.Datos.todo().listas.medios_pago || [];
+    // El medio que YA tiene guardado el cliente va en la lista aunque no esté
+    // entre los de la planilla. Si no, el desplegable cae en «—» y al guardar se
+    // lo lleva puesto sin que nadie se entere: pasa si en la hoja `listas` le
+    // cambian el nombre a un medio de pago, y pasa entero en un teléfono que
+    // todavía no sincronizó, donde esa lista está vacía.
+    const medios = (window.Datos.todo().listas.medios_pago || []).slice();
+    if (!nuevo && c.medio_pago && medios.indexOf(c.medio_pago) < 0) medios.push(c.medio_pago);
 
     vista.innerHTML = `
       <div class="tarjeta">
@@ -218,7 +224,7 @@ window.Clientes = (function () {
         o.classList.toggle("elegida", o.contains(r) && r.checked));
     });
 
-    document.getElementById("btn-guardar").onclick = () => guardar(c);
+    unaVez(document.getElementById("btn-guardar"), () => guardar(c));
 
     const baja = document.getElementById("btn-baja");
     if (baja) baja.onclick = async () => {

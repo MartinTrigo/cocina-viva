@@ -464,3 +464,99 @@ diciendo «sin remito» o «sin comprobante».
 pintado era el otro, la mano iba sola al que no correspondía, y darse cuenta
 implicaba volver a entrar a la venta. Decir «sin remito» en vez de solo
 «guardar» hace visible la diferencia en el momento de elegir.
+
+## Por qué las bajas volvían solas
+
+Se borraba una venta de prueba o un cliente viejo y al rato reaparecía. No era
+una impresión: eran **dos bugs distintos** que daban el mismo síntoma, y por eso
+a veces pasaba y a veces no.
+
+**Uno.** Al sincronizar, los ingresos, los egresos y los movimientos se fusionan
+mirando la lista de bajas, pero los productos y los clientes se fusionan por su
+clave —el código o el nombre— con otra función, `fusionarPorClave`, **que nunca
+recibió esa lista**. Así que borrar un cliente mandaba la lápida, el servicio la
+guardaba obedientemente en la hoja `borrados`… y después la ignoraba. La fila
+seguía en la planilla, se leía de vuelta y volvía al teléfono. Este era el de los
+clientes, y pasaba siempre.
+
+**Dos, y más grave.** La marca de «hasta acá está todo subido» se ponía con la
+hora de la RESPUESTA, no con la del pedido. Entonces todo lo que se tocaba
+mientras el pedido viajaba quedaba por detrás de la marca y **no se subía nunca
+más**. Si en ese rato se borraba algo, la respuesta —que es una foto de antes—
+lo revivía y la lápida quedaba muerta. Este era el de las ventas, y pasaba solo
+si el borrado caía justo mientras había una sincronización en el aire: de ahí lo
+intermitente.
+
+Y encima, pedir una sincronización mientras había otra corriendo la **descartaba**
+(`if (trabajando) return`), así que el cambio que la disparó se quedaba esperando
+una próxima vuelta que podía no llegar.
+
+Lo peor de los tres no eran las bajas: **una venta cargada mientras había una
+sincronización en el aire se perdía entera**, del teléfono y de la planilla, sin
+que nada avisara.
+
+Los tres arreglos:
+
+- `fusionarPorClave` mira las bajas. Con una diferencia contra la otra: acá la
+  lápida gana solo si es **igual o más nueva** que la fila, porque un nombre se
+  puede volver a usar. Si un cliente se borra y después se carga de nuevo con el
+  mismo nombre, gana la fila nueva. Con los ingresos es al revés —la lápida gana
+  siempre— porque sus ids son irrepetibles y así la baja aguanta aunque a la fila
+  le falte el `mod`.
+- El pedido se arma con un **corte**, tomado antes de leer nada, y la marca se
+  mueve hasta ese corte y no hasta la hora de la respuesta. Lo que pasó durante
+  el viaje sigue pendiente, que es exactamente lo que tiene que pasar.
+- Al aplicar la respuesta, lo tocado después del corte se aparta y se vuelve a
+  poner encima: lo borrado en ese rato no revive y lo cargado en ese rato no
+  desaparece.
+- Una sincronización pedida mientras hay otra ya no se tira: se anota y sale sola
+  apenas termina la anterior.
+
+**Queda un banco de pruebas en `pruebas/`** que corre el código de verdad de las
+dos puntas contra una planilla de mentira y reproduce todo esto. Los seis casos
+fallaban antes del arreglo; ahora pasan. Vale la pena correrlo antes de tocar la
+sincronización.
+
+## Dos toques no pueden guardar dos veces
+
+Guardar una venta son varias escrituras seguidas más recalcular todo. En un
+celular que tarda medio segundo, el segundo toque —que es lo más natural del
+mundo cuando el botón no reacciona— entraba antes de que el primero terminara y
+guardaba la venta **dos veces**, con el stock descontado doble. Comprobado: tres
+toques seguidos daban tres ventas.
+
+Se resolvió con un ayudante en `util.js`, `unaVez(boton, fn)`, que desactiva el
+botón mientras la función corre. Está en todos los botones que escriben: las dos
+formas de guardar una venta, borrarla, los egresos, el stock, las tres de
+consignación, los productos y los clientes.
+
+**Restaura el estado anterior, no habilita.** Hay botones que nacen desactivados
+a propósito, como el de dar de baja los marcados mientras no hay ninguno
+marcado.
+
+El que más se agradece es el del **aumento masivo de precios**: aplicado dos
+veces componía el porcentaje, y un 12 % se convertía en un 25 % sin que nadie
+entendiera por qué.
+
+## Cosas más chicas de la misma revisión
+
+- **El medio de pago de un cliente ya no se pierde solo.** El desplegable se
+  arma con la lista de la hoja `listas`; si el valor guardado no estaba entre las
+  opciones, caía en «—» y guardar se lo llevaba puesto. Pasa si le cambian el
+  nombre a un medio de pago en la planilla, y pasa entero en un teléfono que
+  todavía no sincronizó, donde esa lista está vacía. Ahora el valor guardado se
+  agrega a la lista aunque no figure.
+- **El CSV ya no puede abrirse con una fórmula viva.** Un texto que arranca con
+  `=`, `+` o `@` lo interpreta la planilla que abre el archivo. El Apps Script ya
+  lo neutralizaba al escribir en la hoja; faltaba hacerlo también al descargar.
+- **El nombre del cliente se parte en el remito.** En 384 puntos, un nombre largo
+  se salía del papel y la térmica lo iba a cortar. Ahora se acomoda en varias
+  líneas, y `partir` además corta por letra las palabras que no entran enteras.
+- **«1 unidad», no «1 unidades»**, en la lista de locales y en los dos avisos de
+  consignación.
+
+Lo que se revisó y **estaba bien**: el escapado del HTML (se probó con nombres
+que traen `<img onerror=…>` y no ejecutan nada, se ven como texto), el parseo de
+números a la argentina (`6.800`, `6,50`, `$1.250.000`), la fecha local en vez de
+UTC, el CSV con BOM y comillas dobladas, y toda la aritmética del resumen y del
+stock, verificada a mano contra catorce movimientos y cinco ventas.

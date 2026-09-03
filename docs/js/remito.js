@@ -141,7 +141,11 @@ window.Remito = (function () {
     // que quedan en manos del cliente.
     y = escribir(c, dibuja, datos.etiquetaCliente || "ENTREGADO A",
                  letra(9, "700"), GRIS, MARGEN, y + 16);
-    y = escribir(c, dibuja, datos.cliente || "—", letra(17, "700"), NEGRO, MARGEN, y + 20);
+    // El nombre se parte si no entra. En 384 puntos, «almacén de ramos generales
+    // don segundo sombra» se salía del papel y la térmica lo cortaba a la mitad.
+    partir(c, datos.cliente || "—", UTIL, letra(17, "700")).forEach((parte, i) => {
+      y = escribir(c, dibuja, parte, letra(17, "700"), NEGRO, MARGEN, y + (i ? 19 : 20));
+    });
     if (datos.leyenda) {
       partir(c, datos.leyenda, UTIL, letra(10)).forEach((parte) => {
         y = escribir(c, dibuja, parte, letra(10), GRIS, MARGEN, y + 13);
@@ -158,10 +162,11 @@ window.Remito = (function () {
     // que el nombre quede en tres pedazos, que es justo lo que hay que leer.
     (datos.lineas || []).forEach((l) => {
       y += 13;
-      partir(c, l.nombre, UTIL - 40, letra(12, "600")).forEach((parte, i) => {
+      const partes = partir(c, l.nombre, UTIL - 40, letra(12, "600"));
+      partes.forEach((parte, i) => {
         escribir(c, dibuja, parte, letra(12, "600"), NEGRO, MARGEN, y + i * 14);
       });
-      y += (partir(c, l.nombre, UTIL - 40, letra(12, "600")).length - 1) * 14;
+      y += (partes.length - 1) * 14;
 
       if (dibuja) {
         c.fillStyle = GRIS;
@@ -274,6 +279,17 @@ window.Remito = (function () {
     const salida = [];
     let renglon = "";
     palabras.forEach((p) => {
+      // Una palabra sola más ancha que el papel no se puede acomodar moviendo
+      // espacios: hay que cortarla por letra. Pasa con una dirección web pegada
+      // o con un nombre escrito todo junto sin querer, y si no se corta se sale
+      // del ticket y la térmica se la come.
+      while (c.measureText(p).width > ancho) {
+        let corte = 1;
+        while (corte < p.length && c.measureText(p.slice(0, corte + 1)).width <= ancho) corte++;
+        if (renglon) { salida.push(renglon); renglon = ""; }
+        salida.push(p.slice(0, corte));
+        p = p.slice(corte);
+      }
       const prueba = renglon ? renglon + " " + p : p;
       if (c.measureText(prueba).width > ancho && renglon) { salida.push(renglon); renglon = p; }
       else renglon = prueba;

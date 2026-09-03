@@ -106,5 +106,41 @@ window.Util = (function () {
     return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
   }
 
-  return { esc, brindis, numero, dinero, aNumero, hoy, fecha, mesLargo, mesDe, enBloque, nuevoId };
+  // Un botón que dispara algo asíncrono tiene que dejar de responder mientras
+  // eso pasa. Guardar una venta son varias escrituras seguidas más recalcular
+  // todo: en un celular que tarda medio segundo, el segundo toque —que es lo
+  // más natural del mundo cuando el botón no reacciona— entra antes de que el
+  // primero haya terminado y guarda la venta DOS VECES, con el stock
+  // descontado doble. Lo mismo con el aumento de precios, que aplicado dos
+  // veces compone el porcentaje.
+  //
+  // Se desactiva mientras corre y se vuelve a habilitar al terminar, salvo que
+  // la pantalla ya se haya ido, que es lo normal cuando el guardado navega a
+  // otro lado.
+  function unaVez(boton, fn) {
+    if (!boton) return;
+    let ocupado = false;
+    boton.onclick = async (evento) => {
+      if (ocupado) return;
+      ocupado = true;
+      // Vuelve a como estaba, no a habilitado: hay botones que nacen
+      // deshabilitados a propósito, como el de dar de baja los marcados
+      // mientras no hay ninguno marcado.
+      const estaba = boton.disabled;
+      boton.disabled = true;
+      try {
+        await fn(evento);
+      } finally {
+        ocupado = false;
+        if (boton.isConnected) boton.disabled = estaba;
+      }
+    };
+  }
+
+  // «1 unidad», no «1 unidades». Escrito a mano se escapa siempre, y en una
+  // pantalla que la clienta tiene enfrente se nota.
+  const unidades = (n) => numero(n) + (Number(n) === 1 ? " unidad" : " unidades");
+
+  return { esc, brindis, numero, dinero, aNumero, hoy, fecha, mesLargo, mesDe,
+           enBloque, nuevoId, unaVez, unidades };
 })();

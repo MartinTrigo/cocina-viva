@@ -176,7 +176,7 @@ function sincronizar(pedido) {
   [['productos', 'cod'], ['clientes', 'nombre']].forEach(function (par) {
     var entrantes = pedido[par[0]] || [];
     guardados += entrantes.length;
-    var fusionadas = fusionarPorClave(leerFilas(par[0]), entrantes, par[1]);
+    var fusionadas = fusionarPorClave(leerFilas(par[0]), entrantes, par[1], borrados);
     escribirFilas(par[0], fusionadas);
     resultado[par[0]] = fusionadas;
   });
@@ -204,11 +204,22 @@ function fusionar(remotas, locales, borrados) {
     .sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
 }
 
-function fusionarPorClave(remotas, locales, clave) {
+// Productos y clientes se borran por su clave, no por un id. La lápida gana
+// mientras sea igual o más nueva que la fila: si después de dar de baja a un
+// cliente lo vuelven a cargar con el mismo nombre, la fila nueva es más nueva
+// que la lápida y gana ella. Si la lápida ganara siempre, un nombre borrado una
+// vez no se podría volver a usar nunca más, y nadie entendería por qué.
+//
+// Con los ingresos y los movimientos es al revés —ahí la lápida gana siempre—
+// porque sus ids son irrepetibles: nunca hay que revivir uno, y así la baja
+// aguanta aunque a la fila le falte el "mod".
+function fusionarPorClave(remotas, locales, clave, borrados) {
   var porClave = {};
   remotas.concat(locales).forEach(function (f) {
     var k = String((f && f[clave]) || '').trim();
     if (!k) return;
+    var lapida = borrados && borrados[k];
+    if (lapida && (Number(lapida.mod) || 0) >= (Number(f.mod) || 0)) return;
     var previa = porClave[k];
     if (!previa || (Number(f.mod) || 0) > (Number(previa.mod) || 0)) porClave[k] = f;
   });

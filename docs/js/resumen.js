@@ -479,7 +479,13 @@ window.Resumen = (function () {
   function celda(v) {
     if (v == null) return "";
     if (typeof v === "number") return String(v);
-    const s = String(v);
+    let s = String(v);
+    // Un texto que arranca con = o + lo toma como fórmula la planilla que
+    // abra el archivo, no este código. El Apps Script ya hace lo mismo al
+    // escribir en la hoja (`comoTexto`); acá hace falta igual, porque el CSV
+    // se abre en otra planilla y los datos salen de una hoja que se edita a
+    // mano.
+    if (/^[=+@]/.test(s)) s = "'" + s;
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 

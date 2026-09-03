@@ -39,6 +39,7 @@ window.Sincro = (function () {
   const hayServicio = () => !!SERVICIO;
 
   let trabajando = false;
+  let pedidaDeNuevo = false;
   let ultimoError = "";
 
   // ---------- Canje del código ----------
@@ -73,7 +74,13 @@ window.Sincro = (function () {
   // silencioso: la que corre sola al abrir la app. No molesta con avisos si no
   // hay señal, porque no haber señal es lo normal y no es un problema.
   async function sincronizar(silencioso) {
-    if (trabajando) return { ok: false, error: "Ya se está sincronizando." };
+    // Si ya hay una en el aire, esta no se tira: se anota y sale sola apenas
+    // termine la otra. Descartarla era perder el cambio que la disparó, porque
+    // cada guardado y cada borrado dispara la suya.
+    if (trabajando) {
+      pedidaDeNuevo = true;
+      return { ok: false, encolada: true, error: "Ya se está sincronizando." };
+    }
     if (!hayServicio()) {
       return { ok: false, error: "El servicio todavía no está publicado.", sin_servicio: true };
     }
@@ -86,7 +93,7 @@ window.Sincro = (function () {
     if (!silencioso) brindis("Sincronizando…");
 
     try {
-      const { sobre, cuantos } = await window.CVDB.pendientes();
+      const { sobre, cuantos, corte } = await window.CVDB.pendientes();
       const cuerpo = Object.assign({
         credencial: window.Acceso.credencial(),
         dispositivo: window.Acceso.dispositivo(),
@@ -114,7 +121,7 @@ window.Sincro = (function () {
 
       // Recién cuando el servicio confirma se reemplaza la copia local y se
       // mueve la marca. Si algo falla antes, lo pendiente sigue pendiente.
-      await window.CVDB.guardarEstado(r);
+      await window.CVDB.guardarEstado(r, corte);
       await window.Datos.cargar();
       ultimoError = "";
       if (!silencioso) {
@@ -129,6 +136,10 @@ window.Sincro = (function () {
     } finally {
       trabajando = false;
       avisarEstado();
+      if (pedidaDeNuevo) {
+        pedidaDeNuevo = false;
+        sincronizar(true);
+      }
     }
   }
 

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Banco de pruebas · sincronización</title>
+<style>
+  body { font: 14px/1.5 ui-monospace, monospace; margin: 0; padding: 16px; background: #111; color: #ddd; }
+  h1 { font-size: 16px; color: #fff; }
+  .ok   { color: #6f6; }
+  .mal  { color: #f66; font-weight: bold; }
+  .caso { color: #fc6; margin-top: 14px; }
+  pre { white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+<h1>Banco de pruebas · sincronización Cocina Viva</h1>
+<pre id="salida">corriendo…</pre>
+
+<!-- 1. La planilla de mentira, antes que nada -->
+<script src="planilla.js"></script>
+<!-- 2. El servicio REAL, tal cual está en el repositorio -->
+<script src="../apps-script/Code.gs"></script>
+<!-- 3. El almacén REAL del teléfono -->
+<script src="../docs/js/db.js"></script>
+
+<script>
+// ---------- lo que sincro.js espera encontrar alrededor ----------
+window.Util = {
+  esc: (s) => String(s == null ? "" : s),
+  brindis: () => {},
+};
+window.Acceso = {
+  tieneAcceso: () => true,
+  credencial: () => "CREDENCIAL-DE-MENTIRA",
+  dispositivo: () => "banco",
+  persona: () => "banco",
+  guardarAcceso: () => {},
+  borrarCredencial: () => {},
+};
+window.Datos = { cargar: async () => {} };
+
+// ---------- la red de mentira ----------
+//
+// En vez de salir a internet, le pasa el pedido al sincronizar() de Code.gs que
+// está cargado en esta misma página. La demora es configurable: con eso se
+// simula el viaje de ida y vuelta, que es donde vive el bug.
+window.__demoraRed = 0;
+window.__viajes = 0;
+window.fetch = async function (url, opciones) {
+  window.__viajes++;
+  const pedido = JSON.parse((opciones && opciones.body) || "{}");
+  if (window.__demoraRed) await new Promise((r) => setTimeout(r, window.__demoraRed / 2));
+  const respuesta = sincronizar(pedido);              // <- el Code.gs de verdad
+  if (window.__demoraRed) await new Promise((r) => setTimeout(r, window.__demoraRed / 2));
+  return { json: async () => JSON.parse(JSON.stringify(respuesta)) };
+};
+</script>
+
+<!-- 4. La sincronización REAL del teléfono, ya con la red intervenida -->
+<script src="../docs/js/sincro.js"></script>
+<script src="casos.js"></script>
+</body>
+</html>

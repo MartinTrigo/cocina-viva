@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.3.0 · notebook y balance";
+  const VERSION = "1.3.1 · bajas, doble toque y ticket";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");

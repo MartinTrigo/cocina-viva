@@ -18,7 +18,7 @@
 // ==========================================================================
 
 window.Ingresos = (function () {
-  const { esc, dinero, numero, aNumero, hoy, fecha, enBloque } = window.Util;
+  const { esc, dinero, numero, aNumero, hoy, fecha, enBloque, unaVez } = window.Util;
 
   let vista = null;
   let ir = null;
@@ -252,8 +252,8 @@ window.Ingresos = (function () {
       if (ultimos.length) ultimos[ultimos.length - 1].focus();
     };
 
-    document.getElementById("btn-guardar").onclick = () => guardar(false);
-    document.getElementById("btn-guardar-remito").onclick = () => guardar(true);
+    unaVez(document.getElementById("btn-guardar"), () => guardar(false));
+    unaVez(document.getElementById("btn-guardar-remito"), () => guardar(true));
 
     // Los renglones de las últimas ventas son <li> con role="button": el
     // teclado los enfoca pero, sin esto, Enter no hace nada.
@@ -481,7 +481,7 @@ window.Ingresos = (function () {
       </div>`;
 
     document.getElementById("btn-remito").onclick = () => generarRemito(v);
-    document.getElementById("btn-borrar").onclick = () => borrarVenta(v);
+    unaVez(document.getElementById("btn-borrar"), () => borrarVenta(v));
   }
 
   async function generarRemito(v) {

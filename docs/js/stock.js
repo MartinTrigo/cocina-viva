@@ -18,7 +18,7 @@
 // ==========================================================================
 
 window.Stock = (function () {
-  const { esc, dinero, numero, aNumero, hoy, fecha, enBloque } = window.Util;
+  const { esc, dinero, numero, aNumero, hoy, fecha, enBloque, unaVez } = window.Util;
 
   const QUE_PASO = {
     produccion: {
@@ -324,17 +324,17 @@ window.Stock = (function () {
 
     document.getElementById("s-cod").onchange = resumenVivo;
     document.getElementById("s-cantidad").oninput = resumenVivo;
-    document.getElementById("btn-guardar").onclick = guardar;
+    unaVez(document.getElementById("btn-guardar"), guardar);
 
     vista.querySelectorAll("[data-deshacer]").forEach((b) => {
-      b.onclick = async () => {
+      unaVez(b, async () => {
         const id = b.dataset.deshacer;
         await window.CVDB.borrar("movimientos", id);
         await window.Datos.cargar();
         window.Sincro.sincronizar(true);
         cargadosRecien = cargadosRecien.filter((m) => m.id !== id);
         pintar(`<p class="aviso aviso--ok">Deshecho.</p>`);
-      };
+      });
     });
   }
 

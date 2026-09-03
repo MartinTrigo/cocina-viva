@@ -152,20 +152,27 @@ window.CVDB = (function () {
     operar("meta", "readwrite", (a) => a.put({ clave: META_SINCRO, valor: cuando }));
 
   // Lo que este teléfono cambió y la planilla todavía no vio.
+  //
+  // El CORTE se toma antes de leer nada y viaja con el sobre. Todo lo que se
+  // cargue o se borre mientras el pedido está en el aire queda por encima del
+  // corte: no entra en este sobre y sigue pendiente para la vuelta que viene.
+  // Sin ese corte, la marca terminaba tapando cambios que nunca se subieron.
   async function pendientes() {
     const desde = await ultimaSincro();
+    const corte = Date.now();
+    const enLaVentana = (r) => (r.mod || 0) > desde && (r.mod || 0) <= corte;
     const sobre = { borrados: [] };
     let cuantos = 0;
 
     for (const nombre of Object.keys(SINCRONIZABLES)) {
-      const nuevos = (await todos(nombre)).filter((r) => (r.mod || 0) > desde);
+      const nuevos = (await todos(nombre)).filter(enLaVentana);
       sobre[nombre] = nuevos;
       cuantos += nuevos.length;
     }
-    sobre.borrados = (await todos("borrados")).filter((r) => (r.mod || 0) > desde);
+    sobre.borrados = (await todos("borrados")).filter(enLaVentana);
     cuantos += sobre.borrados.length;
 
-    return { sobre, cuantos };
+    return { sobre, cuantos, corte };
   }
 
   const cuantosPendientes = () => pendientes().then((p) => p.cuantos);
@@ -181,25 +188,53 @@ window.CVDB = (function () {
     });
   }
 
-  async function guardarEstado(estado) {
-    // La marca no puede quedar por detrás del registro más nuevo que acaba de
-    // bajar. El reloj del teléfono y el del servicio no son el mismo: si el
-    // del servicio va unos segundos adelantado, todo lo que baje con un "mod"
-    // mayor que Date.now() se contaría como pendiente y se volvería a subir en
-    // cada sincronización hasta que el reloj lo alcance.
-    let masNuevo = Date.now();
-    const mirar = (lista) => (lista || []).forEach((r) => {
-      if ((r.mod || 0) > masNuevo) masNuevo = r.mod;
-    });
+  // Guarda lo que contestó el servicio, RESPETANDO lo que se tocó mientras el
+  // pedido viajaba.
+  //
+  // Acá estuvo el bug de las bajas que volvían solas. La respuesta del servicio
+  // es una foto del estado en el momento en que se armó el pedido: no sabe nada
+  // de lo que pasó después. Si se la copia tal cual encima de todo, una venta
+  // borrada en ese rato vuelve a aparecer, y una venta cargada en ese rato
+  // desaparece sin dejar rastro. Por eso lo posterior al corte se aparta antes
+  // de pisar los almacenes y se vuelve a aplicar encima.
+  async function guardarEstado(estado, corte) {
+    const tope = corte || Date.now();
+
+    const posteriores = {};
+    for (const nombre of Object.keys(SINCRONIZABLES)) {
+      posteriores[nombre] = (await todos(nombre)).filter((r) => (r.mod || 0) > tope);
+    }
+    const bajasPosteriores = (await todos("borrados")).filter((r) => (r.mod || 0) > tope);
 
     for (const nombre of Object.keys(SINCRONIZABLES)) {
-      if (estado[nombre]) { mirar(estado[nombre]); await reemplazar(nombre, estado[nombre]); }
+      if (!estado[nombre]) continue;
+      await operar(nombre, "readwrite", (a) => {
+        a.clear();
+        estado[nombre].forEach((r) => a.put(r));
+        // Primero se van los borrados de último momento y después vuelve lo
+        // cargado de último momento: si algo se borró y se volvió a cargar en
+        // ese rato, tiene que quedar cargado.
+        bajasPosteriores.forEach((b) => a.delete(b.id));
+        posteriores[nombre].forEach((r) => a.put(r));
+        return null;
+      });
     }
-    if (estado.borrados) { mirar(estado.borrados); await reemplazar("borrados", estado.borrados); }
+    if (estado.borrados) {
+      await operar("borrados", "readwrite", (a) => {
+        a.clear();
+        estado.borrados.forEach((r) => a.put(r));
+        bajasPosteriores.forEach((r) => a.put(r));
+        return null;
+      });
+    }
     if (estado.listas) {
       await operar("meta", "readwrite", (a) => a.put({ clave: "listas", valor: estado.listas }));
     }
-    await marcarSincro(masNuevo);
+
+    // La marca es el corte con el que se armó el pedido, NO la hora de la
+    // respuesta. Poniendo la hora de la respuesta, todo lo que pasó durante el
+    // viaje quedaba por detrás de la marca y no se subía nunca más.
+    await marcarSincro(tope);
   }
 
   const listas = () => obtener("meta", "listas").then((m) => (m && m.valor) || null);

@@ -18,7 +18,7 @@
 // ==========================================================================
 
 window.Productos = (function () {
-  const { esc, dinero, aNumero, numero, enBloque } = window.Util;
+  const { esc, dinero, aNumero, numero, enBloque, unaVez } = window.Util;
 
   let vista = null;
   let ir = null;
@@ -176,7 +176,7 @@ window.Productos = (function () {
                en la historia, así que no se puede borrar: se daría de baja nada más.</p>`}
         </div>`}`;
 
-    document.getElementById("btn-guardar").onclick = () => guardar(p);
+    unaVez(document.getElementById("btn-guardar"), () => guardar(p));
 
     const baja = document.getElementById("btn-baja");
     if (baja) baja.onclick = async () => {
@@ -333,7 +333,7 @@ window.Productos = (function () {
 
     [pct, redondeo, cuales].forEach((c) => { c.oninput = previsualizar; c.onchange = previsualizar; });
 
-    aplicar.onclick = async () => {
+    unaVez(aplicar, async () => {
       const cambios = calcular(activos, aNumero(pct.value), Number(redondeo.value), cuales.value);
       if (!cambios.length) return;
       await window.CVDB.guardarVarios("productos", cambios.map((c) =>
@@ -342,7 +342,7 @@ window.Productos = (function () {
       window.Sincro.sincronizar(true);
       window.Util.brindis("Precios actualizados: " + cambios.length + ".");
       ir("productos");
-    };
+    });
 
     const chequeos = vista.querySelectorAll(".chequeo input");
     const bajas = document.getElementById("btn-bajas");
@@ -356,7 +356,7 @@ window.Productos = (function () {
       };
     });
 
-    bajas.onclick = async () => {
+    unaVez(bajas, async () => {
       const elegidos = [...chequeos].filter((x) => x.checked).map((x) => x.value);
       if (!elegidos.length) return;
       await window.CVDB.guardarVarios("productos", elegidos.map((cod) =>
@@ -365,7 +365,7 @@ window.Productos = (function () {
       window.Sincro.sincronizar(true);
       window.Util.brindis(elegidos.length + " dado" + (elegidos.length === 1 ? "" : "s") + " de baja.");
       ir("productos");
-    };
+    });
   }
 
   // Devuelve solo los productos cuyo precio efectivamente cambia. Un aumento

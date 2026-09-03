@@ -23,7 +23,7 @@
 // ==========================================================================
 
 window.Consignacion = (function () {
-  const { esc, dinero, numero, aNumero, hoy, fecha } = window.Util;
+  const { esc, dinero, numero, aNumero, hoy, fecha, unaVez, unidades: enUnidades } = window.Util;
 
   const MODOS = {
     entregar: { icono: "📦", titulo: "Entregar", verbo: "Entregar", corto: "Entregar",
@@ -106,7 +106,7 @@ window.Consignacion = (function () {
               <span class="renglon__texto">
                 <span class="renglon__que">${esc(f.nombre)}</span>
                 <span class="renglon__detalle">${f.unidades
-                  ? numero(f.unidades) + " unidades · " + f.productos + " producto" + (f.productos === 1 ? "" : "s")
+                  ? enUnidades(f.unidades) + " · " + f.productos + " producto" + (f.productos === 1 ? "" : "s")
                   : "sin mercadería"}</span>
               </span>
               <span class="renglon__cuanto">${f.unidades ? dinero(f.valor) : "—"}</span>
@@ -477,10 +477,11 @@ window.Consignacion = (function () {
     const eraLiquidacion = modo === "liquidar";
 
     ficha(local, eraLiquidacion
-      ? `<p class="aviso aviso--ok">Cobrado: ${dinero(plata)} por ${numero(unidades)}
-         unidades que vendió ${esc(local)}. Entró como ingreso en ${esc(medioPago)}.</p>`
-      : `<p class="aviso aviso--ok">Volvieron al depósito ${numero(unidades)} unidades
-         de ${esc(local)}.</p>`);
+      ? `<p class="aviso aviso--ok">Cobrado: ${dinero(plata)} por
+         ${enUnidades(unidades)} que vendió ${esc(local)}. Entró como ingreso en
+         ${esc(medioPago)}.</p>`
+      : `<p class="aviso aviso--ok">${unidades === 1 ? "Volvió" : "Volvieron"} al
+         depósito ${enUnidades(unidades)} de ${esc(local)}.</p>`);
 
     if (conComprobante) mostrarRemito(comprobante);
   }
@@ -657,17 +658,15 @@ window.Consignacion = (function () {
       if (medio) medio.onchange = () => { medioPago = medio.value; };
     }
 
-    const guardarlo = document.getElementById("cg-guardar");
-    if (guardarlo) guardarlo.onclick = () => {
+    unaVez(document.getElementById("cg-guardar"), () => {
       if (modo === "entregar") leerEntrega();
-      guardar(local, false);
-    };
+      return guardar(local, false);
+    });
 
-    const conComprobante = document.getElementById("cg-guardar-remito");
-    if (conComprobante) conComprobante.onclick = () => {
+    unaVez(document.getElementById("cg-guardar-remito"), () => {
       if (modo === "entregar") leerEntrega();
-      guardar(local, true);
-    };
+      return guardar(local, true);
+    });
 
     recalcular(local);
     enganchar();

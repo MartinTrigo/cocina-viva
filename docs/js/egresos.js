@@ -12,7 +12,7 @@
 // ==========================================================================
 
 window.Egresos = (function () {
-  const { esc, dinero, aNumero, hoy, fecha, mesDe, mesLargo } = window.Util;
+  const { esc, dinero, aNumero, hoy, fecha, mesDe, mesLargo, unaVez } = window.Util;
 
   let vista = null;
   let ir = null;
@@ -210,15 +210,15 @@ window.Egresos = (function () {
     ["g-detalle", "g-cantidad", "g-monto", "g-obs"].forEach((id) => {
       document.getElementById(id).oninput = leer;
     });
-    document.getElementById("g-guardar").onclick = guardar;
+    unaVez(document.getElementById("g-guardar"), guardar);
 
     vista.querySelectorAll("[data-borrar]").forEach((b) => {
-      b.onclick = async () => {
+      unaVez(b, async () => {
         await window.CVDB.borrar("egresos", b.dataset.borrar);
         await window.Datos.cargar();
         window.Sincro.sincronizar(true);
         formulario(`<p class="aviso aviso--ok">Egreso borrado.</p>`);
-      };
+      });
     });
   }
 

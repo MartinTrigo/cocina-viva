@@ -163,6 +163,25 @@ van. Es la misma pantalla que Productos, con una diferencia importante.
 - [x] **El botón con comprobante va primero y pintado**, y el que solo guarda
       queda abajo diciendo «sin remito» o «sin comprobante».
 
+## Revisión de la sincronización · **hecha**
+
+- [x] **Encontrado y arreglado el bug de las bajas que volvían solas.** Eran dos
+      causas distintas con el mismo síntoma, y una tercera que las tapaba. Están
+      contadas en DECISIONES.md.
+- [x] **Banco de pruebas en `pruebas/`**, que corre el `Code.gs` y el `db.js` de
+      verdad contra una planilla de mentira. Seis casos, veintiuna afirmaciones.
+      Fallaban once antes del arreglo; ahora pasan todas, en cuatro corridas
+      seguidas.
+- [x] **Dos toques ya no guardan dos veces.** Comprobado en los dos sentidos:
+      sin la guarda, tres toques daban tres ventas; con la guarda, una.
+- [x] Revisadas las 19 pantallas y subpantallas, sin un error en consola.
+- [x] Aritmética verificada a mano: depósito 300 u. / $1.929.800, consignación
+      $183.100, y el resumen entero —totales, los cuatro medios de pago, las dos
+      tortas, por producto y por cliente— con el filtro de julio y el de todo.
+- [x] Probados a mano los caminos destructivos: borrar una liquidación devuelve
+      la mercadería **al local**, borrar una venta la devuelve **al depósito**, y
+      renombrar un cliente arrastra su historia y su stock en consignación.
+
 ## Cuando llegue la impresora térmica
 
 El remito ya sale en formato ticket de 58 mm, negro sobre blanco, listo para
