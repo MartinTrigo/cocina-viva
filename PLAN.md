@@ -311,10 +311,14 @@ aumento de precios en masa que ya existe se hace **a ciegas**.
       idempotente y el costo sobrevive la vuelta completa de sincronización.
 - [ ] Si alguna vez quieren precisión de verdad, el paso siguiente es una receta
       por producto. Es un proyecto entero y **no** conviene arrancar por ahí.
-- [ ] **Falta que Martín pegue el `Code.gs` nuevo y publique la implementación.**
-      Hasta que eso pase, los teléfonos con la app nueva no sincronizan: el
-      número de protocolo subió a 2 para que un teléfono viejo no borre los
-      costos.
+- [x] **Publicado y verificado en el libro** (4/9/2026). La migración corrió
+      sola en la primera sincronización: la columna `costo` quedó entre la
+      presentación y los precios, **ningún precio se corrió** y la baja de
+      PDN360 se conservó. La tabla del resumen sigue valuando a precio mayorista
+      —$2.048.150 de depósito—, así que el arreglo de la fórmula también entró.
+- [ ] Falta que Luna y Melí carguen los costos. Hasta entonces la columna dice
+      $0, que la app lee como «sin cargar» y no como «gratis»: por eso no muestra
+      ningún margen todavía.
 
 ## Fase 8 — Pedidos · **falta, y conviene esperar**
 
