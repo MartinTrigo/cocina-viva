@@ -241,6 +241,108 @@ imprimir. Falta ver cómo se le habla al aparato.
 
 ---
 
+# Mejoras: de «cuánto entró» a «cómo vamos»
+
+Salieron de mirar dos cosas: lo que la app no contesta todavía, y **lo que ellas
+ya intentaban llevar en la planilla vieja y quedó afuera** —las horas de trabajo,
+el stock en elaboración, y los rubros de egreso con subcategoría—. Eso último
+vale más que cualquier comparación con otras apps: son necesidades que ya
+sintieron.
+
+**Están ordenadas por una regla práctica: cuáles necesitan implementación nueva
+del Apps Script y cuáles no.** Pegar el código, correr las funciones y publicar
+una versión es el trámite más pesado del proyecto, así que conviene juntar los
+cambios de hoja en pocas tandas en vez de repartirlos.
+
+## Fase 6 — Lo que ya se puede calcular · **falta**
+
+**No toca la planilla: no hace falta implementación nueva.** Son tres cosas que
+salen de datos que la app ya tiene y hoy no muestra.
+
+- [ ] **Antigüedad de la consignación.** Hoy la pantalla dice cuánto tiene cada
+      local, no hace cuánto. Y ese es el número que decide a quién ir a ver: el
+      molino paraje tiene mercadería desde abril y renacer desde agosto, y en la
+      lista se ven igual. Cada local con «16 u. · hace 4 meses sin liquidar», y
+      poder ordenar por eso.
+- [ ] **Vista «a quién ir a ver»**: los locales sin movimiento hace más de X
+      días, con la plata parada en cada uno.
+- [ ] **Rotación por local**: cuánto vende por mes cada uno. Distingue al que no
+      vende del que vende y no avisa, que son dos problemas con soluciones
+      opuestas.
+- [ ] **Qué conviene producir**: los productos ordenados por cuántas semanas de
+      stock quedan al ritmo al que se venden. Es la hoja «planificación» que
+      intentaron, pero calculada sola.
+- [ ] **Egresos desglosados por detalle.** El campo `detalle` ya se carga, pero
+      el resumen solo agrupa por rubro. Mostrar «Insumos: frascos $145.000 ·
+      repollo $96.000» es la subcategoría que tenían en la planilla, sin agregar
+      ni una columna.
+
+## Fase 7 — Costo y margen · **falta**
+
+**Una implementación nueva** (se agrega una columna a `productos`).
+
+Hoy la app sabe cuánta plata entró y cuánta salió, pero nunca las conecta con un
+producto. Sabe que se vendieron 3 kimchi a $6.800; no sabe qué costaron. Y el
+aumento de precios en masa que ya existe se hace **a ciegas**.
+
+- [ ] **Un campo `costo` en Productos**, que actualizan cuando quieren. Con eso
+      solo aparece margen en la pantalla de venta, margen por producto en el
+      resumen, y la respuesta a «¿me conviene este cliente a mayorista?».
+- [ ] **Costo del lote en el movimiento de producción** (opcional, misma
+      implementación): costo por unidad = costo del lote ÷ frascos. Da precisión
+      sin tener que inventar recetas.
+- [ ] Si alguna vez quieren precisión de verdad, el paso siguiente es una receta
+      por producto. Es un proyecto entero y **no** conviene arrancar por ahí.
+
+## Fase 8 — Pedidos · **falta, y conviene esperar**
+
+**Una implementación nueva** (hoja `pedidos`).
+
+En la planilla vieja hay clientes que se llaman «pedido luna» y «pedido melí»:
+eso es un parche. No existe la idea de algo comprometido que todavía no se
+entregó, así que hoy vive en WhatsApp.
+
+- [ ] Sección liviana: cliente, para cuándo, renglón por producto, pendiente o
+      entregado. Al entregar se convierte en venta o en entrega de un toque.
+- [ ] El inicio avisando «3 pedidos para esta semana».
+
+**Por qué esperar:** el diseño depende de cómo toman los pedidos en la realidad
+—si les escriben, si las llaman, con cuánta anticipación—. Conviene hacerla
+después de unas semanas de uso real, no antes.
+
+## Fase 9 — Precios contra costos · **falta**
+
+**Una implementación nueva.** Depende de la fase 7: sin costos no dice mucho.
+
+- [ ] **Historial de precios**: hoy un producto guarda su precio actual y nada
+      más. Guardando cada cambio se puede ver «el kale pasó de $6.150 a $6.900
+      el 12/8».
+- [ ] **«Tus precios contra tus costos»**: cuánto subieron los insumos desde el
+      último aumento. Es la pregunta de todos los meses en Argentina, y hoy se
+      contesta a ojo.
+
+## Fase 10 — Solo si lo piden · **falta**
+
+- [ ] **Fecha de elaboración en la producción**, para que la app avise «hay 12
+      kimchi de hace 8 meses». Es calidad, no trazabilidad: la trazabilidad
+      completa con lotes es maquinaria de escala regulatoria y **no** conviene a
+      menos que bromatología se la pida.
+- [ ] **Horas de trabajo**, pero como un campo del movimiento de producción
+      («envasamos 25, nos llevó 6 horas»), no como sección aparte. La hoja
+      «Labores» ya la abandonaron una vez a principios de 2024, y el motivo es
+      claro: anotar horas todos los días es fricción. Que sea un dato más en un
+      momento en que ya están en la app.
+
+## Lo que decidimos NO hacer
+
+- **Facturación y AFIP.** Superficie regulatoria grande, y depende de cómo estén
+  inscriptas. No se adivina.
+- **Códigos de barras, portal para clientes, tienda en línea, multi-moneda.** No
+  es la escala de dos personas vendiendo en la comarca.
+- **Notificaciones push.** En iOS son un dolor y de todos modos abren la app.
+
+---
+
 # Cosas que no son de programación
 
 Estas dependen de ellas, no de la app.
