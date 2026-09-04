@@ -216,8 +216,22 @@ imprimir. Falta ver cómo se le habla al aparato.
       intacto y no hay stock negativo.
 - [ ] **Falta que Martín las pegue** en la hoja `movimientos` del libro nuevo y
       sincronice. No requiere implementación nueva.
-- [ ] Falta corregir tres clientes que figuran como «compra» y en la planilla
-      vieja siempre aparecen a consignación.
+- [x] **Pegadas y verificadas** contra el libro: la hoja `resumen` calcula
+      $1.242.200 en consignación y el depósito queda intacto en $2.060.950.
+- [x] Los tres clientes que figuraban como «compra» quedan resueltos solos:
+      estaban dados de baja a propósito, así que su consignación se saca.
+
+## Arreglos sobre el libro · **listos para correr**
+
+- [x] **`INGRESOS POR MES` ya no da `#ERROR!`.** Se sacó el arreglo `{ ... \ ... }`
+      que QUERY no entendía y se reemplazó por SORT/UNIQUE/FILTER más un
+      SUMPRODUCT por renglón. Explicado en DECISIONES.md.
+- [x] **`limpiarConsignacionDeBajas()`**, que saca de consignación a los clientes
+      marcados como no activos, tocando solo los renglones del conteo inicial.
+      Probada contra la planilla simulada: conserva las entregas y devoluciones
+      reales de un cliente dado de baja, y es idempotente.
+- [ ] **Falta que Martín pegue el `Code.gs` nuevo**, corra las dos funciones y
+      haga la implementación nueva.
 
 ## Fase 5 — Puesta en marcha · **falta**
 

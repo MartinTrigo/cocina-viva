@@ -978,15 +978,122 @@ function crearResumen() {
 
   h.getRange('A72').setValue('INGRESOS POR MES').setFontWeight('bold').setFontColor(COLOR.bordo);
   h.getRange('D72').setValue('EGRESOS POR RUBRO').setFontWeight('bold').setFontColor(COLOR.tierra);
-  // Los meses se arman como texto "aaaa-mm" en vez de con funciones de fecha:
-  // QUERY las resuelve distinto según el tipo de la columna y se rompe seguido.
-  h.getRange('A73').setValue('=QUERY({ARRAYFORMULA(IF(ingresos!C2:C="";"";TEXT(ingresos!C2:C;"yyyy-mm")))\\ingresos!J2:J};"select Col1, sum(Col2) where Col1<>\'\' group by Col1 order by Col1 desc label Col1 \'mes\', sum(Col2) \'ingresos\'";0)');
+  ingresosPorMes(h);
   h.getRange('D73').setValue('=QUERY(egresos!C2:F;"select C, sum(F) where C is not null group by C order by sum(F) desc label C \'rubro\', sum(F) \'total\'";0)');
-  h.getRange('B73:B200').setNumberFormat('"$"#,##0');
   h.getRange('E73:E200').setNumberFormat('"$"#,##0');
 
   [1, 2].forEach(function (c) { h.setColumnWidth(c, 190); });
   [3, 4, 5, 6, 7].forEach(function (c) { h.setColumnWidth(c, 120); });
+}
+
+/* --------------------------------------------------------------------------
+   INGRESOS POR MES
+
+   Acá había un QUERY sobre un arreglo armado a mano —{mes \ subtotal}— que en
+   la planilla daba #ERROR!, que es lo que muestra Sheets cuando no entiende la
+   fórmula. Se reemplazó por dos piezas que no necesitan armar ningún arreglo:
+
+     - la columna de meses sale de SORT + UNIQUE + FILTER sobre el texto
+       "aaaa-mm" de la fecha;
+     - cada total es un SUMPRODUCT común y corriente, uno por renglón.
+
+   Es más largo de escribir y mucho más difícil de romper. Los meses se siguen
+   comparando como texto y no con funciones de fecha, que era la decisión
+   original y sigue siendo la correcta: QUERY resuelve las fechas según el tipo
+   que le adivina a la columna.
+
+   Van 36 renglones, tres años de meses. Si alguna vez se quedan cortos, se
+   cambia RENGLONES_MES y se vuelve a correr arreglarIngresosPorMes().
+   -------------------------------------------------------------------------- */
+
+var RENGLONES_MES = 36;
+
+function ingresosPorMes(h) {
+  h.getRange('A73:B73').setValues([['mes', 'ingresos']]).setFontWeight('bold');
+
+  h.getRange('A74').setValue(
+    '=IFERROR(SORT(UNIQUE(FILTER(TEXT(ingresos!C2:C2000;"yyyy-mm");'
+    + 'ingresos!C2:C2000<>""));1;FALSE);"")');
+
+  var totales = [];
+  for (var i = 0; i < RENGLONES_MES; i++) {
+    var f = 74 + i;
+    totales.push(['=IFERROR(IF($A' + f + '="";"";SUMPRODUCT('
+      + '(TEXT(ingresos!$C$2:$C$2000;"yyyy-mm")=$A' + f + ')'
+      + '*ingresos!$J$2:$J$2000));"")']);
+  }
+  h.getRange(74, 2, RENGLONES_MES, 1).setValues(totales);
+  h.getRange(74, 2, RENGLONES_MES, 1).setNumberFormat('"$"#,##0');
+}
+
+// Para arreglar un libro que ya existe: crearResumen() no sirve porque se corta
+// sola si la hoja ya está, y borrar la hoja entera para rehacerla es más
+// riesgoso que reescribir las cuatro celdas que hacen falta.
+function arreglarIngresosPorMes() {
+  var h = SpreadsheetApp.getActive().getSheetByName('resumen');
+  if (!h) return 'No hay hoja resumen. Corré prepararLibro().';
+  h.getRange('A73:B200').clearContent();
+  ingresosPorMes(h);
+  return 'Listo: INGRESOS POR MES reescrito con ' + RENGLONES_MES + ' renglones.';
+}
+
+/* --------------------------------------------------------------------------
+   SACAR DE CONSIGNACIÓN A LOS CLIENTES DADOS DE BAJA
+
+   La consignación vieja se importó desde la planilla anterior, y ahí había
+   locales con los que ya no trabajan. Esta función saca la mercadería de los
+   que estén marcados como NO activos.
+
+   Toca SOLO los renglones del conteo inicial, los que tienen la referencia
+   'conteo inicial'. Una entrega, una liquidación o una devolución de verdad no
+   se borran nunca, aunque después den de baja al cliente: eso pasó y tiene que
+   quedar anotado. Lo importado es lo único que se puede sacar sin mentir.
+
+   No lleva ningún nombre escrito: mira quién está dado de baja en la hoja de
+   clientes. Si mañana dan de baja a otro, se vuelve a correr y listo.
+   -------------------------------------------------------------------------- */
+
+function limpiarConsignacionDeBajas() {
+  var deBaja = {};
+  leerFilas('clientes').forEach(function (c) {
+    if (c.activo === false) deBaja[c.nombre] = true;
+  });
+
+  var movimientos = leerFilas('movimientos');
+  var sacados = [];
+  var quedan = movimientos.filter(function (m) {
+    var esImportado = m.tipo === 'ajuste' && String(m.ref).trim() === 'conteo inicial';
+    if (esImportado && deBaja[String(m.hacia).trim()]) {
+      sacados.push(m);
+      return false;
+    }
+    return true;
+  });
+
+  if (!sacados.length) return 'No había consignación de clientes dados de baja.';
+
+  // Las lápidas hacen que la baja también les llegue a los teléfonos que ya se
+  // habían bajado esas filas, en vez de depender de que no las vuelvan a subir.
+  var borrados = {};
+  leerBorrados().forEach(function (b) { borrados[b.id] = b; });
+  var ahora = Date.now();
+  sacados.forEach(function (m) { borrados[m.id] = { id: m.id, mod: ahora }; });
+
+  escribirFilas('movimientos', quedan);
+  escribirBorrados(borrados);
+
+  var porLocal = {};
+  sacados.forEach(function (m) {
+    porLocal[m.hacia] = (porLocal[m.hacia] || 0) + (Number(m.cantidad) || 0);
+  });
+  var detalle = Object.keys(porLocal).sort().map(function (n) {
+    return '  • ' + n + ': ' + porLocal[n] + ' u.';
+  }).join('\n');
+
+  var texto = 'Sacados ' + sacados.length + ' renglones de conteo inicial:\n' + detalle
+    + '\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
 }
 
 /* ================= Auxiliares ================= */

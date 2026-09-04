@@ -655,3 +655,55 @@ git**: para eso hay que reescribir el historial y forzar la subida, o empezar un
 repositorio nuevo.
 
 Queda anotado como decisión pendiente de Martín, que es de quien es el dato.
+
+## INGRESOS POR MES: por qué daba #ERROR! y con qué se reemplazó
+
+`#ERROR!` en Google Sheets no es un dato que falta ni una cuenta imposible: es
+lo que muestra cuando **no entiende la fórmula**. La que había armaba un arreglo
+a mano de dos columnas —el mes como texto y el subtotal— y se lo pasaba a QUERY:
+
+    =QUERY({ARRAYFORMULA(...TEXT(fecha;"yyyy-mm")...)\ingresos!J2:J};"select ...")
+
+Esa construcción con `{ ... \ ... }` es la parte frágil, y es la que se sacó. La
+fórmula de al lado, EGRESOS POR RUBRO, usa QUERY sin arreglo y siempre anduvo,
+lo que deja bastante claro de dónde venía el problema.
+
+En vez de arreglar el arreglo se sacó el arreglo. Ahora son dos piezas que no
+necesitan armar nada:
+
+- **La columna de meses** sale de `SORT(UNIQUE(FILTER(TEXT(...))))`, ordenada del
+  más nuevo al más viejo.
+- **Cada total** es un `SUMPRODUCT` común, uno por renglón, treinta y seis
+  renglones que son tres años de meses.
+
+Es más largo de escribir y mucho más difícil de romper. Los dos van envueltos en
+`IFERROR`, así que aunque algo falle no vuelve a aparecer un `#ERROR!` pelado.
+
+Se mantuvo la decisión original de **comparar los meses como texto «aaaa-mm» y
+no con funciones de fecha**: QUERY resuelve las fechas según el tipo que le
+adivina a la columna, y ahí es donde se rompía seguido.
+
+`crearResumen()` se corta sola si la hoja ya existe, así que para arreglar un
+libro que ya está hay una función aparte, `arreglarIngresosPorMes()`, que
+reescribe solo esas celdas. Borrar la hoja entera para rehacerla era más
+riesgoso que tocar cuatro celdas.
+
+## Los clientes dados de baja salen de consignación
+
+La consignación importada de la planilla vieja traía locales con los que ya no
+trabajan. `limpiarConsignacionDeBajas()` los saca.
+
+**Toca solo los renglones del conteo inicial**, los que llevan la referencia
+`conteo inicial`. Una entrega, una liquidación o una devolución de verdad no se
+borran nunca, aunque después den de baja al cliente: eso pasó, y borrarlo sería
+falsear la historia. Lo importado es lo único que se puede sacar sin mentir,
+porque nunca fue un movimiento: fue una foto de la planilla anterior.
+
+**No lleva ningún nombre escrito en el código.** Mira quién está marcado como no
+activo en la hoja de clientes. Si mañana dan de baja a otro local, se vuelve a
+correr y listo. De paso, el código del repositorio no suma nombres de clientes,
+que es algo que en este proyecto conviene cuidar.
+
+Escribe lápidas en la hoja `borrados`, así la baja también les llega a los
+teléfonos que ya se habían bajado esas filas, en vez de depender de que no las
+vuelvan a subir.
