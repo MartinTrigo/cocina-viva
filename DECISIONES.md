@@ -707,3 +707,65 @@ que es algo que en este proyecto conviene cuidar.
 Escribe lápidas en la hoja `borrados`, así la baja también les llega a los
 teléfonos que ya se habían bajado esas filas, en vez de depender de que no las
 vuelvan a subir.
+
+## El reloj de la consignación mide la LIQUIDACIÓN, no el último movimiento
+
+Es la decisión central de la fase 6 y no es obvia.
+
+Si el reloj contara cualquier movimiento, dejarle una caja nueva a un local que
+hace cinco meses no paga pondría el contador en cero **justo cuando el problema
+empeora**: ahora hay más plata parada ahí. Así que el reloj corre desde la
+última liquidación, y si nunca liquidaron, desde que tienen mercadería.
+
+Por eso el texto dice dos cosas distintas según el caso, y la diferencia
+importa: «sin liquidar hace 3 meses» es un local que alguna vez pagó y dejó de
+hacerlo; «hace 5 meses, nunca liquidó» es uno que quizás recién arranca o
+quizás se olvidaron para siempre.
+
+**El umbral es de 45 días y está escrito en el código con su razón.** Mes y
+medio: si un local tiene mercadería y en ese tiempo no liquidó nada, o no está
+vendiendo o está vendiendo y no avisa, y las dos cosas se resuelven yendo. Más
+corto sería gritar antes de tiempo, y una alarma que suena siempre se deja de
+mirar. Por lo mismo, el reloj se pinta **solo** cuando pasó el umbral.
+
+El color es el tierra de «lo que sale», no el rojo de error: que un local tarde
+en liquidar no es una falla del sistema, es algo que hay que ir a resolver.
+
+## Las fechas de la consignación importada tuvieron que corregirse
+
+Los 84 renglones entraron con fecha 21/8/2026, la del conteo del depósito. Como
+foto era coherente, pero **dejaba ciega a la pantalla de antigüedad**: los diez
+locales aparecían con la misma edad, cuando en la planilla había entregas de
+abril y de agosto. La primera prueba mostró los diez diciendo «hace 14 días»,
+que es aritmética correcta sobre el dato equivocado.
+
+La fecha real de cada local había quedado escrita en las observaciones, así que
+`fecharConsignacionImportada()` la pasa a la columna de fecha. No mueve stock:
+esos movimientos tienen el «desde» vacío, así que cambiarles la fecha no cambia
+ningún saldo, solo el reloj. Al conteo del depósito no lo toca, porque el 21/8
+sí es su fecha correcta.
+
+## «Qué conviene producir» muestra las ventas crudas, no el ritmo
+
+La primera versión decía «se venden 0,2 por semana · dura 4 meses». Los dos
+números eran correctos y **no cuadraban entre sí**: 3 ÷ 0,2 da 15 semanas, no 4
+meses. El 0,2 era un redondeo.
+
+Ahora dice «3 en depósito · 2 vendidos en 3 meses». Es el dato crudo, se puede
+verificar dividiendo, y de paso deja ver **lo flaca que es la estimación**, que
+es justo lo que hace falta para creerle o no. Un producto con dos ventas en tres
+meses no merece la misma confianza que uno con veintiséis.
+
+Arriba del año la duración dice «más de un año» en vez del número: un «69 meses»
+calculado sobre tres ventas es precisión falsa.
+
+**Los productos sin ninguna venta van al final, apagados y con un guión.** No se
+puede decir cuánto duran, pero que estén quietos es información en sí misma, y
+esconderlos sería esconder el stock muerto.
+
+## El desglose de egresos no necesitó ninguna columna nueva
+
+El campo `detalle` ya se cargaba en cada egreso —«frascos», «repollo»,
+«alquiler»— y el resumen solo agrupaba por rubro. Agrupar también por detalle
+dentro de cada rubro reconstruye la subcategoría que llevaban en la planilla
+vieja sin tocar el modelo de datos ni pedir una implementación nueva.

@@ -141,6 +141,22 @@ window.Util = (function () {
   // pantalla que la clienta tiene enfrente se nota.
   const unidades = (n) => numero(n) + (Number(n) === 1 ? " unidad" : " unidades");
 
+  // "ayer", "hace 12 días", "hace 4 meses". Un número de días pelado obliga a
+  // dividir mentalmente, y estos números se leen de reojo mientras se decide a
+  // quién visitar.
+  function haceCuanto(dias) {
+    if (dias == null) return "";
+    if (dias <= 0) return "hoy";
+    if (dias === 1) return "ayer";
+    if (dias < 31) return "hace " + dias + " días";
+    const meses = Math.round(dias / 30.44);
+    if (meses < 12) return "hace " + meses + (meses === 1 ? " mes" : " meses");
+    const anios = Math.floor(meses / 12);
+    const resto = meses % 12;
+    return "hace " + anios + (anios === 1 ? " año" : " años")
+      + (resto ? " y " + resto + (resto === 1 ? " mes" : " meses") : "");
+  }
+
   return { esc, brindis, numero, dinero, aNumero, hoy, fecha, mesLargo, mesDe,
-           enBloque, nuevoId, unaVez, unidades };
+           enBloque, nuevoId, unaVez, unidades, haceCuanto };
 })();

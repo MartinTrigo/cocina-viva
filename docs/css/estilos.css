@@ -1063,3 +1063,104 @@ h3.subtitulo {
 @media (prefers-reduced-motion: reduce) {
   .arranque { transition: none; }
 }
+
+/* ==========================================================================
+   El reloj de la consignación
+
+   Hace cuánto que un local no liquida. Va debajo del renglón, en chico, y solo
+   se pinta cuando pasó del umbral: si estuviera pintado siempre, dejaría de
+   avisar. El color es el tierra de «lo que sale», no el rojo de error: que un
+   local tarde en liquidar no es una falla del sistema, es algo que hay que ir
+   a resolver.
+   ========================================================================== */
+
+.reloj {
+  display: block;
+  font-size: 12px;
+  color: var(--texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reloj--alerta {
+  color: var(--tierra);
+  font-weight: 600;
+}
+
+/* En la ficha del local va suelto, sin renglón alrededor. */
+.reloj--suelto {
+  margin: -4px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radio);
+  background: var(--tierra-suave);
+  white-space: normal;
+}
+
+.reloj--suelto:not(.reloj--alerta) {
+  background: var(--papel);
+  border: 1px solid var(--borde);
+}
+
+/* La lista de los que hay que ir a ver, arriba de todo. */
+.visitar {
+  margin: 0 0 22px;
+  padding: 14px;
+  border: 1px solid var(--tierra);
+  border-radius: var(--radio);
+  background: var(--tierra-suave);
+}
+
+.visitar h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--tierra);
+}
+
+.visitar .nota { margin: 4px 0 10px; }
+.visitar .renglones { margin: 0; }
+
+/* ==========================================================================
+   Los egresos abiertos por detalle
+   ========================================================================== */
+
+.desglose + .desglose { margin-top: 14px; }
+
+.desglose__rubro {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--borde);
+  font-weight: 600;
+  color: var(--tierra);
+}
+
+.desglose__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.desglose__lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 14px;
+}
+
+.desglose__lista li span:first-child {
+  color: var(--texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cuántas veces se cargó ese mismo detalle en el período. */
+.desglose__lista em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--borde);
+}

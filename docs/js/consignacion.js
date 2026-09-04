@@ -23,7 +23,16 @@
 // ==========================================================================
 
 window.Consignacion = (function () {
-  const { esc, dinero, numero, aNumero, hoy, fecha, unaVez, unidades: enUnidades } = window.Util;
+  const { esc, dinero, numero, aNumero, hoy, fecha, unaVez, haceCuanto,
+          unidades: enUnidades } = window.Util;
+
+  // A partir de cuántos días sin liquidar un local pasa a la lista de visitas.
+  //
+  // Mes y medio: si un local tiene mercadería y en ese tiempo no liquidó nada,
+  // o no está vendiendo o está vendiendo y no avisa, y las dos cosas se
+  // resuelven yendo. Más corto sería gritar antes de tiempo, y una alarma que
+  // suena siempre se deja de mirar.
+  const DIAS_PARA_VISITAR = 45;
 
   const MODOS = {
     entregar: { icono: "📦", titulo: "Entregar", verbo: "Entregar", corto: "Entregar",
@@ -80,8 +89,22 @@ window.Consignacion = (function () {
     const filas = todos.map((nombre) => {
       const suyo = window.Datos.stockEn(nombre);
       const u = Object.keys(suyo).reduce((n, c) => n + suyo[c], 0);
-      return { nombre, unidades: u, productos: Object.keys(suyo).length, valor: window.Datos.valorDe(suyo) };
+      return {
+        nombre,
+        unidades: u,
+        productos: Object.keys(suyo).length,
+        valor: window.Datos.valorDe(suyo),
+        ritmo: window.Datos.ritmoDeLocal(nombre),
+      };
     }).sort((a, b) => b.valor - a.valor);
+
+    // Los que hay que ir a ver: tienen mercadería y hace rato que no liquidan.
+    // Se ordenan por tiempo y no por plata, porque el que hace ocho meses que no
+    // paga es más urgente que el que tiene más mercadería hace tres semanas.
+    const paraVisitar = filas
+      .filter((f) => f.unidades && f.ritmo.dias != null && f.ritmo.dias >= DIAS_PARA_VISITAR)
+      .sort((a, b) => b.ritmo.dias - a.ritmo.dias);
+    const paradoEnLaCalle = paraVisitar.reduce((n, f) => n + f.valor, 0);
 
     vista.innerHTML = `
       <div class="cifras">
@@ -98,7 +121,27 @@ window.Consignacion = (function () {
         </div>
       </div>
 
+      ${paraVisitar.length ? `
+        <section class="visitar">
+          <h2>Para ir a ver</h2>
+          <p class="nota">Locales con mercadería que hace más de ${DIAS_PARA_VISITAR} días
+             no liquidan. Son ${dinero(paradoEnLaCalle)} parados.</p>
+          <ul class="renglones">
+            ${paraVisitar.map((f) => `
+              <li class="renglon renglon--sale"
+                  data-ir="consignacion/${encodeURIComponent(f.nombre)}" role="button" tabindex="0">
+                <span class="renglon__texto">
+                  <span class="renglon__que">${esc(f.nombre)}</span>
+                  <span class="renglon__detalle">${enUnidades(f.unidades)}</span>
+                  <span class="reloj reloj--alerta">${esc(relojDe(f.ritmo))}</span>
+                </span>
+                <span class="renglon__cuanto">${dinero(f.valor)}</span>
+              </li>`).join("")}
+          </ul>
+        </section>` : ""}
+
       ${filas.length ? `
+        ${paraVisitar.length ? `<h2 class="separado">Todos los locales</h2>` : ""}
         <ul class="renglones">
           ${filas.map((f) => `
             <li class="renglon ${f.unidades ? "renglon--sale" : ""} ${f.unidades ? "" : "en-cero"}"
@@ -108,6 +151,8 @@ window.Consignacion = (function () {
                 <span class="renglon__detalle">${f.unidades
                   ? enUnidades(f.unidades) + " · " + f.productos + " producto" + (f.productos === 1 ? "" : "s")
                   : "sin mercadería"}</span>
+                ${f.unidades ? `<span class="reloj ${f.ritmo.dias >= DIAS_PARA_VISITAR
+                    ? "reloj--alerta" : ""}">${esc(relojDe(f.ritmo))}</span>` : ""}
               </span>
               <span class="renglon__cuanto">${f.unidades ? dinero(f.valor) : "—"}</span>
             </li>`).join("")}
@@ -121,6 +166,27 @@ window.Consignacion = (function () {
         ${tabla(window.Datos.renglonesDe(enLaCalle), total)}` : ""}`;
 
     enganchar();
+  }
+
+  // El reloj de un local, en una línea. Dice DOS cosas distintas según el caso,
+  // y la diferencia importa: "sin liquidar nunca" es un local que quizás recién
+  // arranca o quizás se olvidaron para siempre; "sin liquidar hace 3 meses" es
+  // uno que alguna vez pagó y dejó de hacerlo.
+  function relojDe(r) {
+    if (!r || r.dias == null) return "";
+    const cuanto = haceCuanto(r.dias);
+    return r.nuncaLiquido
+      ? cuanto + ", nunca liquidó"
+      : "sin liquidar " + cuanto;
+  }
+
+  // A qué ritmo vende un local. Null cuando no hay con qué estimarlo, y
+  // entonces no se muestra ningún número: inventar un cero sería peor que no
+  // decir nada, porque un cero se lee como "no vende".
+  function ritmoEnPalabras(r) {
+    if (!r || !r.porMes) return "";
+    const n = r.porMes >= 10 ? Math.round(r.porMes) : Math.round(r.porMes * 10) / 10;
+    return "vende unas " + numero(n) + " por mes";
   }
 
   function tabla(renglones, total) {
@@ -163,6 +229,8 @@ window.Consignacion = (function () {
     const renglones = window.Datos.renglonesDe(suyo);
     const valor = window.Datos.valorDe(suyo);
     const unidades = renglones.reduce((n, r) => n + r.cantidad, 0);
+    const ritmo = window.Datos.ritmoDeLocal(local);
+    const alDia = [relojDe(ritmo), ritmoEnPalabras(ritmo)].filter((t) => t).join(" · ");
 
     vista.innerHTML = `
       ${mensaje || ""}
@@ -177,6 +245,9 @@ window.Consignacion = (function () {
           <span class="cifra__cuanto">${numero(unidades)}</span>
         </div>
       </div>
+
+      ${alDia ? `<p class="reloj reloj--suelto ${unidades && ritmo.dias >= DIAS_PARA_VISITAR
+        ? "reloj--alerta" : ""}">${esc(alDia)}</p>` : ""}
 
       <div class="campo">
         <label>¿Qué estás haciendo?</label>

@@ -127,6 +127,10 @@ window.Resumen = (function () {
           "Los egresos por rubro.",
           dona(agrupar(p.egresos, (e) => e.rubro, (e) => e.monto), p.totalEgresos)) : ""}
 
+        ${p.egresos.length ? bloque("Rubro por rubro",
+          "Cada rubro abierto por lo que dice el detalle de cada gasto.",
+          egresosPorDetalle(p.egresos), true) : ""}
+
         ${p.ingresos.length ? bloque("Qué se vendió",
           "Los ingresos por producto.",
           dona(porProducto(p.ingresos), p.totalIngresos)) : ""}
@@ -173,6 +177,33 @@ window.Resumen = (function () {
 
   // Un bloque del tablero. En el teléfono van uno abajo del otro; en una
   // pantalla grande se acomodan de a dos, y los que piden fila entera lo dicen.
+  // Los egresos abiertos por detalle dentro de cada rubro.
+  //
+  // «Insumos» solo dice que la plata se fue en producir. «frascos $145.000 ·
+  // repollo $96.000» dice dónde conviene mirar, que es la pregunta real. Es la
+  // subcategoría que llevaban en la planilla vieja, y no hizo falta agregar
+  // ninguna columna: el detalle ya se carga en cada egreso.
+  function egresosPorDetalle(egresos) {
+    return agrupar(egresos, (e) => e.rubro, (e) => e.monto).map((r) => {
+      const suyos = egresos.filter((e) => String(e.rubro || "—") === r.que);
+      const detalles = agrupar(suyos,
+        (e) => String(e.detalle || "").trim() || "sin detalle", (e) => e.monto);
+      return `
+        <div class="desglose">
+          <p class="desglose__rubro">
+            <span>${esc(r.que)}</span><span>${dinero(r.cuanto)}</span>
+          </p>
+          <ul class="desglose__lista">
+            ${detalles.map((d) => `
+              <li>
+                <span>${esc(d.que)}${d.cuantos > 1 ? ` <em>×${d.cuantos}</em>` : ""}</span>
+                <span>${dinero(d.cuanto)}</span>
+              </li>`).join("")}
+          </ul>
+        </div>`;
+    }).join("");
+  }
+
   function bloque(titulo, nota, contenido, ancho) {
     if (!contenido) return "";
     return `

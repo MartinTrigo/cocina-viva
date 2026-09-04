@@ -173,6 +173,126 @@ window.Datos = (function () {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
 
+  // ---------- Ritmo: hace cuánto y a qué velocidad ----------
+  //
+  // Todo esto sale de las fechas de los movimientos, que ya estaban. No hay
+  // ningún dato nuevo que cargar ni ninguna columna nueva en la planilla.
+
+  const DIA = 86400000;
+
+  const dos = (n) => String(n).padStart(2, "0");
+  const soloFecha = (v) => String(v || "").slice(0, 10);
+
+  // Días entre una fecha "aaaa-mm-dd" y hoy. Null si la fecha no sirve, que es
+  // distinto de cero: cero es "hoy".
+  function diasDesde(iso) {
+    const s = soloFecha(iso);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const p = s.split("-");
+    const cuando = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return Math.round((hoy - cuando) / DIA);
+  }
+
+  // La fecha de hace tantos días, en "aaaa-mm-dd", para comparar como texto.
+  function hace(dias) {
+    const d = new Date();
+    d.setDate(d.getDate() - dias);
+    return d.getFullYear() + "-" + dos(d.getMonth() + 1) + "-" + dos(d.getDate());
+  }
+
+  // Todo lo que se puede decir del tiempo en un local.
+  //
+  // EL RELOJ QUE IMPORTA ES EL DE LA LIQUIDACIÓN, no el del último movimiento.
+  // Dejarle una caja nueva a un local que hace cinco meses no paga no arregla
+  // nada; si contara cualquier movimiento, el reloj se pondría en cero justo
+  // cuando el problema empeora. Si nunca liquidaron, corre desde que tienen
+  // mercadería.
+  function ritmoDeLocal(nombre) {
+    const local = String(nombre || "").trim();
+    const suyos = (cache ? cache.movimientos : [])
+      .filter((m) => m.desde === local || m.hacia === local);
+
+    const fechasDe = (tipos) => suyos
+      .filter((m) => tipos.indexOf(m.tipo) >= 0)
+      .map((m) => soloFecha(m.fecha))
+      .filter((f) => f)
+      .sort();
+
+    const liquidaciones = fechasDe(["liquidacion"]);
+    // Lo que puso mercadería ahí: una entrega, o el conteo con el que se
+    // importó lo que ya tenían de la planilla vieja.
+    const llegadas = fechasDe(["entrega", "ajuste"]);
+    const todas = fechasDe(["liquidacion", "entrega", "ajuste", "devolucion"]);
+
+    const ultimaLiquidacion = liquidaciones.length ? liquidaciones[liquidaciones.length - 1] : null;
+    const primeraLlegada = llegadas.length ? llegadas[0] : null;
+    const ultimoMovimiento = todas.length ? todas[todas.length - 1] : null;
+    const desde = ultimaLiquidacion || primeraLlegada;
+
+    const liquidado = suyos
+      .filter((m) => m.tipo === "liquidacion")
+      .reduce((n, m) => n + (Number(m.cantidad) || 0), 0);
+
+    // Con menos de un mes de historia no se habla de ritmo: diría cualquier
+    // cosa y la gente le creería.
+    const historia = primeraLlegada ? diasDesde(primeraLlegada) : null;
+    const porMes = (liquidado > 0 && historia && historia >= 30)
+      ? liquidado / (historia / 30.44)
+      : null;
+
+    return {
+      ultimaLiquidacion, ultimoMovimiento, primeraLlegada,
+      nuncaLiquido: !ultimaLiquidacion,
+      dias: desde ? diasDesde(desde) : null,
+      liquidado, porMes,
+    };
+  }
+
+  // Cuántas unidades por semana se vendieron de un producto en los últimos
+  // días. Cuenta la venta directa y la liquidación de consignación, que son las
+  // dos maneras en que un frasco se vende de verdad. La entrega no: esa todavía
+  // no se vendió, solo cambió de lugar.
+  function ventasPorSemana(cod, dias) {
+    if (!cache) return 0;
+    const ventana = dias || 90;
+    const desde = hace(ventana);
+    let unidades = 0;
+    cache.movimientos.forEach((m) => {
+      if (m.cod !== cod) return;
+      if (m.tipo !== "venta" && m.tipo !== "liquidacion") return;
+      const f = soloFecha(m.fecha);
+      if (f && f >= desde) unidades += Number(m.cantidad) || 0;
+    });
+    return { unidades: unidades, porSemana: unidades / (ventana / 7), dias: ventana };
+  }
+
+  // Para cada producto activo: lo que hay en el depósito y cuántas semanas dura
+  // al ritmo al que se vende.
+  //
+  // Cuando no se vendió nada en la ventana, "semanas" queda en null y NO en
+  // infinito: la diferencia entre "dura para siempre" y "no sabemos" es todo el
+  // punto de esta pantalla.
+  function coberturaDeStock(dias) {
+    const enDeposito = stockDeposito();
+    const enLaCalle = stockEnLaCalle();
+    return productosActivos().map((p) => {
+      const v = ventasPorSemana(p.cod, dias);
+      const cantidad = enDeposito[p.cod] || 0;
+      return {
+        cod: p.cod,
+        nombre: nombreDe(p.cod),
+        cantidad,
+        enLaCalle: enLaCalle[p.cod] || 0,
+        vendidos: v.unidades,
+        diasMirados: v.dias,
+        porSemana: v.porSemana,
+        semanas: v.porSemana > 0 ? cantidad / v.porSemana : null,
+      };
+    });
+  }
+
   // ---------- Armado de movimientos ----------
 
   // Arma la fila del libro mayor para una clase de movimiento. Que el "desde"
@@ -224,6 +344,7 @@ window.Datos = (function () {
     producto, productosActivos, clientesActivos, localesDeConsignacion,
     nombreDe, precioDe,
     stockEn, stockDeposito, stockEnLaCalle, localesConMercaderia, valorDe, renglonesDe,
+    diasDesde, ritmoDeLocal, ventasPorSemana, coberturaDeStock,
     movimiento, ajuste,
   };
 })();

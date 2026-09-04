@@ -1096,6 +1096,52 @@ function limpiarConsignacionDeBajas() {
   return texto;
 }
 
+/* --------------------------------------------------------------------------
+   FECHAR LA CONSIGNACIÓN IMPORTADA
+
+   Los 84 renglones que se trajeron de la planilla vieja entraron todos con
+   fecha 21/8/2026, el día del conteo del depósito. Como foto es coherente, pero
+   deja ciega a la pantalla de antigüedad: los diez locales aparecen con la
+   misma edad, cuando en la planilla había entregas de abril y de agosto. Y
+   distinguir eso es justamente para lo que sirve esa pantalla.
+
+   La fecha real de cada local quedó escrita en las observaciones —«anotada el
+   8/04/2026»—. Esta función la pasa a la columna de fecha, que es donde sirve.
+
+   NO MUEVE STOCK. Estos movimientos tienen el «desde» vacío, así que cambiarles
+   la fecha no cambia ningún saldo: solo mueve el reloj.
+
+   Al depósito no lo toca: su conteo sí es del 21/8 y esa fecha es la correcta.
+   -------------------------------------------------------------------------- */
+
+function fecharConsignacionImportada() {
+  var movimientos = leerFilas('movimientos');
+  var tocados = 0;
+
+  movimientos.forEach(function (m) {
+    if (m.tipo !== 'ajuste' || String(m.ref).trim() !== 'conteo inicial') return;
+    var local = String(m.hacia || '').trim();
+    if (!local || local === DEPOSITO) return;
+
+    // El año es opcional porque en la planilla había fechas escritas «7/8».
+    var d = String(m.obs || '').match(/anotada el\s+(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{4}))?/);
+    if (!d) return;
+
+    var iso = (d[3] || '2026') + '-' + dos(d[2]) + '-' + dos(d[1]);
+    if (m.fecha === iso) return;
+    m.fecha = iso;
+    m.mod = Date.now();
+    tocados++;
+  });
+
+  if (!tocados) return 'No había fechas que corregir.';
+  escribirFilas('movimientos', movimientos);
+  var texto = 'Corregidas ' + tocados + ' fechas de la consignación importada.\n'
+    + 'Sincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
+}
+
 /* ================= Auxiliares ================= */
 
 function hoja(nombre) {

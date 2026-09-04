@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.3.2 · pantalla de arranque";
+  const VERSION = "1.4.0 · a quién ir a ver";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");

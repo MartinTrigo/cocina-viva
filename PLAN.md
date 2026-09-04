@@ -254,28 +254,35 @@ del Apps Script y cuáles no.** Pegar el código, correr las funciones y publica
 una versión es el trámite más pesado del proyecto, así que conviene juntar los
 cambios de hoja en pocas tandas en vez de repartirlos.
 
-## Fase 6 — Lo que ya se puede calcular · **falta**
+## Fase 6 — Lo que ya se puede calcular · **hecha**
 
 **No toca la planilla: no hace falta implementación nueva.** Son tres cosas que
 salen de datos que la app ya tiene y hoy no muestra.
 
-- [ ] **Antigüedad de la consignación.** Hoy la pantalla dice cuánto tiene cada
+- [x] **Antigüedad de la consignación.** Hoy la pantalla dice cuánto tiene cada
       local, no hace cuánto. Y ese es el número que decide a quién ir a ver: el
       molino paraje tiene mercadería desde abril y renacer desde agosto, y en la
       lista se ven igual. Cada local con «16 u. · hace 4 meses sin liquidar», y
       poder ordenar por eso.
-- [ ] **Vista «a quién ir a ver»**: los locales sin movimiento hace más de X
+- [x] **Vista «a quién ir a ver»**: los locales sin movimiento hace más de X
       días, con la plata parada en cada uno.
-- [ ] **Rotación por local**: cuánto vende por mes cada uno. Distingue al que no
+- [x] **Rotación por local**: cuánto vende por mes cada uno. Distingue al que no
       vende del que vende y no avisa, que son dos problemas con soluciones
       opuestas.
-- [ ] **Qué conviene producir**: los productos ordenados por cuántas semanas de
+- [x] **Qué conviene producir**: los productos ordenados por cuántas semanas de
       stock quedan al ritmo al que se venden. Es la hoja «planificación» que
       intentaron, pero calculada sola.
-- [ ] **Egresos desglosados por detalle.** El campo `detalle` ya se carga, pero
+- [x] **Egresos desglosados por detalle.** El campo `detalle` ya se carga, pero
       el resumen solo agrupa por rubro. Mostrar «Insumos: frascos $145.000 ·
       repollo $96.000» es la subcategoría que tenían en la planilla, sin agregar
       ni una columna.
+
+- [x] Probada con el catálogo real: la pantalla de consignación avisa que hay
+      **$406.400 parados** en tres locales, con el molino paraje hace cinco
+      meses. Las trece rutas de la app responden sin un error en consola.
+- [ ] **Falta correr `fecharConsignacionImportada()`** en el Apps Script: sin
+      eso los diez locales figuran con la misma antigüedad y la pantalla no
+      dice nada.
 
 ## Fase 7 — Costo y margen · **falta**
 

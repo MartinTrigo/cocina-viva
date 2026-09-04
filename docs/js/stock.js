@@ -127,9 +127,93 @@ window.Stock = (function () {
         </div>` : ""}
 
       <h2 class="separado">Lo que hay en el depósito</h2>
-      ${resumenDeposito(productos, deposito)}`;
+      ${resumenDeposito(productos, deposito)}
+
+      ${queConvieneProducir()}`;
 
     enganchar();
+  }
+
+  // ---------- Qué conviene producir ----------
+  //
+  // Cuántas semanas dura lo que hay en el depósito al ritmo al que se vende. No
+  // hace falta cargar nada nuevo: el ritmo sale de las ventas y las
+  // liquidaciones que ya están anotadas.
+  //
+  // Los primeros son los que menos duran, que es el orden en el que uno decide
+  // qué envasar el lunes.
+
+  // Cuánto mira para atrás. Tres meses es suficiente para que un producto de
+  // venta despareja no parezca muerto por una mala semana, y poco como para que
+  // un cambio de temporada se note.
+  const VENTANA_DIAS = 90;
+
+  // Debajo de esto, urge. Dos semanas es más o menos lo que tarda un fermento
+  // en estar listo, así que es el aviso que llega a tiempo.
+  const SEMANAS_CORTAS = 2;
+
+  function queConvieneProducir() {
+    const todos = window.Datos.coberturaDeStock(VENTANA_DIAS);
+    const conRitmo = todos.filter((f) => f.porSemana > 0);
+
+    if (!conRitmo.length) {
+      return `
+        <h2 class="separado">Qué conviene producir</h2>
+        <p class="vacio">Todavía no hay ventas cargadas de los últimos tres meses,
+           así que no hay con qué estimar cuánto dura el stock. Aparece solo
+           cuando empiecen a cargar ventas y liquidaciones.</p>`;
+    }
+
+    const orden = conRitmo.slice().sort((a, b) => a.semanas - b.semanas);
+    const urgentes = orden.filter((f) => f.semanas < SEMANAS_CORTAS).length;
+    // Los que no se vendieron nada van al final. No se puede decir cuánto duran,
+    // pero que estén quietos es información en sí misma.
+    const quietos = todos.filter((f) => !f.porSemana && f.cantidad)
+      .sort((a, b) => b.cantidad - a.cantidad);
+
+    return `
+      <h2 class="separado">Qué conviene producir</h2>
+      <p class="nota">Cuánto dura lo del depósito al ritmo de los últimos tres
+         meses. ${urgentes
+           ? "Hay " + urgentes + (urgentes === 1 ? " producto" : " productos")
+             + " para menos de " + SEMANAS_CORTAS + " semanas."
+           : "Ninguno baja de las " + SEMANAS_CORTAS + " semanas."}</p>
+      <ul class="renglones">
+        ${orden.map((f) => renglonDeCobertura(f)).join("")}
+        ${quietos.map((f) => renglonDeCobertura(f)).join("")}
+      </ul>`;
+  }
+
+  function renglonDeCobertura(f) {
+    const meses = Math.round(f.diasMirados / 30.44);
+    // Se muestran las unidades vendidas crudas y no el ritmo por semana: un
+    // "0,2 por semana" redondeado no cuadra con la duración si alguien divide,
+    // y además "2 vendidos en 3 meses" deja ver solo lo flaca que es la
+    // estimación, que es justo lo que hay que saber para creerle o no.
+    return `
+      <li class="renglon ${f.semanas != null && f.semanas < SEMANAS_CORTAS ? "renglon--sale" : ""}
+                 ${f.semanas == null ? "en-cero" : ""}">
+        <span class="renglon__texto">
+          <span class="renglon__que">${esc(f.nombre)}</span>
+          <span class="renglon__detalle">${numero(f.cantidad)} en depósito ·
+            ${f.vendidos ? numero(f.vendidos) + " vendidos" : "sin ventas"}
+            en ${meses} meses</span>
+        </span>
+        <span class="renglon__cuanto ${f.semanas != null && f.semanas < SEMANAS_CORTAS ? "negativo" : ""}">
+          ${duracion(f.semanas)}</span>
+      </li>`;
+  }
+
+  // "3 sem." aguanta bien hasta un par de meses; de ahí en más el número de
+  // semanas deja de decir algo y conviene pasar a meses. Y arriba del año el
+  // número exacto es una precisión falsa: sale de un puñado de ventas.
+  function duracion(semanas) {
+    if (semanas == null) return "—";
+    if (semanas < 1) return "menos de 1 sem.";
+    if (semanas < 9) return Math.round(semanas) + " sem.";
+    if (semanas > 52) return "más de un año";
+    const meses = Math.round(semanas / 4.35);
+    return meses + (meses === 1 ? " mes" : " meses");
   }
 
   // ---------- El resumen del depósito ----------
