@@ -221,7 +221,7 @@ imprimir. Falta ver cómo se le habla al aparato.
 - [x] Los tres clientes que figuraban como «compra» quedan resueltos solos:
       estaban dados de baja a propósito, así que su consignación se saca.
 
-## Arreglos sobre el libro · **listos para correr**
+## Arreglos sobre el libro · **hechos**
 
 - [x] **`INGRESOS POR MES` ya no da `#ERROR!`.** Se sacó el arreglo `{ ... \ ... }`
       que QUERY no entendía y se reemplazó por SORT/UNIQUE/FILTER más un
@@ -230,8 +230,10 @@ imprimir. Falta ver cómo se le habla al aparato.
       marcados como no activos, tocando solo los renglones del conteo inicial.
       Probada contra la planilla simulada: conserva las entregas y devoluciones
       reales de un cliente dado de baja, y es idempotente.
-- [ ] **Falta que Martín pegue el `Code.gs` nuevo**, corra las dos funciones y
-      haga la implementación nueva.
+- [x] **Hecho el 4/9/2026.** Verificado en el libro: `INGRESOS POR MES` ya
+      calcula (2026-09 · $12.800) en vez de dar `#ERROR!`, y los quince
+      renglones de los tres clientes dados de baja salieron de `movimientos` y
+      quedaron con su lápida en `borrados`.
 
 ## Fase 5 — Puesta en marcha · **falta**
 
@@ -280,9 +282,9 @@ salen de datos que la app ya tiene y hoy no muestra.
 - [x] Probada con el catálogo real: la pantalla de consignación avisa que hay
       **$406.400 parados** en tres locales, con el molino paraje hace cinco
       meses. Las trece rutas de la app responden sin un error en consola.
-- [ ] **Falta correr `fecharConsignacionImportada()`** en el Apps Script: sin
-      eso los diez locales figuran con la misma antigüedad y la pantalla no
-      dice nada.
+- [x] **Corrido en el libro y verificado** (4/9/2026): las fechas quedaron
+      repartidas de abril a agosto, la consignación en $1.032.650 y 142 unidades,
+      y el depósito en $2.048.150 después de la primera venta real.
 
 ## Fase 7 — Costo y margen · **falta**
 
