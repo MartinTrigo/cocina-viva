@@ -605,3 +605,53 @@ falló, lo que hay que ver es el cartel del error y no el logo.
 **En el arranque va solo el número de versión**, sin el nombre: ahí abajo del
 logo, «1.3.2 · pantalla de arranque» sería un renglón de ruido. El nombre
 completo sigue en el pie.
+
+## La consignación de la planilla vieja entra como conteo, no como entrega
+
+En la hoja `INGRESOS` de la planilla vieja, las primeras 97 filas —contiguas,
+arriba de todo— tienen «Consignación» en la columna del medio de pago. Son diez
+locales y 171 unidades.
+
+**No son remitos de entrega: son un conteo de lo que cada local tiene.** Se nota
+en que cada local trae la lista casi completa del catálogo, **con los renglones
+en cero incluidos**. Un remito no lista lo que no entregó; una planilla de
+control sí, y se edita en el lugar cuando el local vende.
+
+**Y el conteo del depósito ya los excluía.** Esto se comprobó, no se supuso: en
+la tabla de stock de la planilla vieja hay tres productos en cero que sin
+embargo están en varios locales. Si el conteo del depósito los hubiera incluido,
+no podrían dar cero. Además esa tabla suma exactamente las 263 unidades y los
+$2.060.950 con los que arrancó la app.
+
+De ahí la decisión: **entran como `ajuste` con `desde` vacío y `hacia` el local**,
+que es el mismo movimiento con el que se cargó el stock inicial del depósito.
+Cargarlos como `entrega` habría descontado 171 unidades de un depósito que nunca
+las tuvo, y habría dejado tres productos en negativo.
+
+Se probó con el catálogo real cargado: el depósito queda intacto en 263 unidades
+y $2.060.950, la consignación pasa a $1.242.200, y no queda ninguna ubicación en
+negativo.
+
+**Lo que esto no resuelve.** La planilla anotaba una fecha por local y algunas
+son de abril. Si desde entonces vendieron y no quedó anotado, el número carga de
+más. Es un punto de partida, no un conteo de hoy: sigue haciendo falta pasar por
+cada local. Lo bueno es que ahora hay contra qué comparar, que antes no había.
+
+**Los datos no van al repositorio.** Las 84 filas se entregaron como archivo
+aparte, para pegar en la hoja `movimientos`. La app tiene el camino previsto
+—las hojas se editan a mano y la sincronización las lee— así que no hizo falta
+tocar código ni hacer una implementación nueva.
+
+## El repositorio es público y `Code.gs` lleva datos del emprendimiento
+
+Encontrado al preparar la carga de la consignación, y sin resolver: el archivo
+`apps-script/Code.gs` está versionado y trae `SEMILLA_CLIENTES` con los 46
+clientes, su localidad y si compran o trabajan a consignación, y
+`SEMILLA_PRODUCTOS` con los dos precios de cada producto y el stock inicial.
+
+Las semillas ya cumplieron su función: el libro está creado. Sacarlas del
+archivo es barato, pero **borrarlas del archivo no las borra del historial de
+git**: para eso hay que reescribir el historial y forzar la subida, o empezar un
+repositorio nuevo.
+
+Queda anotado como decisión pendiente de Martín, que es de quien es el dato.

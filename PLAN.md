@@ -205,6 +205,20 @@ imprimir. Falta ver cómo se le habla al aparato.
 - [ ] Comprobar que el ancho es 58 mm y no 80 mm. Si fuera de 80, el ancho pasa
       de 384 a 576 en `docs/js/remito.js` y no hay que tocar nada más.
 
+## Consignación de la planilla vieja · **preparada**
+
+- [x] Encontradas y leídas las 97 filas con «Consignación» de la hoja `INGRESOS`:
+      diez locales, 171 unidades, $1.242.200 a precio mayorista.
+- [x] Comprobado que el conteo del depósito **ya las excluía**, así que entran
+      como conteo y no como entrega. Está explicado en DECISIONES.md.
+- [x] Generadas las 84 filas para pegar en la hoja `movimientos` (se saltean los
+      13 renglones en cero) y probadas con el catálogo real: el depósito queda
+      intacto y no hay stock negativo.
+- [ ] **Falta que Martín las pegue** en la hoja `movimientos` del libro nuevo y
+      sincronice. No requiere implementación nueva.
+- [ ] Falta corregir tres clientes que figuran como «compra» y en la planilla
+      vieja siempre aparecen a consignación.
+
 ## Fase 5 — Puesta en marcha · **falta**
 
 - [ ] Prueba de punta a punta con las dos, cargando cosas de verdad.
