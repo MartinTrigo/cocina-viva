@@ -82,6 +82,25 @@ window.Datos = (function () {
     return p.presentacion ? p.producto + " " + window.Util.enBloque(p.presentacion) : p.producto;
   }
 
+  // Lo que cuesta hacer un frasco. Cero significa «no lo cargaron», no «es
+  // gratis», y por eso todo lo que calcula margen pregunta primero si hay costo.
+  const costoDe = (cod) => {
+    const p = producto(cod);
+    return p ? Number(p.costo) || 0 : 0;
+  };
+
+  const hayCosto = (cod) => costoDe(cod) > 0;
+
+  // Lo que deja un frasco y qué porcentaje del precio es. Null cuando no hay
+  // costo cargado: mostrar 100 % de margen porque el costo está vacío sería
+  // mentir con un número, que es la peor manera de mentir.
+  function margenDe(cod, lista) {
+    const precio = precioDe(cod, lista);
+    const costo = costoDe(cod);
+    if (!costo || !precio) return null;
+    return { costo, precio, gana: precio - costo, porcentaje: (precio - costo) / precio };
+  }
+
   const precioDe = (cod, lista) => {
     const p = producto(cod);
     if (!p) return 0;
@@ -342,7 +361,7 @@ window.Datos = (function () {
     DEPOSITO, PRODUCCION, VENDIDO, MERMA, RESERVADAS,
     cargar, hay, todo,
     producto, productosActivos, clientesActivos, localesDeConsignacion,
-    nombreDe, precioDe,
+    nombreDe, precioDe, costoDe, hayCosto, margenDe,
     stockEn, stockDeposito, stockEnLaCalle, localesConMercaderia, valorDe, renglonesDe,
     diasDesde, ritmoDeLocal, ventasPorSemana, coberturaDeStock,
     movimiento, ajuste,

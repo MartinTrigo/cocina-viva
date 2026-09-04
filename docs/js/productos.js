@@ -97,6 +97,7 @@ window.Productos = (function () {
                 <td>
                   <span class="celda__que">${esc(p.producto)}${p.presentacion ? " " + esc(enBloque(p.presentacion)) : ""}</span>
                   <span class="celda__detalle">${esc(p.cod)}</span>
+                  ${margenEnPalabras(p.cod)}
                 </td>
                 <td class="numero">${dinero(p.pmayor)}</td>
                 <td class="numero">${dinero(p.pminor)}</td>
@@ -111,6 +112,24 @@ window.Productos = (function () {
   }
 
   // ---------- Alta y edición ----------
+
+  // El margen mayorista de un producto, en una línea corta. Vacío cuando no hay
+  // costo cargado: un guión en la columna de costo ya dice que falta el dato, y
+  // repetirlo en cada fila sería ruido.
+  //
+  // Se muestra el MAYORISTA porque es el precio al que se vende casi todo. El
+  // minorista se ve entrando al producto.
+  function margenEnPalabras(cod) {
+    const m = window.Datos.margenDe(cod, "mayorista");
+    if (!m) return "";
+    const pct = Math.round(m.porcentaje * 100);
+    const clase = m.gana <= 0 ? "margen--mal" : (pct < 30 ? "margen--flaco" : "margen");
+    // Va corto a propósito. Con el costo escrito también acá, el renglón
+    // ensanchaba la columna y empujaba el lápiz de editar fuera de la pantalla
+    // del teléfono. El costo se ve entrando al producto; lo que hace falta de un
+    // vistazo en la lista es cuál deja poco.
+    return `<span class="celda__margen ${clase}">deja ${dinero(m.gana)} (${pct}%)</span>`;
+  }
 
   function formulario(p) {
     const nuevo = !p;
@@ -141,6 +160,14 @@ window.Productos = (function () {
                  placeholder="340 g">
         </div>
 
+        <div class="campo">
+          <label for="c-costo">Cuánto cuesta hacer uno</label>
+          <span class="ayuda">Los insumos de un frasco: la verdura, el frasco, la
+             etiqueta, la sal. Sin esto la app no puede decir cuánto se gana.</span>
+          <input type="text" id="c-costo" class="numero" inputmode="decimal"
+                 value="${nuevo || !p.costo ? "" : p.costo}" placeholder="0">
+        </div>
+
         <div class="fila">
           <div class="campo">
             <label for="c-pmayor">Precio mayorista <span class="obliga">•</span></label>
@@ -153,6 +180,8 @@ window.Productos = (function () {
                    value="${nuevo ? "" : p.pminor}">
           </div>
         </div>
+
+        <p class="nota" id="c-margen"></p>
 
         <p class="campo__error" id="c-error" hidden></p>
         <button class="boton boton--ancho" id="btn-guardar">Guardar</button>
@@ -175,6 +204,37 @@ window.Productos = (function () {
           : `<p class="nota separado">Tiene ${numero(usos)} registro${usos === 1 ? "" : "s"}
                en la historia, así que no se puede borrar: se daría de baja nada más.</p>`}
         </div>`}`;
+
+    // El margen se recalcula mientras escriben. Enterarse de que un precio deja
+    // el 8 % DESPUÉS de guardarlo obliga a volver a entrar; acá se ve mientras
+    // se decide, que es cuando sirve.
+    const verMargen = () => {
+      const costo = aNumero(document.getElementById("c-costo").value);
+      const mayor = aNumero(document.getElementById("c-pmayor").value);
+      const menor = aNumero(document.getElementById("c-pminor").value);
+      const linea = document.getElementById("c-margen");
+      if (!Number.isFinite(costo) || costo <= 0) {
+        linea.textContent = "";
+        linea.className = "nota";
+        return;
+      }
+      const partes = [];
+      const contra = (precio, como) => {
+        if (!Number.isFinite(precio) || precio <= 0) return;
+        const pct = Math.round(((precio - costo) / precio) * 100);
+        partes.push(como + ": deja " + dinero(precio - costo) + " (" + pct + "%)");
+      };
+      contra(mayor, "Mayorista");
+      contra(menor, "Minorista");
+      linea.textContent = partes.join(" · ");
+      linea.className = (Number.isFinite(mayor) && mayor > 0 && mayor <= costo)
+        ? "nota margen--mal" : "nota";
+    };
+    ["c-costo", "c-pmayor", "c-pminor"].forEach((id) => {
+      const campo = document.getElementById(id);
+      if (campo) campo.oninput = verMargen;
+    });
+    verMargen();
 
     unaVez(document.getElementById("btn-guardar"), () => guardar(p));
 
@@ -208,6 +268,7 @@ window.Productos = (function () {
     const cod = (document.getElementById("c-cod").value || "").trim().toUpperCase();
     const producto = (document.getElementById("c-producto").value || "").trim();
     const presentacion = (document.getElementById("c-presentacion").value || "").trim();
+    const costo = aNumero(document.getElementById("c-costo").value);
     const pmayor = aNumero(document.getElementById("c-pmayor").value);
     const pminor = aNumero(document.getElementById("c-pminor").value);
 
@@ -229,6 +290,9 @@ window.Productos = (function () {
     }
     if (!producto) return mal("Falta el nombre del producto.");
     if (!Number.isFinite(pmayor) || pmayor <= 0) return mal("El precio mayorista tiene que ser un número mayor que cero.");
+    if (document.getElementById("c-costo").value.trim() && !Number.isFinite(costo)) {
+      return mal("El costo tiene que ser un número.");
+    }
     if (document.getElementById("c-pminor").value.trim() && !Number.isFinite(pminor)) {
       return mal("El precio minorista no se entiende como número.");
     }
@@ -237,6 +301,7 @@ window.Productos = (function () {
       cod: nuevo ? cod : previo.cod,
       producto: producto,
       presentacion: presentacion,
+      costo: Number.isFinite(costo) ? costo : 0,
       pmayor: pmayor,
       pminor: Number.isFinite(pminor) ? pminor : 0,
       activo: nuevo ? true : previo.activo !== false,

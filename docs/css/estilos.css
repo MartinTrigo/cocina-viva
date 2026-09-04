@@ -1164,3 +1164,23 @@ h3.subtitulo {
   font-size: 12px;
   color: var(--borde);
 }
+
+/* ==========================================================================
+   El margen
+
+   Tres estados y no dos: bien, flaco y mal. El del medio existe porque un
+   margen del 15 % no es un error —no hay nada que corregir— pero sí es algo
+   que conviene mirar antes de que el próximo aumento de insumos se lo coma.
+   ========================================================================== */
+
+.margen { color: var(--verde); }
+.margen--flaco { color: var(--tierra); }
+.margen--mal { color: var(--error); font-weight: 600; }
+
+/* El margen en la lista de productos. Envuelve en vez de estirar la columna:
+   si no cortara, empujaría el lápiz de editar fuera de la pantalla. */
+.celda__margen {
+  display: block;
+  font-size: 13px;
+  white-space: normal;
+}

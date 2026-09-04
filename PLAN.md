@@ -286,7 +286,7 @@ salen de datos que la app ya tiene y hoy no muestra.
       repartidas de abril a agosto, la consignación en $1.032.650 y 142 unidades,
       y el depósito en $2.048.150 después de la primera venta real.
 
-## Fase 7 — Costo y margen · **falta**
+## Fase 7 — Costo y margen · **hecha**
 
 **Una implementación nueva** (se agrega una columna a `productos`).
 
@@ -294,14 +294,27 @@ Hoy la app sabe cuánta plata entró y cuánta salió, pero nunca las conecta co
 producto. Sabe que se vendieron 3 kimchi a $6.800; no sabe qué costaron. Y el
 aumento de precios en masa que ya existe se hace **a ciegas**.
 
-- [ ] **Un campo `costo` en Productos**, que actualizan cuando quieren. Con eso
+- [x] **Un campo `costo` en Productos**, que actualizan cuando quieren. Con eso
       solo aparece margen en la pantalla de venta, margen por producto en el
       resumen, y la respuesta a «¿me conviene este cliente a mayorista?».
-- [ ] **Costo del lote en el movimiento de producción** (opcional, misma
+- [x] **Costo del lote en la pantalla de Stock** (opcional, misma
       implementación): costo por unidad = costo del lote ÷ frascos. Da precisión
       sin tener que inventar recetas.
+- [x] Margen en la lista de productos con tres estados —bien, flaco y mal— y en
+      el formulario mientras se escribe el precio.
+- [x] **«Lo que dejó»** en el resumen: lo vendido menos lo que costó hacerlo,
+      producto por producto, dejando afuera los que no tienen costo y diciendo
+      cuánto quedó afuera.
+- [x] Migración automática de la hoja, que corre antes de cualquier lectura, y
+      arreglo de la fórmula del resumen que apuntaba a la columna por letra.
+      Probadas contra la planilla simulada: los precios no se corren, es
+      idempotente y el costo sobrevive la vuelta completa de sincronización.
 - [ ] Si alguna vez quieren precisión de verdad, el paso siguiente es una receta
       por producto. Es un proyecto entero y **no** conviene arrancar por ahí.
+- [ ] **Falta que Martín pegue el `Code.gs` nuevo y publique la implementación.**
+      Hasta que eso pase, los teléfonos con la app nueva no sincronizan: el
+      número de protocolo subió a 2 para que un teléfono viejo no borre los
+      costos.
 
 ## Fase 8 — Pedidos · **falta, y conviene esperar**
 

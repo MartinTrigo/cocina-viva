@@ -100,6 +100,14 @@ window.Stock = (function () {
           </select>
         </div>
 
+        <div class="campo" id="s-caja-lote"${que === "produccion" ? "" : " hidden"}>
+          <label for="s-lote">Qué costó este lote</label>
+          <span class="ayuda">Opcional. Lo que se gastó en insumos para esta tanda:
+             la verdura, los frascos, las etiquetas. La app lo divide por las
+             unidades y actualiza el costo del producto.</span>
+          <input type="text" id="s-lote" class="numero" inputmode="decimal" placeholder="0">
+        </div>
+
         <div class="campo">
           <label for="s-obs">Observaciones</label>
           <input type="text" id="s-obs" placeholder="opcional">
@@ -326,12 +334,27 @@ window.Stock = (function () {
     } else {
       caja.className = "resumen-vivo";
       caja.innerHTML = `Estás ingresando <strong>${numero(n)}</strong> ${esc(nombre)}.
-        Pasan a ser <strong>${numero(hay + n)}</strong> en el depósito.`;
+        Pasan a ser <strong>${numero(hay + n)}</strong> en el depósito.`
+        + textoDelLote(cod, n);
     }
     caja.hidden = false;
   }
 
   // ---------- Guardar ----------
+
+  // Lo que va a pasar con el costo, dicho antes de guardar. Incluye el costo
+  // que tenía: pasar de $2.100 a $2.850 es una información distinta que pasar
+  // de nada a $2.850, y la primera merece que la miren dos veces.
+  function textoDelLote(cod, unidades) {
+    const campo = document.getElementById("s-lote");
+    if (!campo || que !== "produccion" || !unidades) return "";
+    const lote = aNumero(campo.value);
+    if (!Number.isFinite(lote) || lote <= 0) return "";
+    const nuevo = Math.round(lote / unidades);
+    const antes = window.Datos.costoDe(cod);
+    return ` El costo pasa a <strong>${dinero(nuevo)}</strong> por unidad`
+      + (antes ? ` (venía de ${dinero(antes)}).` : ".");
+  }
 
   async function guardar() {
     const cod = document.getElementById("s-cod").value;
@@ -366,11 +389,31 @@ window.Stock = (function () {
     }
 
     await window.CVDB.guardarVarios("movimientos", [m]);
+
+    // Si dijeron qué costó el lote, el costo del producto queda al día sin que
+    // nadie tenga que acordarse de ir a Productos a cambiarlo. Ese olvido es lo
+    // que hace que un costo cargado una vez quede viejo para siempre.
+    let avisoDelCosto = "";
+    const campoLote = document.getElementById("s-lote");
+    if (que === "produccion" && campoLote && n > 0) {
+      const lote = aNumero(campoLote.value);
+      if (Number.isFinite(lote) && lote > 0) {
+        const producto = window.Datos.producto(cod);
+        const nuevoCosto = Math.round(lote / n);
+        if (producto && nuevoCosto !== Number(producto.costo)) {
+          await window.CVDB.guardar("productos",
+            Object.assign({}, producto, { costo: nuevoCosto, mod: Date.now() }));
+          avisoDelCosto = " El costo de " + window.Datos.nombreDe(cod)
+            + " quedó en " + dinero(nuevoCosto) + " por unidad.";
+        }
+      }
+    }
+
     await window.Datos.cargar();
     window.Sincro.sincronizar(true);
 
     cargadosRecien.unshift(m);
-    pintar(`<p class="aviso aviso--ok">${esc(textoDeGuardado(m, cod, n))}</p>`);
+    pintar(`<p class="aviso aviso--ok">${esc(textoDeGuardado(m, cod, n) + avisoDelCosto)}</p>`);
   }
 
   function textoDeGuardado(m, cod, n) {
@@ -402,12 +445,18 @@ window.Stock = (function () {
         vista.querySelectorAll(".opcion").forEach((o) => {
           o.classList.toggle("elegida", o.contains(r) && r.checked);
         });
+        // El costo del lote solo tiene sentido envasando. Al romperse un frasco
+        // o al corregir un conteo no se produjo nada que costara algo.
+        const caja = document.getElementById("s-caja-lote");
+        caja.hidden = que !== "produccion";
+        if (caja.hidden) document.getElementById("s-lote").value = "";
         resumenVivo();
       };
     });
 
     document.getElementById("s-cod").onchange = resumenVivo;
     document.getElementById("s-cantidad").oninput = resumenVivo;
+    document.getElementById("s-lote").oninput = resumenVivo;
     unaVez(document.getElementById("btn-guardar"), guardar);
 
     vista.querySelectorAll("[data-deshacer]").forEach((b) => {

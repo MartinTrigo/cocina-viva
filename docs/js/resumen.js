@@ -138,6 +138,10 @@ window.Resumen = (function () {
         ${p.ingresos.length ? bloque("Lo que más se vendió", "",
           tablaProductos(p.ingresos)) : ""}
 
+        ${p.ingresos.length ? bloque("Lo que dejó",
+          "Lo vendido menos lo que costó hacerlo.",
+          loQueDejo(p.ingresos), true) : ""}
+
         ${p.ingresos.length ? bloque("Por cliente", "",
           barras(agrupar(p.ingresos, (f) => f.cliente, (f) => f.subtotal).slice(0, 12),
                  p.totalIngresos, BORDO)) : ""}
@@ -420,6 +424,80 @@ window.Resumen = (function () {
   }
 
   // ---------- Lo más vendido ----------
+
+  // Cuánto quedó después de descontar lo que costaron los frascos vendidos.
+  //
+  // SOLO CUENTA LOS PRODUCTOS CON COSTO CARGADO, y dice cuánto quedó afuera.
+  // Un margen calculado tratando el costo vacío como cero diría que se gana el
+  // 100 %, que es exactamente el número que uno quiere creer y el que más caro
+  // sale creer. Mejor un total sobre la mitad de las ventas, con el aviso al
+  // lado, que un total redondo que está mal.
+  function loQueDejo(ingresos) {
+    const porCod = {};
+    ingresos.forEach((f) => {
+      if (!porCod[f.cod]) porCod[f.cod] = { cod: f.cod, unidades: 0, vendido: 0 };
+      porCod[f.cod].unidades += Number(f.cantidad) || 0;
+      porCod[f.cod].vendido += Number(f.subtotal) || 0;
+    });
+
+    const conCosto = [];
+    let sinCosto = 0, cuantosSinCosto = 0;
+    Object.keys(porCod).forEach((c) => {
+      const f = porCod[c];
+      const costo = window.Datos.costoDe(c);
+      if (!costo) { sinCosto += f.vendido; cuantosSinCosto++; return; }
+      f.costo = costo * f.unidades;
+      f.dejo = f.vendido - f.costo;
+      conCosto.push(f);
+    });
+    conCosto.sort((a, b) => b.dejo - a.dejo);
+
+    if (!conCosto.length) {
+      return `<p class="vacio">Todavía no hay ningún producto con el costo cargado.
+        Se carga en <strong>Productos</strong>, en «cuánto cuesta hacer uno», y a
+        partir de ahí la app puede decir cuánto se gana.</p>`;
+    }
+
+    const vendido = conCosto.reduce((n, f) => n + f.vendido, 0);
+    const costo = conCosto.reduce((n, f) => n + f.costo, 0);
+    const dejo = vendido - costo;
+    const pct = (v, sobre) => sobre > 0 ? Math.round((v / sobre) * 100) + "%" : "—";
+
+    return `
+      <div class="tabla-envoltorio">
+        <table class="tabla">
+          <thead>
+            <tr><th>Producto</th><th class="numero">Vendido</th>
+                <th class="numero">Costó</th><th class="numero">Dejó</th></tr>
+          </thead>
+          <tbody>
+            ${conCosto.map((f) => `
+              <tr>
+                <td>
+                  <span class="celda__que">${esc(window.Datos.nombreDe(f.cod))}</span>
+                  <span class="celda__detalle">${numero(f.unidades)} u. · ${pct(f.dejo, f.vendido)}</span>
+                </td>
+                <td class="numero">${dinero(f.vendido)}</td>
+                <td class="numero">${dinero(f.costo)}</td>
+                <td class="numero${f.dejo < 0 ? " negativo" : ""}">${dinero(f.dejo)}</td>
+              </tr>`).join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total · ${pct(dejo, vendido)}</td>
+              <td class="numero">${dinero(vendido)}</td>
+              <td class="numero">${dinero(costo)}</td>
+              <td class="numero${dejo < 0 ? " negativo" : ""}">${dinero(dejo)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      ${cuantosSinCosto ? `
+        <p class="nota">Quedaron afuera ${cuantosSinCosto}
+           producto${cuantosSinCosto === 1 ? "" : "s"} sin costo cargado,
+           ${dinero(sinCosto)} de lo vendido. Cargando esos costos en
+           <strong>Productos</strong>, este total pasa a ser el de verdad.</p>` : ""}`;
+  }
 
   function tablaProductos(ingresos) {
     const porCod = {};

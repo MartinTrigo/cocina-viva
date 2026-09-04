@@ -769,3 +769,81 @@ El campo `detalle` ya se cargaba en cada egreso —«frascos», «repollo»,
 «alquiler»— y el resumen solo agrupaba por rubro. Agrupar también por detalle
 dentro de cada rubro reconstruye la subcategoría que llevaban en la planilla
 vieja sin tocar el modelo de datos ni pedir una implementación nueva.
+
+## El costo es UN número por producto, no una receta
+
+La versión completa —recetas, lista de materiales, stock de ingredientes, costo
+que se recalcula solo cuando sube el repollo— es lo que hacen las apps para
+productores del rubro, y es un proyecto entero.
+
+Acá el costo es **un campo que se escribe a mano** en cada producto. Con eso
+solo aparece el margen en la lista, en el formulario mientras se escribe el
+precio, y el «lo que dejó» del resumen. Es el 80 % del valor por el 5 % del
+trabajo, y no obliga a cargar recetas de nada.
+
+**Lo que evita que ese número quede viejo** es el campo del costo del lote en la
+pantalla de Stock: al envasar se puede decir qué costó la tanda, y la app divide
+por las unidades y actualiza el costo del producto sola. El olvido de ir a
+Productos a corregir el costo es lo que hace que un dato cargado una vez quede
+viejo para siempre; así se actualiza en el momento en que ya están en la app.
+
+## Cero no es gratis: el margen se calcula solo cuando hay costo
+
+Un costo vacío tratado como cero dice que se gana el **100 %**. Es exactamente el
+número que uno quiere creer y el que más caro sale creer.
+
+Por eso `margenDe()` devuelve null cuando no hay costo cargado, la lista de
+productos no muestra nada en esos, y el «lo que dejó» del resumen **los deja
+afuera y avisa cuánto quedó afuera**: «quedaron afuera 4 productos sin costo,
+$79.300 de lo vendido». Un total sobre la mitad de las ventas con el aviso al
+lado es más útil que un total redondo que está mal.
+
+## El margen tiene tres estados, no dos
+
+Bien, **flaco** y mal. El del medio existe porque un margen del 15 % no es un
+error —no hay nada roto que corregir— pero sí es algo que conviene mirar antes
+de que el próximo aumento de insumos se lo coma. Con dos estados, ese producto
+se vería igual que uno que deja el 70 %.
+
+## Agregar una columna en el medio de una hoja es peligroso
+
+El costo va entre la presentación y los precios, que es donde se lee bien:
+cuesta X, lo vendo a Y y a Z. Pero la sincronización lee y escribe **por
+posición**, así que una hoja en el orden viejo leída con el orden nuevo devuelve
+los datos corridos: el precio mayorista pasaría a leerse como costo, el
+minorista como precio mayorista, y así en cascada. Sin dar ningún error.
+
+Por eso `migrarProductos()` corre desde `asegurarEsquema()`, que `doPost` llama
+**antes** de sincronizar. No hay ninguna ventana en la que alguien pueda
+sincronizar contra una hoja a medio migrar. Se detecta sola mirando si el
+encabezado ya dice «costo», así que correrla mil veces es gratis.
+
+**Y había una segunda víctima que no era obvia:** la hoja `resumen` tenía escrita
+la letra `D` para el precio mayorista. Con la columna nueva, la `D` pasó a ser el
+costo, y la tabla habría valuado todo el stock al costo **sin dar error**. La
+migración también corrige esa fórmula, y de paso la letra ahora se calcula con
+`letraDe()` en vez de escribirse a mano, para que no vuelva a pasar.
+
+## Por qué el API sube a 2
+
+Un teléfono con la app vieja manda los productos **sin** el campo de costo. Si
+lo dejáramos sincronizar, el primer producto que editara desde ahí borraría su
+costo, en silencio.
+
+Subir el número del protocolo hace que ese teléfono no sincronice hasta que se
+actualice la app, que es exactamente para lo que existe esa constante.
+
+De paso se arregló el cartel: antes decía siempre «hay que publicar una versión
+nueva del Apps Script», que manda a tocar el servicio cuando el problema puede
+ser el opuesto. Ahora compara los dos números y dice cuál de los dos está
+atrasado y qué hacer en cada caso.
+
+## Lo que no entró en la lista de productos
+
+El costo llegó a mostrarse como una columna más de la tabla. Con cinco columnas
+la tabla dejó de entrar en el teléfono y **el lápiz de editar quedó fuera de la
+pantalla**: se rompía la única forma de editar un producto.
+
+Quedó como un renglón corto debajo del código —«deja $4.450 (70%)»— que envuelve
+en vez de estirar la columna. El costo en números se ve entrando al producto; lo
+que hace falta de un vistazo en la lista es cuál deja poco.

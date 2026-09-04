@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.4.0 · a quién ir a ver";
+  const VERSION = "1.5.0 · cuánto cuesta y cuánto deja";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");

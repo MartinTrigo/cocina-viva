@@ -34,7 +34,7 @@ window.Sincro = (function () {
   // implementación vieja quedó publicada y contesta con otro número, la app
   // prefiere no hacer nada antes que pisar los datos con un esquema que ya no
   // existe.
-  const API = 1;
+  const API = 2;
 
   const hayServicio = () => !!SERVICIO;
 
@@ -57,11 +57,7 @@ window.Sincro = (function () {
       const r = await respuesta.json();
 
       if (!r.ok) return r;
-      if (r.api !== API) {
-        return { ok: false, error: "El servicio publicado es de otra versión de la app "
-          + "(la suya es " + r.api + ", la de este teléfono es " + API + "). "
-          + "Hay que publicar una versión nueva del Apps Script." };
-      }
+      if (r.api !== API) return { ok: false, error: desajuste(r.api) };
       window.Acceso.guardarAcceso(r.credencial, r.persona);
       return r;
     } catch (err) {
@@ -115,7 +111,7 @@ window.Sincro = (function () {
         return r;
       }
       if (r.api !== API) {
-        ultimoError = "El servicio publicado es de otra versión. No se guardó nada.";
+        ultimoError = desajuste(r.api);
         return { ok: false, error: ultimoError };
       }
 
@@ -141,6 +137,21 @@ window.Sincro = (function () {
         sincronizar(true);
       }
     }
+  }
+
+  // Cuando los números no coinciden, el que está atrasado puede ser cualquiera
+  // de los dos, y lo que hay que hacer es distinto en cada caso. Decir siempre
+  // «hay que publicar el Apps Script» mandaba a tocar el servicio cuando el
+  // problema era que el teléfono tenía la app vieja en la memoria.
+  function desajuste(delServicio) {
+    if (delServicio > API) {
+      return "Este teléfono tiene una versión vieja de la app (la " + API
+        + ") y el servicio ya va por la " + delServicio + ". Cerrá la app y volvé "
+        + "a abrirla para que se actualice. No se perdió nada de lo cargado.";
+    }
+    return "El servicio de la planilla quedó en una versión vieja (la "
+      + delServicio + ") y esta app va por la " + API + ". Hay que publicar una "
+      + "versión nueva del Apps Script. No se guardó nada.";
   }
 
   // Acá caen dos cosas muy distintas y conviene nombrar las dos: que no haya

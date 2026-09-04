@@ -54,7 +54,7 @@
 // Versión del protocolo. La app rechaza una respuesta que no la traiga o que
 // traiga otra: así una implementación vieja que haya quedado publicada no
 // puede pisar los datos del teléfono con un esquema que ya no existe.
-var API = 1;
+var API = 2;
 
 // Ubicaciones reservadas del libro mayor. En mayúscula y sin acentos a
 // propósito: los locales se escriben como los nombraron ellas ("humus",
@@ -65,7 +65,7 @@ var VENDIDO = 'VENDIDO';
 var MERMA = 'MERMA';
 
 var COLUMNAS = {
-  productos:   ['cod', 'producto', 'presentacion', 'pmayor', 'pminor', 'activo', 'mod'],
+  productos:   ['cod', 'producto', 'presentacion', 'costo', 'pmayor', 'pminor', 'activo', 'mod'],
   clientes:    ['nombre', 'localidad', 'tipo', 'medio_pago', 'activo', 'mod'],
   ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'cod',
                 'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
@@ -75,7 +75,7 @@ var COLUMNAS = {
 };
 
 var ENCABEZADOS = {
-  productos:   ['código', 'producto', 'presentación', 'precio mayor', 'precio minorista', 'activo', 'mod'],
+  productos:   ['código', 'producto', 'presentación', 'costo', 'precio mayor', 'precio minorista', 'activo', 'mod'],
   clientes:    ['nombre', 'localidad', 'tipo', 'medio de pago habitual', 'activo', 'mod'],
   ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio de pago', 'código',
                 'cantidad', 'precio', 'subtotal', 'observaciones', 'mod'],
@@ -256,6 +256,7 @@ function leerFilas(nombre) {
       if (!o.cod) continue;
       o.producto = String(o.producto || '').trim();
       o.presentacion = String(o.presentacion || '').trim();
+      o.costo = numero(o.costo);
       o.pmayor = numero(o.pmayor);
       o.pminor = numero(o.pminor);
       o.activo = siNo(o.activo, true);
@@ -696,10 +697,83 @@ function prepararLibro() {
   return texto;
 }
 
+/* --------------------------------------------------------------------------
+   LA COLUMNA DE COSTO EN LA HOJA DE PRODUCTOS
+
+   La hoja se creó sin costo. Agregarlo en el medio corre todo lo que está a la
+   derecha, y como la sincronización lee y escribe POR POSICIÓN, una hoja en el
+   orden viejo leída con el orden nuevo devuelve los datos cambiados de lugar:
+   el precio mayorista pasaría a leerse como costo, y así en cascada.
+
+   Por eso esto corre desde asegurarEsquema(), que doPost llama ANTES de
+   sincronizar. No hay ventana en la que alguien pueda sincronizar contra una
+   hoja a medio migrar.
+
+   Se detecta sola y no hace nada si ya está hecha, así que correrla mil veces
+   es gratis.
+   -------------------------------------------------------------------------- */
+
+var COLUMNAS_PRODUCTOS_V1 = ['cod', 'producto', 'presentacion', 'pmayor', 'pminor', 'activo', 'mod'];
+
+function migrarProductos() {
+  var h = hoja('productos');
+  var ancho = Math.max(h.getLastColumn(), COLUMNAS.productos.length);
+  var encabezado = h.getRange(1, 1, 1, ancho).getValues()[0];
+  for (var i = 0; i < encabezado.length; i++) {
+    if (String(encabezado[i]).trim().toLowerCase() === 'costo') return '';
+  }
+
+  var ultima = h.getLastRow();
+  var viejas = ultima > 1
+    ? h.getRange(2, 1, ultima - 1, COLUMNAS_PRODUCTOS_V1.length).getValues()
+    : [];
+
+  var nuevas = [];
+  viejas.forEach(function (f) {
+    if (!String(f[0] || '').trim()) return;
+    //  viejo: cod, producto, presentacion, pmayor, pminor, activo, mod
+    //  nuevo: cod, producto, presentacion, COSTO, pmayor, pminor, activo, mod
+    nuevas.push([f[0], f[1], f[2], '', f[3], f[4], f[5], f[6]]);
+  });
+
+  var n = COLUMNAS.productos.length;
+  asegurarFilas(h, Math.max(nuevas.length + 1, FILAS_CON_FORMATO));
+  h.getRange(1, 1, 1, n).setValues([ENCABEZADOS.productos]);
+  if (ultima > 1) h.getRange(2, 1, ultima - 1, n).clearContent();
+  if (nuevas.length) h.getRange(2, 1, nuevas.length, n).setValues(nuevas);
+
+  reaplicarFormato();
+  arreglarPrecioDelResumen();
+  return 'Hoja de productos migrada: se agregó la columna de costo ('
+       + nuevas.length + ' productos).';
+}
+
+// La hoja resumen tenía escrita la letra D para el precio mayorista. Con la
+// columna nueva, la D pasó a ser el costo: la tabla habría mostrado el stock
+// valuado al costo sin dar ningún error.
+function arreglarPrecioDelResumen() {
+  var ss = SpreadsheetApp.getActive();
+  var h = ss.getSheetByName('resumen');
+  if (!h) return;
+  var letra = letraDe('productos', 'pmayor');
+  var filas = [];
+  for (var i = 0; i < 60; i++) {
+    var p = i + 2, f = i + 11;
+    filas.push(['=IF($A' + f + '="";"";productos!' + letra + p + ')']);
+  }
+  h.getRange(11, 5, 60, 1).setValues(filas);
+}
+
 // Lo que corre también en cada sincronización: barato si ya está todo hecho.
 function asegurarEsquema() {
   var props = PropertiesService.getDocumentProperties();
   var hechas = [];
+
+  // Antes que nada, y en cada sincronización. Es barato —mira una celda— y
+  // tiene que correr SÍ O SÍ antes de leer: si alguien sincroniza con la hoja
+  // en el orden viejo, las columnas se leen corridas y se escriben corridas.
+  var migrada = migrarProductos();
+  if (migrada) hechas.push(migrada);
 
   ['productos', 'clientes', 'ingresos', 'egresos', 'movimientos', 'listas',
    'invitaciones', 'dispositivos', 'borrados'].forEach(function (n) { hoja(n); });
@@ -739,9 +813,10 @@ function asegurarEsquema() {
 function cargarProductos() {
   var ahora = Date.now();
   var filas = SEMILLA_PRODUCTOS.map(function (p) {
-    return [p[0], p[1], p[2], p[3], p[4], 'sí', ahora];
+    // El costo va vacío: no está en la planilla vieja y no se inventa.
+    return [p[0], p[1], p[2], '', p[3], p[4], 'sí', ahora];
   });
-  hoja('productos').getRange(2, 1, filas.length, 7).setValues(filas);
+  hoja('productos').getRange(2, 1, filas.length, COLUMNAS.productos.length).setValues(filas);
   return 'Cargados ' + filas.length + ' productos.';
 }
 
@@ -845,7 +920,7 @@ function formatoDatos(nombre, fuerte, suave) {
     h.getRange(2, col('fecha'), FILAS_CON_FORMATO - 1).setNumberFormat('dd/mm/yyyy');
     h.setColumnWidth(col('fecha'), 95);
   }
-  ['pmayor', 'pminor', 'precio', 'subtotal', 'monto'].forEach(function (c) {
+  ['costo', 'pmayor', 'pminor', 'precio', 'subtotal', 'monto'].forEach(function (c) {
     if (col(c)) {
       h.getRange(2, col(c), FILAS_CON_FORMATO - 1).setNumberFormat('"$"#,##0');
       h.setColumnWidth(col(c), 110);
@@ -967,7 +1042,7 @@ function crearResumen() {
       '=IF($A' + f + '="";"";productos!B' + p + '&" "&productos!C' + p + ')',
       '=IF($A' + f + '="";"";' + entra + '-' + sale + ')',
       '=IF($A' + f + '="";"";' + entraCalle + '-' + saleCalle + ')',
-      '=IF($A' + f + '="";"";productos!D' + p + ')',
+      '=IF($A' + f + '="";"";productos!' + letraDe('productos', 'pmayor') + p + ')',
       '=IF($A' + f + '="";"";C' + f + '*E' + f + ')',
       '=IF($A' + f + '="";"";D' + f + '*E' + f + ')'
     ]);
@@ -1143,6 +1218,16 @@ function fecharConsignacionImportada() {
 }
 
 /* ================= Auxiliares ================= */
+
+// La letra de una columna, calculada desde COLUMNAS. Escribir la letra a mano
+// dentro de una fórmula es una bomba de tiempo: el día que se agrega una columna
+// la fórmula sigue apuntando al lugar de antes, no da error, y muestra el dato
+// equivocado sin que nadie se entere. Que pasó exactamente eso con el costo.
+function letraDe(nombre, campo) {
+  var i = COLUMNAS[nombre].indexOf(campo);
+  if (i < 0) throw new Error('No existe la columna ' + campo + ' en ' + nombre);
+  return String.fromCharCode(65 + i);      // ninguna hoja llega a la Z
+}
 
 function hoja(nombre) {
   var ss = SpreadsheetApp.getActive();
