@@ -1018,3 +1018,23 @@ impreso, así que parecía que había funcionado.
 Se descubrió tarde, porque el banco de pruebas mostró `API 3` cuando tenía que
 decir 4. Desde entonces los guiones **verifican contra el archivo escrito** y no
 contra lo que creen haber hecho.
+
+## Agregar un almacén a IndexedDB sin subir la versión rompe la app
+
+Lo rompí y quedó anotado, porque es de los errores que no se ven probando.
+
+El `onupgradeneeded` de IndexedDB corre **solo cuando sube el número de
+versión**. Al agregar `horas` y `personas` al esquema sin tocar `VERSION`, en un
+teléfono donde la base ya existía esos almacenes no se crearon nunca:
+`Datos.cargar()` reventaba y la app no arrancaba.
+
+**En una base nueva andaba todo**, y por eso pasó las pruebas: cada prueba
+borraba la base antes, así que siempre se creaba fresca y completa. La prueba
+que faltaba era la única que importaba —abrir con una base vieja— y ahora está
+hecha: v1 con datos adentro, sin los almacenes nuevos.
+
+Además de subir la versión, **la apertura ahora se cura sola**: después de abrir
+mira si falta algún almacén y, si falta, vuelve a abrir con la versión siguiente,
+que es lo que dispara la creación. Una sola vez; si después sigue faltando, falla
+con un mensaje que dice cuál. Así este olvido no puede volver a tirar la app
+abajo.
