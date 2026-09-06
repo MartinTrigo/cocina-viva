@@ -19,7 +19,10 @@
 
 window.CVDB = (function () {
   const NOMBRE = "cocinaviva";
-  const VERSION = 1;
+  // Sube de a uno cada vez que se agrega un almacén. Si alguien se olvida, la
+  // apertura lo detecta y lo arregla sola —ver abrir()—, pero conviene subirla:
+  // así la base se crea bien de una y no hace falta el reintento.
+  const VERSION = 2;
 
   // Los almacenes que se sincronizan, con cuál es su clave. Para agregar uno
   // más adelante: sumarlo acá y subir VERSION en uno.
@@ -40,39 +43,71 @@ window.CVDB = (function () {
 
   let conexion = null;
 
+  // Abre la base, y SE ASEGURA de que estén todos los almacenes.
+  //
+  // El upgrade de IndexedDB corre solo cuando sube el número de versión. Si se
+  // agrega un almacén al esquema y alguien se olvida de subir VERSION, en un
+  // teléfono que YA tiene la base creada ese almacén no se crea nunca, y la app
+  // muere al arrancar con un error que no dice nada. Pasó exactamente eso al
+  // agregar «personas» y «horas»: en una base recién creada anda todo, y en las
+  // que ya existían no arrancaba.
+  //
+  // Por eso, después de abrir, se mira si falta alguno y en ese caso se vuelve
+  // a abrir con la versión siguiente, que es lo que dispara la creación. Una
+  // sola vez: si después de eso sigue faltando, el problema es otro y hay que
+  // verlo, no seguir reintentando.
   function abrir() {
     if (conexion) return Promise.resolve(conexion);
+    return new Promise((resolver, rechazar) => intentarAbrir(VERSION, true, resolver, rechazar));
+  }
 
-    return new Promise((resolver, rechazar) => {
-      const pedido = indexedDB.open(NOMBRE, VERSION);
+  const faltantes = (db) =>
+    Object.keys(ESQUEMA).filter((n) => !db.objectStoreNames.contains(n));
 
-      pedido.onupgradeneeded = (evento) => {
-        const db = evento.target.result;
-        for (const [nombre, clave] of Object.entries(ESQUEMA)) {
-          if (!db.objectStoreNames.contains(nombre)) {
-            db.createObjectStore(nombre, { keyPath: clave });
-          }
+  function intentarAbrir(version, puedeReintentar, resolver, rechazar) {
+    const pedido = indexedDB.open(NOMBRE, version);
+
+    pedido.onupgradeneeded = (evento) => {
+      const db = evento.target.result;
+      for (const [nombre, clave] of Object.entries(ESQUEMA)) {
+        if (!db.objectStoreNames.contains(nombre)) {
+          db.createObjectStore(nombre, { keyPath: clave });
         }
-      };
+      }
+    };
 
-      pedido.onsuccess = () => {
-        conexion = pedido.result;
+    pedido.onsuccess = () => {
+      const db = pedido.result;
 
-        // La conexión se guarda para no reabrirla en cada consulta, pero el
-        // navegador puede cerrarla por su cuenta: otra pestaña que abra una
-        // versión nueva, o el sistema liberando memoria. Si eso pasa y
-        // seguimos usando la guardada, todo falla con «the database connection
-        // is closing» y la app queda muerta hasta recargarla. Se suelta la
-        // referencia y la próxima consulta abre una nueva.
-        conexion.onversionchange = () => { conexion.close(); conexion = null; };
-        conexion.onclose = () => { conexion = null; };
+      const faltan = faltantes(db);
+      if (faltan.length && puedeReintentar) {
+        const siguiente = db.version + 1;
+        db.close();
+        intentarAbrir(siguiente, false, resolver, rechazar);
+        return;
+      }
+      if (faltan.length) {
+        db.close();
+        rechazar(new Error("A la base le faltan almacenes: " + faltan.join(", ")));
+        return;
+      }
 
-        resolver(conexion);
-      };
-      pedido.onerror = () => rechazar(pedido.error);
-      pedido.onblocked = () => rechazar(
-        new Error("Hay otra pestaña de la app abierta con una versión distinta."));
-    });
+      conexion = db;
+
+      // La conexión se guarda para no reabrirla en cada consulta, pero el
+      // navegador puede cerrarla por su cuenta: otra pestaña que abra una
+      // versión nueva, o el sistema liberando memoria. Si eso pasa y
+      // seguimos usando la guardada, todo falla con «the database connection
+      // is closing» y la app queda muerta hasta recargarla. Se suelta la
+      // referencia y la próxima consulta abre una nueva.
+      conexion.onversionchange = () => { conexion.close(); conexion = null; };
+      conexion.onclose = () => { conexion = null; };
+
+      resolver(conexion);
+    };
+    pedido.onerror = () => rechazar(pedido.error);
+    pedido.onblocked = () => rechazar(
+      new Error("Hay otra pestaña de la app abierta con una versión distinta."));
   }
 
   // Envuelve una operación y espera a que la transacción termine de verdad, no

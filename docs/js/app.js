@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.7.0 · honorarios";
+  const VERSION = "1.7.1 · arreglo de arranque";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
