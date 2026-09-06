@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.7.1 · arreglo de arranque";
+  const VERSION = "1.7.2 · la flecha de volver";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -108,6 +108,7 @@
     document.body.dataset.seccion = base;
     window.scrollTo(0, 0);
     pintarBotonSincro();
+    engancharVolver();
 
     // Sin activar no se entra a ninguna sección, ni siquiera escribiendo la
     // dirección a mano. Mientras el servicio no esté publicado se deja pasar:
@@ -280,11 +281,23 @@
 
   // La flecha sube un nivel, no salta al inicio: desde la ficha de un local
   // vuelve a la lista de locales, y recién desde ahí al inicio.
-  botonVolver.onclick = () => {
+  // La flecha sube un escalón de la ruta: de "honorarios/liquidar" a
+  // "honorarios", y de ahí al inicio.
+  function volverUnPaso() {
     const partes = rutaActual().split("/");
     if (partes.length > 1) { partes.pop(); ir(partes.join("/")); return; }
     ir("inicio");
-  };
+  }
+
+  // Se vuelve a colgar en CADA pantalla, no una sola vez al arrancar.
+  //
+  // Si una pantalla dibuja un botón con el mismo id que la flecha —pasó: un
+  // «Volver» dentro de Honorarios se llamaba igual—, getElementById devuelve la
+  // flecha, que viene primero en el documento, y le pisa el handler. La app
+  // queda sin navegación hasta recargarla. Volver a colgarlo en cada pantalla
+  // hace que el estropicio dure una pantalla y no toda la sesión.
+  const engancharVolver = () => { botonVolver.onclick = volverUnPaso; };
+  engancharVolver();
   window.addEventListener("hashchange", mostrar);
 
   window.addEventListener("beforeinstallprompt", (evento) => {

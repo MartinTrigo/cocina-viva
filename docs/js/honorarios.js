@@ -531,7 +531,7 @@ window.Honorarios = (function () {
         <button class="boton boton--secundario boton--ancho separado" id="btn-liquidar-solo">
           Liquidar sin recibo
         </button>
-        <button class="boton boton--secundario boton--ancho separado" id="btn-volver">
+        <button class="boton boton--secundario boton--ancho separado" id="btn-volver-liquidar">
           Volver
         </button>
       </div>
@@ -563,7 +563,7 @@ window.Honorarios = (function () {
 
     unaVez(document.getElementById("btn-liquidar-solo"), () => liquidar(false));
     unaVez(document.getElementById("btn-liquidar-recibo"), () => liquidar(true));
-    document.getElementById("btn-volver").onclick = () => ir("honorarios");
+    document.getElementById("btn-volver-liquidar").onclick = () => ir("honorarios");
   }
 
   async function liquidar(conRecibo) {
@@ -707,7 +707,7 @@ window.Honorarios = (function () {
         <div id="p-baja"></div>
       </div>
 
-      <button class="boton boton--secundario boton--ancho separado" id="btn-volver">
+      <button class="boton boton--secundario boton--ancho separado" id="btn-volver-config">
         Volver a Honorarios
       </button>`;
 
@@ -743,7 +743,7 @@ window.Honorarios = (function () {
     });
 
     document.getElementById("btn-limpiar").onclick = () => configuracion();
-    document.getElementById("btn-volver").onclick = () => ir("honorarios");
+    document.getElementById("btn-volver-config").onclick = () => ir("honorarios");
 
     unaVez(document.getElementById("btn-persona"), async () => {
       const mal = (t) => {

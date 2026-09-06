@@ -1038,3 +1038,21 @@ mira si falta algún almacén y, si falta, vuelve a abrir con la versión siguie
 que es lo que dispara la creación. Una sola vez; si después sigue faltando, falla
 con un mensaje que dice cuál. Así este olvido no puede volver a tirar la app
 abajo.
+
+## Dos elementos con el mismo `id` dejaron la app sin navegación
+
+La pantalla de Honorarios dibujaba un botón «Volver» con `id="btn-volver"`, que
+es el id que ya tenía **la flecha de la cabecera**.
+
+`getElementById` devuelve el primero del documento, o sea la flecha. Así que la
+línea que creía enganchar el botón de la pantalla le **pisaba el handler a la
+flecha**, y desde ese momento la flecha llevaba siempre a Honorarios. Parada en
+Honorarios ponía el mismo hash, no había `hashchange`, y la pantalla quedaba
+trabada sin forma de salir salvo recargando.
+
+Arreglado dándoles nombres propios. Y como red: **la flecha se vuelve a
+enganchar en cada pantalla**, no una sola vez al arrancar. Si algún día vuelve a
+pasar, el estropicio dura una pantalla en vez de toda la sesión.
+
+Vale como regla: un `id` en esta app es global. Los botones que viven dentro de
+una pantalla llevan el nombre de la pantalla en el id.
