@@ -1,8 +1,8 @@
 // ==========================================================================
 // Cocina Viva — Ingresos
 //
-// Una venta cobrada, con todos los productos que lleve. Al guardar pasan dos
-// cosas a la vez, y por eso están en el mismo lugar:
+// Una venta, con todos los productos que lleve. Al guardar pasan dos cosas a la
+// vez, y por eso están en el mismo lugar:
 //
 //   · una fila por producto en la hoja "ingresos"  → la plata
 //   · un movimiento de venta por producto          → la mercadería
@@ -11,10 +11,15 @@
 // permite volver a armarla después para el remito o para borrarla entera. En
 // la planilla esa columna va oculta: para leer, lo que importa es la fila.
 //
-// ESTO NO ES UNA ENTREGA A CONSIGNACIÓN. Acá se cobra. Dejar mercadería en un
-// local sin cobrar se carga en Consignación, que mueve el stock y no toca la
-// plata. Si se elige un cliente que trabaja a consignación, la pantalla lo
-// avisa pero no lo impide: a veces el mismo local también compra.
+// ESTO NO ES UNA ENTREGA A CONSIGNACIÓN, aunque una venta pueda quedar sin
+// cobrar. La diferencia es el compromiso: acá el cliente se llevó la mercadería
+// COMPRADA y debe la plata; en consignación la mercadería sigue siendo nuestra
+// hasta que la venda. Por eso una venta impaga descuenta el depósito igual y
+// figura en «Falta cobrar», y una entrega a consignación no genera ningún
+// ingreso hasta que se liquida.
+//
+// Si se elige un cliente que trabaja a consignación, la pantalla lo avisa pero
+// no lo impide: a veces el mismo local también compra.
 // ==========================================================================
 
 window.Ingresos = (function () {
@@ -32,7 +37,11 @@ window.Ingresos = (function () {
     cliente: "",
     lista: "mayorista",
     medio_pago: "",
+    // La mayoría de las ventas se cobran en el momento, así que arranca en
+    // «cobrada»: el caso raro es el que pide un toque de más, no el común.
+    pagado: true,
     obs: "",
+    editando: "",
     lineas: [{ cod: "", cantidad: "" }],
   });
 
@@ -40,18 +49,41 @@ window.Ingresos = (function () {
     vista = contenedor;
     ir = navegar;
 
-    const idVenta = ruta.split("/")[1] || "";
+    const partes = ruta.split("/");
+    const idVenta = partes[1] || "";
+    const que = partes[2] || "";
+
     if (idVenta) {
       const venta = buscarVenta(idVenta);
-      if (!venta) { formulario(); return { titulo: "Ingresos", subtitulo: "Ventas cobradas" }; }
+      if (!venta) { borrador = vacio(); formulario(); return { titulo: "Ingresos", subtitulo: "Ventas y cobranzas" }; }
+      if (que === "editar") {
+        borrador = deLaVenta(venta);
+        formulario();
+        return { titulo: "Editar venta", subtitulo: venta.cliente + " · " + fecha(venta.fecha) };
+      }
       detalle(venta);
       return { titulo: venta.cliente, subtitulo: "Venta del " + fecha(venta.fecha) };
     }
 
-    if (!borrador) borrador = vacio();
+    // Al volver a la pantalla principal, un borrador que había quedado a medio
+    // editar no puede seguir vivo: guardaría encima de una venta que ya no se
+    // está mirando.
+    if (!borrador || borrador.editando) borrador = vacio();
     formulario();
-    return { titulo: "Ingresos", subtitulo: "Ventas cobradas" };
+    return { titulo: "Ingresos", subtitulo: "Ventas y cobranzas" };
   }
+
+  // Una venta guardada, de vuelta en forma de borrador para poder corregirla.
+  const deLaVenta = (v) => ({
+    fecha: v.fecha,
+    cliente: v.cliente,
+    lista: v.lista || "mayorista",
+    medio_pago: v.medio_pago,
+    pagado: v.pagado !== false,
+    obs: v.obs || "",
+    editando: v.id,
+    lineas: v.lineas.map((l) => ({ cod: l.cod, cantidad: String(l.cantidad) })),
+  });
 
   // ---------- El formulario ----------
 
@@ -107,12 +139,29 @@ window.Ingresos = (function () {
               </label>`).join("")}
           </div>
         </div>
+
+        <div class="campo">
+          <label>¿Ya la pagaron?</label>
+          <div class="opciones opciones--dos">
+            ${[["si", "✅", "Sí, cobrada"], ["no", "⏳", "Todavía no"]].map(([v, i, t]) => {
+              const elegida = (v === "si") === (borrador.pagado !== false);
+              return `
+              <label class="opcion${elegida ? " elegida" : ""}">
+                <input type="radio" name="pagado" value="${v}"${elegida ? " checked" : ""}>
+                <span class="opcion__icono">${i}</span>
+                <span class="opcion__texto">${t}</span>
+              </label>`; }).join("")}
+          </div>
+          ${borrador.pagado === false ? `
+            <span class="ayuda">Va a quedar en <strong>Falta cobrar</strong> hasta que
+               tildes que llegó el pago. La mercadería sale del depósito igual.</span>` : ""}
+        </div>
       </div>
 
       <div class="tarjeta">
         <h2>Productos</h2>
         <div id="v-lineas">
-          ${borrador.lineas.map((l, i) => renglon(l, i, productos)).join("")}
+          ${borrador.lineas.map((l, i) => renglon(l, i)).join("")}
         </div>
         <button class="boton boton--secundario boton--chico boton--ancho" id="btn-mas">+ Agregar producto</button>
 
@@ -125,29 +174,37 @@ window.Ingresos = (function () {
           <textarea id="v-obs" placeholder="opcional">${esc(borrador.obs)}</textarea>
         </div>
         <p class="campo__error" id="v-error" hidden></p>
-        <button class="boton boton--ancho" id="btn-guardar-remito">
-          Guardar y generar remito
-        </button>
-        <button class="boton boton--secundario boton--ancho separado" id="btn-guardar">
-          Guardar sin remito
-        </button>
+        ${borrador.editando ? `
+          <button class="boton boton--ancho" id="btn-guardar">Guardar los cambios</button>
+          <button class="boton boton--secundario boton--ancho separado" id="btn-cancelar">
+            Cancelar
+          </button>`
+        : `
+          <button class="boton boton--ancho" id="btn-guardar-remito">
+            Guardar y generar remito
+          </button>
+          <button class="boton boton--secundario boton--ancho separado" id="btn-guardar">
+            Guardar sin remito
+          </button>`}
       </div>
 
+      ${faltaCobrar()}
       ${ultimasVentas()}`;
 
     enganchar(productos);
     recalcular();
   }
 
-  function renglon(l, i, productos) {
+  function renglon(l, i) {
     return `
       <div class="renglon-venta" data-i="${i}">
         <div class="renglon-venta__linea">
-          <select class="v-cod" data-i="${i}" aria-label="Producto">
-            <option value="">Elegí un producto…</option>
-            ${productos.map((p) => `
-              <option value="${esc(p.cod)}"${p.cod === l.cod ? " selected" : ""}>${esc(p.producto)}${p.presentacion ? " · " + esc(p.presentacion) : ""}</option>`).join("")}
-          </select>
+          <div class="buscador">
+            <input type="text" class="v-busca" data-i="${i}" autocomplete="off"
+                   spellcheck="false" placeholder="Buscar producto…"
+                   aria-label="Producto" value="${esc(comoSeVe(l.cod))}">
+            <div class="buscador__lista" id="v-lista-${i}" hidden></div>
+          </div>
           <input type="text" class="v-cant numero" data-i="${i}" inputmode="numeric"
                  placeholder="0" value="${esc(l.cantidad)}" aria-label="Cantidad">
           <button class="quitar" data-quitar="${i}" aria-label="Quitar este producto">&#10005;</button>
@@ -155,6 +212,64 @@ window.Ingresos = (function () {
         <span class="renglon-venta__sub" id="v-sub-${i}" hidden></span>
         <p class="renglon-venta__aviso" id="v-aviso-${i}" hidden></p>
       </div>`;
+  }
+
+  // ---------- El buscador de productos ----------
+  //
+  // Reemplaza al desplegable, que con diecinueve productos ocupaba la pantalla
+  // entera y obligaba a leerla toda para encontrar uno. Acá se escribe
+  // «kimchi», o «KIM», y quedan dos o tres.
+  //
+  // El código va primero y grande, y el nombre abajo en chico: el código es lo
+  // que después aparece en la planilla y en el remito, así que conviene que se
+  // les vaya haciendo familiar.
+
+  const comoSeVe = (cod) => {
+    const p = cod ? window.Datos.producto(cod) : null;
+    return p ? p.cod + " · " + p.producto + (p.presentacion ? " " + p.presentacion : "") : "";
+  };
+
+  // Sin tildes y en minúscula, de los dos lados: buscar «mosqueta» tiene que
+  // encontrar «Vinagre de mosqueta», y «almibar» tiene que encontrar
+  // «almíbar». Nadie escribe las tildes cuando busca.
+  const plano = (t) => String(t || "").normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  function filtrar(productos, texto) {
+    const q = plano(texto).trim();
+    if (!q) return productos;
+    return productos.filter((p) =>
+      plano(p.cod + " " + p.producto + " " + p.presentacion).indexOf(q) >= 0);
+  }
+
+  function pintarLista(i, productos, texto) {
+    const caja = document.getElementById("v-lista-" + i);
+    if (!caja) return;
+    const hallados = filtrar(productos, texto);
+    caja.innerHTML = hallados.length
+      ? hallados.map((p) => `
+          <button type="button" class="buscador__op" data-i="${i}" data-cod="${esc(p.cod)}">
+            <span class="buscador__cod">${esc(p.cod)}</span>
+            <span class="buscador__nombre">${esc(p.producto)}${
+              p.presentacion ? " " + esc(enBloque(p.presentacion)) : ""}</span>
+          </button>`).join("")
+      : `<p class="buscador__nada">Ningún producto dice «${esc(texto)}».</p>`;
+    caja.hidden = false;
+  }
+
+  const cerrarListas = () => {
+    vista.querySelectorAll(".buscador__lista").forEach((c) => { c.hidden = true; });
+  };
+
+  function elegirProducto(i, cod) {
+    borrador.lineas[i].cod = cod;
+    const campo = vista.querySelector('.v-busca[data-i="' + i + '"]');
+    if (campo) campo.value = comoSeVe(cod);
+    cerrarListas();
+    recalcular();
+    // El foco pasa a la cantidad, que es lo único que falta de ese renglón.
+    const cant = vista.querySelector('.v-cant[data-i="' + i + '"]');
+    if (cant) cant.focus();
   }
 
   // Recalcula subtotales y total sin volver a dibujar: mientras se tipea una
@@ -205,7 +320,11 @@ window.Ingresos = (function () {
     borrador.obs = document.getElementById("v-obs").value.trim();
     const elegida = vista.querySelector('input[name="lista"]:checked');
     if (elegida) borrador.lista = elegida.value;
-    vista.querySelectorAll(".v-cod").forEach((s) => { borrador.lineas[s.dataset.i].cod = s.value; });
+    const cobro = vista.querySelector('input[name="pagado"]:checked');
+    if (cobro) borrador.pagado = cobro.value === "si";
+    // El código del producto no se lee del formulario: lo guarda elegirProducto
+    // en el momento de elegirlo. Lo que hay en el campo de texto es lo que se
+    // está buscando, que no es lo mismo que lo que se eligió.
     vista.querySelectorAll(".v-cant").forEach((c) => { borrador.lineas[c.dataset.i].cantidad = c.value; });
   }
 
@@ -225,8 +344,50 @@ window.Ingresos = (function () {
       };
     });
 
-    vista.querySelectorAll(".v-cod").forEach((s) => {
-      s.onchange = () => { borrador.lineas[s.dataset.i].cod = s.value; recalcular(); };
+    // Este sí vuelve a dibujar: cambia la ayuda de abajo y el texto del botón.
+    vista.querySelectorAll('input[name="pagado"]').forEach((r) => {
+      r.onchange = () => { leerDelFormulario(); formulario(); };
+    });
+
+    vista.querySelectorAll(".v-busca").forEach((campo) => {
+      const i = campo.dataset.i;
+      campo.onfocus = () => {
+        campo.select();                       // escribir reemplaza lo que había
+        pintarLista(i, productos, "");
+      };
+      campo.oninput = () => pintarLista(i, productos, campo.value);
+      campo.onblur = () => {
+        // Lo que quede escrito sin elegir no vale: el campo vuelve a mostrar el
+        // producto que está realmente cargado, para que nunca diga una cosa
+        // distinta de la que se va a guardar.
+        setTimeout(() => {
+          campo.value = comoSeVe(borrador.lineas[i] && borrador.lineas[i].cod);
+          const caja = document.getElementById("v-lista-" + i);
+          if (caja) caja.hidden = true;
+        }, 150);
+      };
+      campo.onkeydown = (ev) => {
+        if (ev.key === "Escape") { cerrarListas(); campo.blur(); }
+        if (ev.key === "Enter") {
+          // Con un solo resultado, Enter lo elige: es lo que espera cualquiera
+          // que escribió hasta que quedó uno.
+          ev.preventDefault();
+          const solo = filtrar(productos, campo.value);
+          if (solo.length === 1) elegirProducto(i, solo[0].cod);
+        }
+      };
+    });
+
+    // Por delegación, y con mousedown en vez de click: las opciones se dibujan
+    // recién al escribir, y el click llegaría después del blur del campo, cuando
+    // la lista ya se cerró.
+    vista.querySelectorAll(".buscador__lista").forEach((caja) => {
+      caja.onmousedown = (ev) => {
+        const op = ev.target.closest(".buscador__op");
+        if (!op) return;
+        ev.preventDefault();
+        elegirProducto(op.dataset.i, op.dataset.cod);
+      };
     });
     vista.querySelectorAll(".v-cant").forEach((c) => {
       c.oninput = () => { borrador.lineas[c.dataset.i].cantidad = c.value; recalcular(); };
@@ -248,12 +409,22 @@ window.Ingresos = (function () {
       formulario();
       // El producto recién agregado queda enfocado: si no, hay que ir a
       // buscarlo con el dedo cada vez.
-      const ultimos = vista.querySelectorAll(".v-cod");
+      const ultimos = vista.querySelectorAll(".v-busca");
       if (ultimos.length) ultimos[ultimos.length - 1].focus();
     };
 
     unaVez(document.getElementById("btn-guardar"), () => guardar(false));
-    unaVez(document.getElementById("btn-guardar-remito"), () => guardar(true));
+    const conRemito = document.getElementById("btn-guardar-remito");
+    if (conRemito) unaVez(conRemito, () => guardar(true));
+    const cancelar = document.getElementById("btn-cancelar");
+    if (cancelar) cancelar.onclick = () => { const id = borrador.editando; borrador = vacio(); ir("ingresos/" + id); };
+
+    vista.querySelectorAll(".v-cobrada").forEach((c) => {
+      c.onchange = () => {
+        c.disabled = true;                       // que no la tilden dos veces
+        marcarCobrada(c.dataset.venta);
+      };
+    });
 
     // Los renglones de las últimas ventas son <li> con role="button": el
     // teclado los enfoca pero, sin esto, Enter no hace nada.
@@ -302,7 +473,12 @@ window.Ingresos = (function () {
       else juntadas.push(Object.assign({}, l));
     });
 
-    const idVenta = window.Util.nuevoId();
+    // Editar es reemplazar: se van las filas y los movimientos viejos y entran
+    // los nuevos con el MISMO id de venta, así el remito ya emitido y cualquier
+    // referencia siguen apuntando a la misma venta.
+    const editando = borrador.editando;
+    const previa = editando ? buscarVenta(editando) : null;
+    const idVenta = editando || window.Util.nuevoId();
     const filas = [];
     const movimientos = [];
 
@@ -315,6 +491,7 @@ window.Ingresos = (function () {
         cliente: borrador.cliente,
         lista: borrador.lista,
         medio_pago: borrador.medio_pago,
+        pagado: borrador.pagado !== false,
         cod: l.cod,
         cantidad: l.cantidad,
         precio: precio,
@@ -328,6 +505,13 @@ window.Ingresos = (function () {
       }));
     });
 
+    // Primero se borra lo viejo y después se escribe lo nuevo. Al revés, un
+    // producto que sigue en la venta se borraría recién escrito.
+    if (previa) {
+      for (const l of previa.lineas) await window.CVDB.borrar("ingresos", l.id);
+      for (const m of movimientosDe(previa)) await window.CVDB.borrar("movimientos", m.id);
+    }
+
     await window.CVDB.guardarVarios("ingresos", filas);
     await window.CVDB.guardarVarios("movimientos", movimientos);
     await window.Datos.cargar();
@@ -336,6 +520,12 @@ window.Ingresos = (function () {
     const total = filas.reduce((n, f) => n + f.subtotal, 0);
     const cliente = borrador.cliente;
     borrador = vacio();
+
+    if (editando) {
+      window.Util.brindis("Venta corregida.");
+      ir("ingresos/" + idVenta);
+      return;
+    }
 
     if (conRemito) {
       ir("ingresos/" + idVenta);
@@ -360,13 +550,17 @@ window.Ingresos = (function () {
       if (!porId[id]) {
         porId[id] = {
           id: id, fecha: f.fecha, cliente: f.cliente, lista: f.lista,
-          medio_pago: f.medio_pago, obs: f.obs, mod: f.mod || 0, lineas: [], total: 0,
+          medio_pago: f.medio_pago, obs: f.obs, mod: f.mod || 0,
+          pagado: true, lineas: [], total: 0,
         };
       }
       const v = porId[id];
       v.lineas.push(f);
       v.total += Number(f.subtotal) || 0;
       if ((f.mod || 0) > v.mod) v.mod = f.mod || 0;
+      // Alcanza con que una fila diga que no para que la venta figure sin
+      // cobrar: es el lado por el que conviene equivocarse.
+      if (f.pagado === false) v.pagado = false;
     });
     return Object.keys(porId).map((id) => porId[id])
       .sort((a, b) => (a.fecha === b.fecha ? b.mod - a.mod : (a.fecha < b.fecha ? 1 : -1)));
@@ -399,8 +593,60 @@ window.Ingresos = (function () {
     };
   }
 
+  // Las ventas entregadas que todavía no pagaron.
+  //
+  // Existe porque a veces dejan la mercadería con un empleado y el dueño
+  // transfiere después. NO es una consignación: el cliente se comprometió a
+  // pagar y la mercadería ya salió del depósito como venta. Lo único que falta
+  // es la plata, y esta lista es para no perderle el rastro.
+  function faltaCobrar() {
+    const deben = ventasArmadas().filter((v) => v.pagado === false);
+    if (!deben.length) return "";
+    const total = deben.reduce((n, v) => n + v.total, 0);
+
+    return `
+      <section class="deudas">
+        <h2>Falta cobrar</h2>
+        <p class="nota">Tildá la casilla cuando llegue el comprobante. La venta
+           pasa a las de abajo y la plata entra al resumen.</p>
+        <ul class="renglones">
+          ${deben.map((v) => `
+            <li class="renglon renglon--sale">
+              <input type="checkbox" class="v-cobrada" data-venta="${esc(v.id)}"
+                     aria-label="Marcar como cobrada la venta a ${esc(v.cliente)}">
+              <span class="renglon__texto" data-ir="ingresos/${esc(v.id)}"
+                    role="button" tabindex="0">
+                <span class="renglon__que">${esc(v.cliente)}</span>
+                <span class="renglon__detalle">${fecha(v.fecha)} · ${esc(v.medio_pago)}</span>
+              </span>
+              <span class="renglon__cuanto">${dinero(v.total)}</span>
+            </li>`).join("")}
+        </ul>
+        <p class="deudas__total">
+          <span>Total sin cobrar</span><strong>${dinero(total)}</strong>
+        </p>
+      </section>`;
+  }
+
+  // Marca cobrada una venta entera: la casilla está en la venta, pero el dato
+  // vive en cada una de sus filas.
+  async function marcarCobrada(idVenta) {
+    const v = buscarVenta(idVenta);
+    if (!v) return;
+    const ahora = Date.now();
+    await window.CVDB.guardarVarios("ingresos",
+      v.lineas.map((l) => Object.assign({}, l, { pagado: true, mod: ahora })));
+    await window.Datos.cargar();
+    window.Sincro.sincronizar(true);
+    window.Util.brindis("Cobrada: " + v.cliente + ", " + dinero(v.total) + ".");
+    formulario();
+  }
+
   function ultimasVentas() {
-    const ventas = ventasArmadas().slice(0, 8);
+    // Las que no se cobraron no entran acá: ya están arriba, en «Falta cobrar».
+    // Aparecer en las dos listas haría dudar de si son la misma venta o dos, y
+    // además le sacaría urgencia a la de arriba.
+    const ventas = ventasArmadas().filter((v) => v.pagado !== false).slice(0, 8);
     if (!ventas.length) return "";
 
     return `
@@ -466,8 +712,16 @@ window.Ingresos = (function () {
         ? "Liquidación de consignación · lo que vendió y pagó " + esc(v.cliente)
         : "Lista " + esc(v.lista)} · ${fecha(v.fecha)}</p>
 
+      ${v.pagado === false ? `
+        <p class="aviso aviso--info"><strong>Esta venta todavía no se cobró.</strong>
+           Está en «Falta cobrar», en la pantalla de Ingresos.</p>` : ""}
+
       <button class="boton boton--ancho separado" id="btn-remito">Generar remito</button>
       <div id="v-remito"></div>
+
+      <button class="boton boton--secundario boton--ancho separado" id="btn-editar">
+        Corregir esta ${salio.esLiquidacion ? "liquidación" : "venta"}
+      </button>
 
       <div class="tarjeta separado">
         <h2>Borrar esta ${salio.esLiquidacion ? "liquidación" : "venta"}</h2>
@@ -481,6 +735,7 @@ window.Ingresos = (function () {
       </div>`;
 
     document.getElementById("btn-remito").onclick = () => generarRemito(v);
+    document.getElementById("btn-editar").onclick = () => ir("ingresos/" + v.id + "/editar");
     unaVez(document.getElementById("btn-borrar"), () => borrarVenta(v));
   }
 

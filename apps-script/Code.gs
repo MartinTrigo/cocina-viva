@@ -54,7 +54,7 @@
 // Versión del protocolo. La app rechaza una respuesta que no la traiga o que
 // traiga otra: así una implementación vieja que haya quedado publicada no
 // puede pisar los datos del teléfono con un esquema que ya no existe.
-var API = 2;
+var API = 3;
 
 // Ubicaciones reservadas del libro mayor. En mayúscula y sin acentos a
 // propósito: los locales se escriben como los nombraron ellas ("humus",
@@ -67,8 +67,8 @@ var MERMA = 'MERMA';
 var COLUMNAS = {
   productos:   ['cod', 'producto', 'presentacion', 'costo', 'pmayor', 'pminor', 'activo', 'mod'],
   clientes:    ['nombre', 'localidad', 'tipo', 'medio_pago', 'activo', 'mod'],
-  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'cod',
-                'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
+  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'pagado',
+                'cod', 'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
   egresos:     ['id', 'fecha', 'rubro', 'detalle', 'cantidad', 'monto', 'medio_pago', 'obs', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'desde', 'hacia', 'ref', 'obs', 'mod'],
   borrados:    ['id', 'mod']
@@ -77,8 +77,8 @@ var COLUMNAS = {
 var ENCABEZADOS = {
   productos:   ['código', 'producto', 'presentación', 'costo', 'precio mayor', 'precio minorista', 'activo', 'mod'],
   clientes:    ['nombre', 'localidad', 'tipo', 'medio de pago habitual', 'activo', 'mod'],
-  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio de pago', 'código',
-                'cantidad', 'precio', 'subtotal', 'observaciones', 'mod'],
+  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio de pago', 'pagado',
+                'código', 'cantidad', 'precio', 'subtotal', 'observaciones', 'mod'],
   egresos:     ['id', 'fecha', 'rubro', 'detalle', 'cantidad', 'monto', 'medio de pago',
                 'observaciones', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'código', 'cantidad', 'desde', 'hacia', 'referencia',
@@ -186,6 +186,7 @@ function sincronizar(pedido) {
     return { id: id, mod: borrados[id].mod };
   });
   resultado.listas = leerListas();
+  resultado.libro = SpreadsheetApp.getActive().getUrl();
   resultado.guardados = guardados;
   return resultado;
 }
@@ -277,6 +278,7 @@ function leerFilas(nombre) {
 
     if (nombre === 'ingresos') {
       o.venta = String(o.venta || '').trim() || o.id;
+      o.pagado = siNo(o.pagado, true);
       o.cliente = String(o.cliente || '').trim();
       o.lista = String(o.lista || '').trim().toLowerCase().indexOf('min') === 0
         ? 'minorista' : 'mayorista';
@@ -713,39 +715,61 @@ function prepararLibro() {
    es gratis.
    -------------------------------------------------------------------------- */
 
-var COLUMNAS_PRODUCTOS_V1 = ['cod', 'producto', 'presentacion', 'pmayor', 'pminor', 'activo', 'mod'];
+// El orden de columnas que tenía cada hoja antes de la versión de ahora. Es lo
+// único que hace falta para migrarla: se lee con el orden con el que se
+// escribió y se vuelve a escribir con el de hoy, mapeando POR NOMBRE.
+var COLUMNAS_ANTERIORES = {
+  productos: ['cod', 'producto', 'presentacion', 'pmayor', 'pminor', 'activo', 'mod'],
+  ingresos:  ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'cod',
+              'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
+};
 
-function migrarProductos() {
-  var h = hoja('productos');
-  var ancho = Math.max(h.getLastColumn(), COLUMNAS.productos.length);
+function migrarHoja(nombre) {
+  var viejas = COLUMNAS_ANTERIORES[nombre];
+  var nuevas = COLUMNAS[nombre];
+  if (!viejas || viejas.length >= nuevas.length) return '';
+
+  // La primera posición donde los dos órdenes dejan de coincidir es, por
+  // construcción, donde entra la columna nueva. Si el encabezado ya dice ahí lo
+  // que dice el orden de hoy, la hoja está migrada.
+  var corte = 0;
+  while (corte < viejas.length && viejas[corte] === nuevas[corte]) corte++;
+
+  var h = hoja(nombre);
+  var ancho = Math.max(h.getLastColumn(), nuevas.length);
   var encabezado = h.getRange(1, 1, 1, ancho).getValues()[0];
-  for (var i = 0; i < encabezado.length; i++) {
-    if (String(encabezado[i]).trim().toLowerCase() === 'costo') return '';
-  }
+  var esperado = String(ENCABEZADOS[nombre][corte]).trim().toLowerCase();
+  if (String(encabezado[corte] || '').trim().toLowerCase() === esperado) return '';
 
   var ultima = h.getLastRow();
-  var viejas = ultima > 1
-    ? h.getRange(2, 1, ultima - 1, COLUMNAS_PRODUCTOS_V1.length).getValues()
-    : [];
+  var crudas = ultima > 1 ? h.getRange(2, 1, ultima - 1, viejas.length).getValues() : [];
 
-  var nuevas = [];
-  viejas.forEach(function (f) {
-    if (!String(f[0] || '').trim()) return;
-    //  viejo: cod, producto, presentacion, pmayor, pminor, activo, mod
-    //  nuevo: cod, producto, presentacion, COSTO, pmayor, pminor, activo, mod
-    nuevas.push([f[0], f[1], f[2], '', f[3], f[4], f[5], f[6]]);
+  var salida = [];
+  crudas.forEach(function (f) {
+    var o = {}, tieneAlgo = false;
+    for (var j = 0; j < viejas.length; j++) {
+      o[viejas[j]] = f[j];
+      if (f[j] !== '' && f[j] != null) tieneAlgo = true;
+    }
+    if (!tieneAlgo) return;
+    // Lo que no existía antes queda vacío, y cada dato viejo cae en su lugar
+    // nuevo por el nombre de la columna, nunca por el número.
+    salida.push(nuevas.map(function (c) {
+      return Object.prototype.hasOwnProperty.call(o, c) ? o[c] : '';
+    }));
   });
 
-  var n = COLUMNAS.productos.length;
-  asegurarFilas(h, Math.max(nuevas.length + 1, FILAS_CON_FORMATO));
-  h.getRange(1, 1, 1, n).setValues([ENCABEZADOS.productos]);
+  var n = nuevas.length;
+  asegurarFilas(h, Math.max(salida.length + 1, FILAS_CON_FORMATO));
+  h.getRange(1, 1, 1, n).setValues([ENCABEZADOS[nombre]]);
   if (ultima > 1) h.getRange(2, 1, ultima - 1, n).clearContent();
-  if (nuevas.length) h.getRange(2, 1, nuevas.length, n).setValues(nuevas);
+  if (salida.length) h.getRange(2, 1, salida.length, n).setValues(salida);
 
   reaplicarFormato();
-  arreglarPrecioDelResumen();
-  return 'Hoja de productos migrada: se agregó la columna de costo ('
-       + nuevas.length + ' productos).';
+  if (nombre === 'productos') arreglarPrecioDelResumen();
+
+  return 'Hoja «' + nombre + '» migrada: entró la columna «'
+       + ENCABEZADOS[nombre][corte] + '» (' + salida.length + ' filas).';
 }
 
 // La hoja resumen tenía escrita la letra D para el precio mayorista. Con la
@@ -772,8 +796,10 @@ function asegurarEsquema() {
   // Antes que nada, y en cada sincronización. Es barato —mira una celda— y
   // tiene que correr SÍ O SÍ antes de leer: si alguien sincroniza con la hoja
   // en el orden viejo, las columnas se leen corridas y se escriben corridas.
-  var migrada = migrarProductos();
-  if (migrada) hechas.push(migrada);
+  ['productos', 'ingresos'].forEach(function (n) {
+    var migrada = migrarHoja(n);
+    if (migrada) hechas.push(migrada);
+  });
 
   ['productos', 'clientes', 'ingresos', 'egresos', 'movimientos', 'listas',
    'invitaciones', 'dispositivos', 'borrados'].forEach(function (n) { hoja(n); });
@@ -969,11 +995,12 @@ function formatoDatos(nombre, fuerte, suave) {
       SpreadsheetApp.newDataValidation().requireValueInList(['compra', 'consignación'], true)
         .setAllowInvalid(true).build());
   }
-  if (col('activo')) {
-    h.getRange(2, col('activo'), FILAS_CON_FORMATO - 1).setDataValidation(
+  ['activo', 'pagado'].forEach(function (c) {
+    if (!col(c)) return;
+    h.getRange(2, col(c), FILAS_CON_FORMATO - 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(['sí', 'no'], true)
         .setAllowInvalid(true).build());
-  }
+  });
 
   // Columnas técnicas: existen porque la sincronización las necesita, pero no
   // le sirven a nadie que abra la planilla a mirar.

@@ -96,6 +96,9 @@
 
   function Libro() { this.hojas = {}; this.orden = []; }
   Libro.prototype.getName = function () { return "Cocina Viva · Gestión (de mentira)"; };
+  Libro.prototype.getUrl = function () {
+    return "https://docs.google.com/spreadsheets/d/DE-MENTIRA/edit";
+  };
   Libro.prototype.getSheetByName = function (n) { return this.hojas[n] || null; };
   Libro.prototype.getSheets = function () {
     var self = this;

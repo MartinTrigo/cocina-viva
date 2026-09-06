@@ -34,7 +34,7 @@ window.Sincro = (function () {
   // implementación vieja quedó publicada y contesta con otro número, la app
   // prefiere no hacer nada antes que pisar los datos con un esquema que ya no
   // existe.
-  const API = 2;
+  const API = 3;
 
   const hayServicio = () => !!SERVICIO;
 

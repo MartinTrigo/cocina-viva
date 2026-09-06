@@ -320,6 +320,23 @@ aumento de precios en masa que ya existe se hace **a ciegas**.
       $0, que la app lee como «sin cargar» y no como «gratis»: por eso no muestra
       ningún margen todavía.
 
+## Cobranzas, edición y buscador · **hecho** (pedido sobre la marcha)
+
+- [x] **¿Ya la pagaron?** en cada venta, con la lista **Falta cobrar** arriba de
+      las últimas ventas y una casilla para tildar cuando llega el comprobante.
+      La columna `pagado` queda también en la planilla.
+- [x] El balance por medio de pago **cuenta solo lo cobrado**, y dice aparte
+      cuánto falta.
+- [x] **Corregir una venta guardada**: se reemplaza con el mismo id y el stock
+      acompaña. Probado bajando una venta de 12 a 10 unidades: vuelven 2 al
+      depósito.
+- [x] **Botón «Ir a la planilla»** en el pie, con la dirección que manda el
+      servicio para no escribirla en un repositorio público.
+- [x] **Buscador de productos** en vez del desplegable largo: código grande,
+      nombre chico, y filtra sin tildes.
+- [ ] **Falta que Martín pegue el `Code.gs` y publique la implementación.** El
+      protocolo sube a 3 por la columna nueva.
+
 ## Fase 8 — Pedidos · **falta, y conviene esperar**
 
 **Una implementación nueva** (hoja `pedidos`).

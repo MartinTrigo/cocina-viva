@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.5.0 · cuánto cuesta y cuánto deja";
+  const VERSION = "1.6.0 · quién pagó y quién no";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -262,6 +262,7 @@
     if (!e.hayServicio || !e.tieneAcceso) { ir("acceso"); return; }
     await window.Sincro.sincronizar(false);
     mostrar();
+    mostrarLaPlanilla();
   };
 
   window.Sincro.alCambiar(pintarBotonSincro);
@@ -284,6 +285,18 @@
   });
 
   document.getElementById("pie-version").textContent = "versión " + VERSION;
+
+  // El enlace a la planilla aparece cuando el servicio mandó su dirección, que
+  // pasa en la primera sincronización. Antes de eso no hay a dónde ir, y un
+  // botón que no lleva a ninguna parte es peor que no tenerlo.
+  async function mostrarLaPlanilla() {
+    const a = document.getElementById("pie-planilla");
+    if (!a) return;
+    const url = await window.CVDB.libro();
+    if (!url) { a.hidden = true; return; }
+    a.href = url;
+    a.hidden = false;
+  }
   // En el arranque va solo el número, sin el nombre de la versión: ahí abajo
   // del logo, «1.3.1 · bajas, doble toque y ticket» sería un renglón de ruido.
   document.getElementById("arranque-version").textContent = "versión " + VERSION.split(" · ")[0];
@@ -325,12 +338,13 @@
     }
 
     await mostrar();
+    await mostrarLaPlanilla();
     levantarElTelon();
 
     // Al abrir se sincroniza sola y en silencio: si hay señal, los números ya
     // están al día antes de que nadie toque nada; si no hay, no molesta.
     if (window.Sincro.hayServicio() && window.Acceso.tieneAcceso()) {
-      window.Sincro.sincronizar(true).then(() => mostrar());
+      window.Sincro.sincronizar(true).then(() => { mostrar(); mostrarLaPlanilla(); });
     }
   }
 

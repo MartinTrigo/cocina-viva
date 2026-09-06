@@ -530,6 +530,8 @@ window.Consignacion = (function () {
         cliente: local,
         lista: "mayorista",
         medio_pago: medioPago,
+        // Una liquidación es, por definición, plata que ya entró.
+        pagado: true,
         cod: l.cod,
         cantidad: l.cantidad,
         precio: l.precio,

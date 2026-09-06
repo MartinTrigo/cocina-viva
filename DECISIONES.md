@@ -847,3 +847,99 @@ pantalla**: se rompía la única forma de editar un producto.
 Quedó como un renglón corto debajo del código —«deja $4.450 (70%)»— que envuelve
 en vez de estirar la columna. El costo en números se ve entrando al producto; lo
 que hace falta de un vistazo en la lista es cuál deja poco.
+
+## Una venta puede estar entregada y sin cobrar
+
+No es una consignación, y la diferencia es el compromiso. Acá el cliente se
+llevó la mercadería **comprada** y debe la plata; en consignación la mercadería
+sigue siendo de ellas hasta que el local la venda.
+
+De ahí que una venta impaga **descuente el depósito igual** —salió— y aparezca
+en «Falta cobrar», mientras que una entrega a consignación no genera ningún
+ingreso hasta que se liquida.
+
+Pasa de verdad: dejan la mercadería con un empleado y el dueño transfiere
+cuando llega. Lo idearon ellas para no perderle el rastro, y la app ahora lo
+sostiene.
+
+**Vacío quiere decir pagado.** Si el vacío contara como deuda, todas las filas
+viejas —y cualquiera que carguen a mano en la planilla— aparecerían de golpe
+como clientes que deben. Es exactamente la alarma que no hay que dar.
+
+**Arranca en «cobrada».** La mayoría de las ventas se cobran en el momento: el
+caso raro es el que pide un toque de más, no el común.
+
+**Alcanza con que una fila diga que no** para que la venta entera figure sin
+cobrar. Es el lado por el que conviene equivocarse.
+
+**Las impagas no se repiten en «Últimas ventas».** Aparecer en las dos listas
+haría dudar de si son la misma venta o dos, y le sacaría urgencia a la de
+arriba.
+
+## El balance por medio de pago cuenta SOLO lo cobrado
+
+Ese cuadro contesta «cuánta plata tendría que haber», y una venta entregada que
+todavía no pagaron no está en ningún bolsillo. Sumarla haría que el número no
+cierre nunca contra la caja, que es justo para lo que se mira.
+
+Los **ingresos totales** sí la cuentan, porque la venta ocurrió. Son dos
+preguntas distintas y ahora la app contesta las dos sin mezclarlas: debajo del
+cuadro dice cuánto falta cobrar, para que la resta se entienda.
+
+## Editar una venta es reemplazarla, con el mismo id
+
+Al guardar los cambios se borran las filas y los movimientos viejos y entran los
+nuevos **con el mismo id de venta**, así el remito ya emitido y cualquier
+referencia siguen apuntando a la misma venta.
+
+**Primero se borra lo viejo y después se escribe lo nuevo.** Al revés, un
+producto que sigue en la venta se borraría recién escrito.
+
+Lo importante es que el stock acompaña: bajar una venta de 12 a 10 unidades
+devuelve 2 al depósito, porque los movimientos se rehacen junto con las filas.
+Probado.
+
+Un borrador a medio editar no sobrevive a volver a la pantalla principal:
+guardaría encima de una venta que ya no se está mirando.
+
+## El buscador de productos reemplaza al desplegable
+
+Con diecinueve productos, la lista nativa ocupaba la pantalla entera y había que
+leerla toda. Ahora se escribe «kimchi», o «KIM», y quedan dos o tres.
+
+**El código va primero y grande, el nombre debajo en chico.** El código es lo que
+después aparece en la planilla y en el remito, así que conviene que se les vaya
+haciendo familiar.
+
+**Busca sin tildes de los dos lados:** «almibar» encuentra «almíbar». Nadie
+escribe las tildes cuando busca.
+
+Detalles que hicieron falta: el evento es **mousedown y no click**, porque el
+click llega después del blur del campo y para entonces la lista ya se cerró; al
+salir sin elegir, el campo **vuelve a mostrar el producto realmente cargado**,
+para que nunca diga una cosa distinta de la que se va a guardar; y al elegir, el
+foco salta a la cantidad, que es lo único que falta de ese renglón.
+
+## La dirección de la planilla la manda el servicio
+
+El botón «Ir a la planilla» no tiene la dirección escrita en el código, porque
+el repositorio es público. El servicio la sabe —vive adentro del libro— y la
+manda en cada sincronización; la app la guarda y muestra el botón. Si algún día
+el libro cambia, la app se entera sola.
+
+Por eso el botón aparece recién después de la primera sincronización: antes no
+hay a dónde ir, y un botón que no lleva a ninguna parte es peor que no tenerlo.
+
+## La migración de hojas ahora es genérica
+
+`migrarHoja(nombre)` sirve para cualquier columna nueva. Lee la hoja con el
+orden que tenía —anotado en `COLUMNAS_ANTERIORES`— y la reescribe con el de hoy
+mapeando **por nombre y no por posición**, así lo que no existía queda vacío y
+nada se corre.
+
+Detecta sola si ya está hecha: busca la primera posición donde los dos órdenes
+dejan de coincidir, que por construcción es donde entra la columna nueva, y mira
+si el encabezado ya dice lo que corresponde.
+
+Corre desde `asegurarEsquema()`, que `doPost` llama antes de sincronizar: no hay
+ninguna ventana para leer una hoja a medio migrar.

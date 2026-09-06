@@ -229,14 +229,24 @@ window.Resumen = (function () {
   // Si se elige un mes, la diferencia es la de ese mes; el saldo real arrastra
   // lo que venía de antes. Eligiendo «todo lo cargado» sí es el saldo desde que
   // empezaron a usar la app.
+  // OJO: este cuadro cuenta SOLO lo cobrado.
+  //
+  // Contesta «cuánta plata tendría que haber», y una venta entregada que
+  // todavía no pagaron no está en ningún bolsillo. Sumarla haría que el número
+  // no cierre nunca contra la caja, que es justo para lo que se mira. Lo que
+  // falta cobrar va debajo del cuadro, aparte, para que la cuenta se entienda.
   function balancePorMedio(p) {
+    const cobrados = p.ingresos.filter((f) => f.pagado !== false);
+    const impagos = p.ingresos.filter((f) => f.pagado === false);
+    const porCobrar = impagos.reduce((n, f) => n + (Number(f.subtotal) || 0), 0);
+
     const medios = {};
     const sumar = (lista, campo, cual) => lista.forEach((f) => {
       const k = String(f.medio_pago || "—");
       if (!medios[k]) medios[k] = { entro: 0, salio: 0 };
       medios[k][cual] += Number(f[campo]) || 0;
     });
-    sumar(p.ingresos, "subtotal", "entro");
+    sumar(cobrados, "subtotal", "entro");
     sumar(p.egresos, "monto", "salio");
 
     const filas = Object.keys(medios)
@@ -278,7 +288,12 @@ window.Resumen = (function () {
             </tr>
           </tfoot>
         </table>
-      </div>`;
+      </div>
+      ${porCobrar ? `
+        <p class="nota">No entra acá lo que todavía no cobraron:
+           <strong>${dinero(porCobrar)}</strong> en
+           ${impagos.length === 1 ? "una venta" : "varias ventas"} entregadas.
+           Están en <strong>Falta cobrar</strong>, en Ingresos.</p>` : ""}`;
   }
 
   // Los ingresos agrupados por producto, para la torta. Más de seis tajadas no

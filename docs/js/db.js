@@ -230,6 +230,12 @@ window.CVDB = (function () {
     if (estado.listas) {
       await operar("meta", "readwrite", (a) => a.put({ clave: "listas", valor: estado.listas }));
     }
+    // La dirección del libro la manda el servicio, que la sabe porque vive
+    // adentro. Así la app puede ofrecer el botón de «ir a la planilla» sin
+    // tenerla escrita en el código, que está en un repositorio público.
+    if (estado.libro) {
+      await operar("meta", "readwrite", (a) => a.put({ clave: "libro", valor: estado.libro }));
+    }
 
     // La marca es el corte con el que se armó el pedido, NO la hora de la
     // respuesta. Poniendo la hora de la respuesta, todo lo que pasó durante el
@@ -238,6 +244,7 @@ window.CVDB = (function () {
   }
 
   const listas = () => obtener("meta", "listas").then((m) => (m && m.valor) || null);
+  const libro = () => obtener("meta", "libro").then((m) => (m && m.valor) || "");
 
   // Nota: la app NO trae ningún catálogo de arranque. El de productos y
   // clientes baja en la primera sincronización, que siempre ocurre apenas se
@@ -247,6 +254,6 @@ window.CVDB = (function () {
 
   return {
     abrir, todos, obtener, guardar, guardarVarios, borrar,
-    pendientes, cuantosPendientes, guardarEstado, ultimaSincro, listas,
+    pendientes, cuantosPendientes, guardarEstado, ultimaSincro, listas, libro,
   };
 })();
