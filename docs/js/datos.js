@@ -45,21 +45,26 @@ window.Datos = (function () {
   // este volumen de datos es instantáneo y evita el problema clásico de tener
   // media app mirando una copia vieja.
   async function cargar() {
-    const [productos, clientes, movimientos, ingresos, egresos, listas] = await Promise.all([
-      window.CVDB.todos("productos"),
-      window.CVDB.todos("clientes"),
-      window.CVDB.todos("movimientos"),
-      window.CVDB.todos("ingresos"),
-      window.CVDB.todos("egresos"),
-      window.CVDB.listas(),
-    ]);
+    const [productos, clientes, personas, movimientos, ingresos, egresos, horas, listas] =
+      await Promise.all([
+        window.CVDB.todos("productos"),
+        window.CVDB.todos("clientes"),
+        window.CVDB.todos("personas"),
+        window.CVDB.todos("movimientos"),
+        window.CVDB.todos("ingresos"),
+        window.CVDB.todos("egresos"),
+        window.CVDB.todos("horas"),
+        window.CVDB.listas(),
+      ]);
 
     cache = {
       productos: productos.sort((a, b) => a.cod.localeCompare(b.cod)),
       clientes: clientes.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
-      movimientos, ingresos, egresos,
+      personas: personas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+      movimientos, ingresos, egresos, horas,
       listas: listas || { medios_pago: [], rubros: [] },
       porCod: Object.fromEntries(productos.map((p) => [p.cod, p])),
+      porPersona: Object.fromEntries(personas.map((p) => [p.nombre, p])),
     };
     return cache;
   }
@@ -74,6 +79,13 @@ window.Datos = (function () {
 
   const localesDeConsignacion = () =>
     clientesActivos().filter((c) => c.tipo === "consignación");
+
+  const personasActivas = () => (cache ? cache.personas.filter((p) => p.activo !== false) : []);
+  const persona = (nombre) => (cache && cache.porPersona[String(nombre || "").trim()]) || null;
+  const precioHora = (nombre) => {
+    const p = persona(nombre);
+    return p ? Number(p.precio_hora) || 0 : 0;
+  };
 
   // Nombre para mostrar: "chucrut 660 g".
   function nombreDe(cod) {
@@ -361,6 +373,7 @@ window.Datos = (function () {
     DEPOSITO, PRODUCCION, VENDIDO, MERMA, RESERVADAS,
     cargar, hay, todo,
     producto, productosActivos, clientesActivos, localesDeConsignacion,
+    persona, personasActivas, precioHora,
     nombreDe, precioDe, costoDe, hayCosto, margenDe,
     stockEn, stockDeposito, stockEnLaCalle, localesConMercaderia, valorDe, renglonesDe,
     diasDesde, ritmoDeLocal, ventasPorSemana, coberturaDeStock,

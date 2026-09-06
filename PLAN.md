@@ -337,6 +337,25 @@ aumento de precios en masa que ya existe se hace **a ciegas**.
 - [ ] **Falta que Martín pegue el `Code.gs` y publique la implementación.** El
       protocolo sube a 3 por la columna nueva.
 
+## Honorarios · **hecha** (pedido sobre la marcha)
+
+Es la hoja «Labores» que habían intentado en la planilla vieja y abandonaron a
+principios de 2024, pero con el formulario arriba de todo y en cuatro toques.
+
+- [x] **Sumar horas**: fecha, quién, actividad, cuántas y observaciones, con el
+      texto vivo diciendo cuánto vale ese rato.
+- [x] **Últimas cinco cargadas**, con lápiz para corregir y cruz para borrar.
+- [x] **Liquidar horas**, que escribe sola la fila en Egresos y puede generar un
+      recibo. Antes de guardar dice cuánto se le debe y cuánto va a quedar.
+- [x] **Resumen** por mes, por año o todo: quién trabajó, en qué se fue el
+      tiempo, y las cuentas al día de cada una.
+- [x] **Configuración**: personas, cargo y precio por hora, con altas, bajas y
+      renombrado que arrastra la historia.
+- [x] **El detalle de un egreso pasó a ser una lista** por rubro, con «otro…»
+      para el caso raro y «Otros Gastos» libre.
+- [ ] **Falta que Martín pegue el `Code.gs` y publique.** El protocolo sube a 4:
+      dos hojas nuevas y una columna en egresos.
+
 ## Fase 8 — Pedidos · **falta, y conviene esperar**
 
 **Una implementación nueva** (hoja `pedidos`).

@@ -8,7 +8,7 @@
 (function () {
   const { esc, dinero, numero } = window.Util;
 
-  const VERSION = "1.6.0 · quién pagó y quién no";
+  const VERSION = "1.7.0 · honorarios";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");
@@ -68,6 +68,14 @@
       subtitulo: "A quién le vendemos",
       listo: true,          // la atiende js/clientes.js
     },
+    honorarios: {
+      icono: "⏱️",
+      titulo: "Honorarios",
+      detalle: "Horas de trabajo, pagos y saldos",
+      subtitulo: "Horas de trabajo y pagos",
+      clase: "menu__boton--sale",
+      listo: true,          // la atiende js/honorarios.js
+    },
     resumen: {
       icono: "📊",
       titulo: "Resumen",
@@ -122,6 +130,7 @@
       productos: window.Productos,
       clientes: window.Clientes,
       stock: window.Stock,
+      honorarios: window.Honorarios,
     };
     if (MODULOS[base]) {
       // Si una pantalla falla en el medio de dibujarse, sin este catch queda a

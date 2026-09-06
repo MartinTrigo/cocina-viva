@@ -943,3 +943,78 @@ si el encabezado ya dice lo que corresponde.
 
 Corre desde `asegurarEsquema()`, que `doPost` llama antes de sincronizar: no hay
 ninguna ventana para leer una hoja a medio migrar.
+
+## Honorarios: lo que se debe se calcula, no se marca
+
+No hay horas «liquidadas» una por una. Se acumula el valor de todo lo trabajado
+y se le resta todo lo pagado:
+
+    saldo = Σ (horas × precio de la hora) − Σ (pagos a esa persona)
+
+Es como trabajan de verdad —se paga un monto, no un conjunto de horas
+concretas— y aguanta que el precio de la hora cambie sin tener que reescribir la
+historia. Marcar horas una por una habría obligado a decidir *cuáles* horas paga
+cada transferencia, que es una pregunta que nadie se hace.
+
+**El saldo no depende del período elegido.** Una deuda no se achica porque uno
+mire un mes más corto. El selector de período afecta el resumen de horas; las
+cuentas al día son siempre sobre la historia completa.
+
+**El precio de la hora se toma de hoy**, no del día en que se trabajó. Si le
+suben la hora a alguien, sube el valor de lo que todavía no cobró — que es lo
+que ellas esperan que pase.
+
+## El pago de honorarios ES un egreso
+
+Liquidar no inventa un registro nuevo: escribe una fila en `egresos` con rubro
+Honorarios. Tiene que estar ahí para que el balance del resumen cierre, y
+hacerlo desde Honorarios ahorra el paso de cargarlo dos veces, que es justo
+donde se olvidan.
+
+**Por eso `egresos` tiene ahora una columna `persona`.** Se podría haber deducido
+del detalle —«hs Luna» → «Luna»— pero eso es acoplar por texto: el día que
+renombran a alguien, la historia queda huérfana y nadie se entera. Con la
+columna, el vínculo es explícito, y un honorario cargado a mano desde Egresos
+también descuenta del saldo correcto.
+
+Renombrar a una persona desde Configuración reescribe sus horas y sus pagos, con
+el mismo criterio que ya se usaba al renombrar un cliente.
+
+## El detalle de un egreso es una lista, no texto libre
+
+Con texto libre, «frascos», «Frascos» y «frascos 660» terminaban siendo tres
+cosas distintas en el desglose por rubro, que es exactamente lo que ese desglose
+vino a resolver.
+
+**«Otros Gastos» es la excepción y sigue libre**: es el cajón de lo que no entra
+en ninguna categoría, y cerrarlo lo dejaría sin sentido. Los demás rubros tienen
+su lista, con un «otro…» que abre un campo de texto para el caso raro.
+
+**La lista de Honorarios se arma con las personas cargadas**, así que sumar a
+alguien en Configuración lo hace aparecer acá sin tocar el código.
+
+Cambiar el rubro ahora **redibuja el formulario**, que antes no hacía: de él
+depende qué forma tiene el campo de detalle. Y borra el detalle anterior, que en
+el rubro nuevo no significaría nada.
+
+## `[hidden]` tiene que ganar siempre
+
+Encontrado al hacer esto: el botón de cancelar aparecía aunque tuviera el
+atributo `hidden`. La regla de `hidden` vive en la hoja del navegador, así que
+cualquier clase nuestra que declare un `display` —`.boton`, `.pie__planilla`— se
+la pisa sin querer.
+
+Se venía parchando selector por selector (`.marca[hidden]`,
+`.renglon-venta__sub[hidden]`). Ahora hay una sola regla con `!important` que lo
+resuelve para toda la app y para lo que venga.
+
+## Una lección de método, anotada porque costó
+
+El guion que aplicaba los cambios al Apps Script abortaba con `sys.exit(1)` si
+**algún** reemplazo fallaba, y el archivo se escribía recién al final. Un ancla
+mal copiada tiró abajo los otros diez cambios en silencio: los «ok» ya se habían
+impreso, así que parecía que había funcionado.
+
+Se descubrió tarde, porque el banco de pruebas mostró `API 3` cuando tenía que
+decir 4. Desde entonces los guiones **verifican contra el archivo escrito** y no
+contra lo que creen haber hecho.

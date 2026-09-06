@@ -75,6 +75,13 @@ body {
 .marca { flex: none; height: 23px; width: auto; }
 .marca[hidden] { display: none; }
 
+/* El atributo "hidden" tiene que ganar SIEMPRE.
+   Su regla vive en la hoja del navegador, así que cualquier clase de acá que
+   declare un "display" —.boton, .pie__planilla, y las que vengan— se lo pisa sin
+   querer, y el elemento aparece igual. Se venía parchando selector por
+   selector; esto lo resuelve de una vez. */
+[hidden] { display: none !important; }
+
 .barra__texto { min-width: 0; flex: 1; }
 .barra h1 { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.2; }
 .barra p { margin: 1px 0 0; font-size: 12px; opacity: .85; }

@@ -54,7 +54,7 @@
 // Versión del protocolo. La app rechaza una respuesta que no la traiga o que
 // traiga otra: así una implementación vieja que haya quedado publicada no
 // puede pisar los datos del teléfono con un esquema que ya no existe.
-var API = 3;
+var API = 4;
 
 // Ubicaciones reservadas del libro mayor. En mayúscula y sin acentos a
 // propósito: los locales se escriben como los nombraron ellas ("humus",
@@ -69,7 +69,13 @@ var COLUMNAS = {
   clientes:    ['nombre', 'localidad', 'tipo', 'medio_pago', 'activo', 'mod'],
   ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'pagado',
                 'cod', 'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
-  egresos:     ['id', 'fecha', 'rubro', 'detalle', 'cantidad', 'monto', 'medio_pago', 'obs', 'mod'],
+  egresos:     ['id', 'fecha', 'rubro', 'detalle', 'persona', 'cantidad', 'monto',
+                'medio_pago', 'obs', 'mod'],
+  // Quién trabaja y a cuánto se le paga la hora. Se identifican por el nombre,
+  // como los clientes: son pocas y las escriben ellas.
+  personas:    ['nombre', 'cargo', 'precio_hora', 'activo', 'mod'],
+  // Cada rato de trabajo, con su fecha y su actividad.
+  horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'obs', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'desde', 'hacia', 'ref', 'obs', 'mod'],
   borrados:    ['id', 'mod']
 };
@@ -79,8 +85,10 @@ var ENCABEZADOS = {
   clientes:    ['nombre', 'localidad', 'tipo', 'medio de pago habitual', 'activo', 'mod'],
   ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio de pago', 'pagado',
                 'código', 'cantidad', 'precio', 'subtotal', 'observaciones', 'mod'],
-  egresos:     ['id', 'fecha', 'rubro', 'detalle', 'cantidad', 'monto', 'medio de pago',
-                'observaciones', 'mod'],
+  egresos:     ['id', 'fecha', 'rubro', 'detalle', 'persona', 'cantidad', 'monto',
+                'medio de pago', 'observaciones', 'mod'],
+  personas:    ['nombre', 'cargo', 'precio por hora', 'activo', 'mod'],
+  horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'observaciones', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'código', 'cantidad', 'desde', 'hacia', 'referencia',
                 'observaciones', 'mod'],
   borrados:     ['id', 'mod'],
@@ -101,6 +109,11 @@ var ENCABEZADOS = {
 //   ajuste        según el conteo real
 //   merma         DEPOSITO   → MERMA       rotura, vencimiento, consumo propio
 var TIPOS = ['produccion', 'venta', 'entrega', 'liquidacion', 'devolucion', 'ajuste', 'merma'];
+
+// En qué se va el tiempo. La misma lista que usa la app, repetida acá para que
+// la planilla ofrezca el desplegable a quien cargue una hora a mano.
+var ACTIVIDADES = ['elaboración', 'envasado', 'administración', 'reparto',
+                   'comercialización', 'comunicación', 'mantenimiento'];
 
 var COLOR = {
   bordo: '#8c0730', bordoSuave: '#f6e7ec',
@@ -163,7 +176,7 @@ function sincronizar(pedido) {
   var guardados = 0;
   var resultado = { ok: true, api: API };
 
-  ['ingresos', 'egresos', 'movimientos'].forEach(function (nombre) {
+  ['ingresos', 'egresos', 'movimientos', 'horas'].forEach(function (nombre) {
     var entrantes = pedido[nombre] || [];
     guardados += entrantes.length;
     var fusionadas = fusionar(leerFilas(nombre), entrantes, borrados);
@@ -173,7 +186,7 @@ function sincronizar(pedido) {
 
   // Productos y clientes se identifican por su código o su nombre, no por un
   // id: son catálogos cortos que ellas también editan desde la planilla.
-  [['productos', 'cod'], ['clientes', 'nombre']].forEach(function (par) {
+  [['productos', 'cod'], ['clientes', 'nombre'], ['personas', 'nombre']].forEach(function (par) {
     var entrantes = pedido[par[0]] || [];
     guardados += entrantes.length;
     var fusionadas = fusionarPorClave(leerFilas(par[0]), entrantes, par[1], borrados);
@@ -292,9 +305,26 @@ function leerFilas(nombre) {
       o.obs = String(o.obs || '');
       if (!o.cantidad && !o.subtotal) continue;
 
+    } else if (nombre === 'personas') {
+      o.nombre = String(o.nombre || '').trim();
+      if (!o.nombre) continue;
+      o.cargo = String(o.cargo || '').trim();
+      o.precio_hora = numero(o.precio_hora);
+      o.activo = siNo(o.activo, true);
+
+    } else if (nombre === 'horas') {
+      o.persona = String(o.persona || '').trim();
+      o.actividad = String(o.actividad || '').trim();
+      o.horas = numero(o.horas);
+      o.obs = String(o.obs || '');
+      if (!o.persona || !o.horas) continue;
+
     } else if (nombre === 'egresos') {
       o.rubro = String(o.rubro || '').trim() || 'Otros Gastos';
       o.detalle = String(o.detalle || '');
+      // Solo la llevan los honorarios: dice a quién se le pagó. Es lo que
+      // permite saber cuánto se le debe a cada una sin adivinarlo del detalle.
+      o.persona = String(o.persona || '').trim();
       // La cantidad de un egreso es texto a propósito: en la planilla vieja hay
       // "5,4", "9,5 l", "2 k" y "7 turnos". Obligarla a número perdería el dato.
       o.cantidad = String(o.cantidad == null ? '' : o.cantidad);
@@ -722,6 +752,8 @@ var COLUMNAS_ANTERIORES = {
   productos: ['cod', 'producto', 'presentacion', 'pmayor', 'pminor', 'activo', 'mod'],
   ingresos:  ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'cod',
               'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
+  egresos:   ['id', 'fecha', 'rubro', 'detalle', 'cantidad', 'monto', 'medio_pago',
+              'obs', 'mod'],
 };
 
 function migrarHoja(nombre) {
@@ -796,13 +828,13 @@ function asegurarEsquema() {
   // Antes que nada, y en cada sincronización. Es barato —mira una celda— y
   // tiene que correr SÍ O SÍ antes de leer: si alguien sincroniza con la hoja
   // en el orden viejo, las columnas se leen corridas y se escriben corridas.
-  ['productos', 'ingresos'].forEach(function (n) {
+  ['productos', 'ingresos', 'egresos'].forEach(function (n) {
     var migrada = migrarHoja(n);
     if (migrada) hechas.push(migrada);
   });
 
-  ['productos', 'clientes', 'ingresos', 'egresos', 'movimientos', 'listas',
-   'invitaciones', 'dispositivos', 'borrados'].forEach(function (n) { hoja(n); });
+  ['productos', 'clientes', 'personas', 'ingresos', 'egresos', 'horas', 'movimientos',
+   'listas', 'invitaciones', 'dispositivos', 'borrados'].forEach(function (n) { hoja(n); });
 
   if (props.getProperty('esquema') !== 'v1') {
     darFormato();
@@ -899,6 +931,8 @@ function darFormato() {
   formatoDatos('clientes', COLOR.gris, '#efedea');
   formatoDatos('ingresos', COLOR.bordo, COLOR.bordoSuave);
   formatoDatos('egresos', COLOR.tierra, COLOR.tierraSuave);
+  formatoDatos('personas', COLOR.gris, '#efedea');
+  formatoDatos('horas', COLOR.tierra, COLOR.tierraSuave);
   formatoDatos('movimientos', COLOR.verde, COLOR.verdeSuave);
 
   var l = hoja('listas');
@@ -946,7 +980,7 @@ function formatoDatos(nombre, fuerte, suave) {
     h.getRange(2, col('fecha'), FILAS_CON_FORMATO - 1).setNumberFormat('dd/mm/yyyy');
     h.setColumnWidth(col('fecha'), 95);
   }
-  ['costo', 'pmayor', 'pminor', 'precio', 'subtotal', 'monto'].forEach(function (c) {
+  ['costo', 'pmayor', 'pminor', 'precio', 'subtotal', 'monto', 'precio_hora'].forEach(function (c) {
     if (col(c)) {
       h.getRange(2, col(c), FILAS_CON_FORMATO - 1).setNumberFormat('"$"#,##0');
       h.setColumnWidth(col(c), 110);
@@ -970,6 +1004,14 @@ function formatoDatos(nombre, fuerte, suave) {
   }
   if (nombre === 'egresos') {
     h.getRange(2, col('rubro'), FILAS_CON_FORMATO - 1).setDataValidation(contra('listas!B2:B200'));
+  }
+  if (col('persona')) {
+    h.getRange(2, col('persona'), FILAS_CON_FORMATO - 1).setDataValidation(contra('personas!A2:A200'));
+  }
+  if (nombre === 'horas') {
+    h.getRange(2, col('actividad'), FILAS_CON_FORMATO - 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(ACTIVIDADES, true)
+        .setAllowInvalid(true).build());
   }
   if (col('cod') && nombre !== 'productos') {
     h.getRange(2, col('cod'), FILAS_CON_FORMATO - 1).setDataValidation(contra('productos!A2:A500'));

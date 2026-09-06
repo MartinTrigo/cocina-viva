@@ -18,6 +18,32 @@ window.Egresos = (function () {
   let ir = null;
   let borrador = null;
 
+  // Qué se puede poner en «detalle» según el rubro.
+  //
+  // Antes era texto libre con sugerencias, y así «frascos», «Frascos» y
+  // «frascos 660» terminaban siendo tres cosas distintas en el resumen. Con la
+  // lista cerrada, el desglose por detalle suma bien.
+  //
+  // Los honorarios son la excepción: su lista se arma con las personas
+  // cargadas, así que un nombre nuevo aparece acá sin tocar el código.
+  const DETALLES = {
+    "Insumos": ["envases", "verdura", "fruta", "condimentos", "etiquetas"],
+    "Gastos Fijos": ["transporte", "alquiler"],
+    "Inversión": ["equipamiento", "marca", "infraestructura", "administración"],
+  };
+
+  // El rubro que no tiene lista —«Otros Gastos»— sigue con texto libre: es
+  // justamente el cajón de lo que no entra en ninguna categoría, y cerrarlo lo
+  // dejaría sin sentido.
+  function detallesDe(rubro) {
+    if (rubro === "Honorarios") {
+      return window.Datos.personasActivas().map((p) => "hs " + p.nombre);
+    }
+    return DETALLES[rubro] || null;
+  }
+
+  const OTRO = "__otro__";
+
   const vacio = () => ({
     fecha: hoy(), rubro: "", detalle: "", cantidad: "", monto: "", medio_pago: "", obs: "",
   });
@@ -61,15 +87,41 @@ window.Egresos = (function () {
           </select>
         </div>
 
+        ${(() => {
+          const lista = detallesDe(borrador.rubro);
+          if (!lista) {
+            return `
         <div class="campo">
           <label for="g-detalle">Detalle <span class="obliga">•</span></label>
           <span class="ayuda">Qué se compró o se pagó. Es lo que se lee en la planilla.</span>
           <input type="text" id="g-detalle" value="${esc(borrador.detalle)}"
-                 placeholder="frascos 660 y tapas" list="g-detalles">
+                 placeholder="lo que sea" list="g-detalles">
           <datalist id="g-detalles">
             ${detallesUsados().map((d) => `<option value="${esc(d)}"></option>`).join("")}
           </datalist>
+        </div>`;
+          }
+          const estaEnLaLista = lista.indexOf(borrador.detalle) >= 0;
+          const esOtro = !!borrador.detalle && !estaEnLaLista;
+          return `
+        <div class="campo">
+          <label for="g-detalle-sel">Detalle <span class="obliga">•</span></label>
+          <select id="g-detalle-sel">
+            <option value="">Elegí…</option>
+            ${lista.map((d) => `
+              <option value="${esc(d)}"${d === borrador.detalle ? " selected" : ""}>${esc(d)}</option>`).join("")}
+            <option value="${OTRO}"${esOtro ? " selected" : ""}>otro…</option>
+          </select>
+          ${borrador.rubro === "Honorarios" && !lista.length ? `
+            <span class="ayuda">No hay nadie cargado en <strong>Honorarios</strong>.
+               Se agregan desde ahí, en Configuración.</span>` : ""}
         </div>
+        <div class="campo" id="g-otro-caja"${esOtro ? "" : " hidden"}>
+          <label for="g-detalle">Cuál</label>
+          <input type="text" id="g-detalle" value="${esc(esOtro ? borrador.detalle : "")}"
+                 placeholder="escribilo">
+        </div>`;
+        })()}
 
         <div class="fila">
           <div class="campo">
@@ -100,6 +152,14 @@ window.Egresos = (function () {
     enganchar();
   }
 
+  // De «hs Luna» sale «Luna», si Luna existe. Si no coincide con nadie, queda
+  // vacío: mejor un honorario sin dueño que atribuirlo a la persona equivocada.
+  function personaDelDetalle(rubro, detalle) {
+    if (rubro !== "Honorarios") return "";
+    const nombre = String(detalle || "").replace(/^hs\s+/i, "").trim();
+    return window.Datos.persona(nombre) ? nombre : "";
+  }
+
   // Los detalles que ya usaron, para no volver a escribir «etiquetas bari»
   // veinte veces y para que en la planilla se escriban siempre igual.
   function detallesUsados() {
@@ -116,7 +176,15 @@ window.Egresos = (function () {
   function leer() {
     borrador.fecha = document.getElementById("g-fecha").value || hoy();
     borrador.rubro = document.getElementById("g-rubro").value;
-    borrador.detalle = document.getElementById("g-detalle").value.trim();
+    const sel = document.getElementById("g-detalle-sel");
+    const libre = document.getElementById("g-detalle");
+    if (!sel) {
+      borrador.detalle = libre ? libre.value.trim() : "";
+    } else if (sel.value === OTRO) {
+      borrador.detalle = libre ? libre.value.trim() : "";
+    } else {
+      borrador.detalle = sel.value;
+    }
     borrador.cantidad = document.getElementById("g-cantidad").value.trim();
     borrador.monto = document.getElementById("g-monto").value;
     borrador.medio_pago = document.getElementById("g-medio").value;
@@ -144,6 +212,9 @@ window.Egresos = (function () {
       fecha: borrador.fecha,
       rubro: borrador.rubro,
       detalle: borrador.detalle,
+      // Un honorario cargado a mano también tiene que descontar del saldo de
+      // esa persona, igual que si se hubiera liquidado desde Honorarios.
+      persona: personaDelDetalle(borrador.rubro, borrador.detalle),
       cantidad: borrador.cantidad,
       monto: monto,
       medio_pago: borrador.medio_pago,
@@ -204,9 +275,30 @@ window.Egresos = (function () {
   }
 
   function enganchar() {
-    ["g-fecha", "g-rubro", "g-medio"].forEach((id) => {
+    ["g-fecha", "g-medio"].forEach((id) => {
       document.getElementById(id).onchange = leer;
     });
+
+    // El rubro SÍ redibuja: de él depende qué forma tiene el campo de detalle
+    // —desplegable con su lista, o texto libre— y con qué opciones.
+    document.getElementById("g-rubro").onchange = () => {
+      const antes = borrador.rubro;
+      leer();
+      // Un detalle del rubro anterior no tiene sentido en el nuevo, y quedaría
+      // colgado como si lo hubieran escrito a mano.
+      if (borrador.rubro !== antes) borrador.detalle = "";
+      formulario();
+    };
+    const sel = document.getElementById("g-detalle-sel");
+    if (sel) sel.onchange = () => {
+      const caja = document.getElementById("g-otro-caja");
+      const libre = document.getElementById("g-detalle");
+      const esOtro = sel.value === OTRO;
+      caja.hidden = !esOtro;
+      if (esOtro) { libre.value = ""; libre.focus(); }
+      leerDelFormulario();
+    };
+
     ["g-detalle", "g-cantidad", "g-monto", "g-obs"].forEach((id) => {
       document.getElementById(id).oninput = leer;
     });

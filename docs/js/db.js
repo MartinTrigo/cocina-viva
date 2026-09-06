@@ -27,8 +27,10 @@ window.CVDB = (function () {
     ingresos:    "id",
     egresos:     "id",
     movimientos: "id",
+    horas:       "id",
     productos:   "cod",
     clientes:    "nombre",
+    personas:    "nombre",
   };
 
   const ESQUEMA = Object.assign({}, SINCRONIZABLES, {
