@@ -798,7 +798,8 @@ function migrarHoja(nombre) {
   if (salida.length) h.getRange(2, 1, salida.length, n).setValues(salida);
 
   reaplicarFormato();
-  if (nombre === 'productos') arreglarPrecioDelResumen();
+  // Cualquier columna nueva corre las letras, y el resumen apunta por letra.
+  arreglarFormulasDelResumen();
 
   return 'Hoja «' + nombre + '» migrada: entró la columna «'
        + ENCABEZADOS[nombre][corte] + '» (' + salida.length + ' filas).';
@@ -1071,8 +1072,10 @@ function crearResumen() {
     .setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
   h.getRange('A3:B7').setValues([
-    ['Ingresos totales', '=SUM(ingresos!J2:J)'],
-    ['Egresos totales', '=SUM(egresos!F2:F)'],
+    ['Ingresos totales', '=SUM(ingresos!' + letraDe('ingresos', 'subtotal') + '2:'
+      + letraDe('ingresos', 'subtotal') + ')'],
+    ['Egresos totales', '=SUM(egresos!' + letraDe('egresos', 'monto') + '2:'
+      + letraDe('egresos', 'monto') + ')'],
     ['Balance', '=B3-B4'],
     ['Valor del stock en depósito', '=SUM(F11:F70)'],
     ['Valor en consignación', '=SUM(G11:G70)']
@@ -1123,7 +1126,7 @@ function crearResumen() {
   h.getRange('A72').setValue('INGRESOS POR MES').setFontWeight('bold').setFontColor(COLOR.bordo);
   h.getRange('D72').setValue('EGRESOS POR RUBRO').setFontWeight('bold').setFontColor(COLOR.tierra);
   ingresosPorMes(h);
-  h.getRange('D73').setValue('=QUERY(egresos!C2:F;"select C, sum(F) where C is not null group by C order by sum(F) desc label C \'rubro\', sum(F) \'total\'";0)');
+  egresosPorRubro(h);
   h.getRange('E73:E200').setNumberFormat('"$"#,##0');
 
   [1, 2].forEach(function (c) { h.setColumnWidth(c, 190); });
@@ -1159,15 +1162,61 @@ function ingresosPorMes(h) {
     '=IFERROR(SORT(UNIQUE(FILTER(TEXT(ingresos!C2:C2000;"yyyy-mm");'
     + 'ingresos!C2:C2000<>""));1;FALSE);"")');
 
+  var subtotal = letraDe('ingresos', 'subtotal');
   var totales = [];
   for (var i = 0; i < RENGLONES_MES; i++) {
     var f = 74 + i;
     totales.push(['=IFERROR(IF($A' + f + '="";"";SUMPRODUCT('
       + '(TEXT(ingresos!$C$2:$C$2000;"yyyy-mm")=$A' + f + ')'
-      + '*ingresos!$J$2:$J$2000));"")']);
+      + '*ingresos!$' + subtotal + '$2:$' + subtotal + '$2000));"")']);
   }
   h.getRange(74, 2, RENGLONES_MES, 1).setValues(totales);
   h.getRange(74, 2, RENGLONES_MES, 1).setNumberFormat('"$"#,##0');
+}
+
+// Los egresos por rubro. El rango y la columna que se suma salen de COLUMNAS,
+// no escritos a mano: cada vez que se agregó una columna a la hoja, esta
+// fórmula se quedó apuntando al lugar de antes y sumó la columna equivocada
+// sin dar error —una vez sumó «cantidad», que es texto, y el resumen dijo $100—.
+function egresosPorRubro(h) {
+  var rubro = letraDe('egresos', 'rubro');
+  var monto = letraDe('egresos', 'monto');
+  h.getRange('D73').setValue(
+    '=QUERY(egresos!' + rubro + '2:' + monto + ';"select ' + rubro + ', sum(' + monto + ')'
+    + ' where ' + rubro + " is not null group by " + rubro
+    + ' order by sum(' + monto + ') desc'
+    + " label " + rubro + " 'rubro', sum(" + monto + ") 'total'" + '";0)');
+}
+
+/* --------------------------------------------------------------------------
+   REESCRIBIR TODAS LAS FÓRMULAS DEL RESUMEN
+
+   La hoja resumen apunta a las otras por letra de columna, que es la única
+   forma que hay en una planilla. El problema es que la letra se mueve cada vez
+   que se agrega una columna, y la fórmula sigue apuntando al lugar de antes:
+   no da error, muestra otro número. Ya pasó tres veces —con el costo, con
+   «pagado» y con «persona»—.
+
+   Ahora todas las letras salen de COLUMNAS con letraDe(), y esta función las
+   reescribe de una. Se llama sola desde la migración, así que agregar una
+   columna ya no deja el resumen mintiendo.
+   -------------------------------------------------------------------------- */
+
+function arreglarFormulasDelResumen() {
+  var h = SpreadsheetApp.getActive().getSheetByName('resumen');
+  if (!h) return 'No hay hoja resumen.';
+
+  h.getRange('B3').setValue('=SUM(ingresos!' + letraDe('ingresos', 'subtotal') + '2:'
+    + letraDe('ingresos', 'subtotal') + ')');
+  h.getRange('B4').setValue('=SUM(egresos!' + letraDe('egresos', 'monto') + '2:'
+    + letraDe('egresos', 'monto') + ')');
+
+  arreglarPrecioDelResumen();
+  egresosPorRubro(h);
+  h.getRange('A73:B200').clearContent();
+  ingresosPorMes(h);
+
+  return 'Fórmulas del resumen reescritas contra las columnas de hoy.';
 }
 
 // Para arreglar un libro que ya existe: crearResumen() no sirve porque se corta
@@ -1197,7 +1246,9 @@ function arreglarIngresosPorMes() {
    clientes. Si mañana dan de baja a otro, se vuelve a correr y listo.
    -------------------------------------------------------------------------- */
 
-function limpiarConsignacionDeBajas() {
+function limpiarConsignacionDeBajas() { return conCandado(limpiarConsignacionDeBajasAhora); }
+
+function limpiarConsignacionDeBajasAhora() {
   var deBaja = {};
   leerFilas('clientes').forEach(function (c) {
     if (c.activo === false) deBaja[c.nombre] = true;
@@ -1258,7 +1309,9 @@ function limpiarConsignacionDeBajas() {
    Al depósito no lo toca: su conteo sí es del 21/8 y esa fecha es la correcta.
    -------------------------------------------------------------------------- */
 
-function fecharConsignacionImportada() {
+function fecharConsignacionImportada() { return conCandado(fecharConsignacionImportadaAhora); }
+
+function fecharConsignacionImportadaAhora() {
   var movimientos = leerFilas('movimientos');
   var tocados = 0;
 
@@ -1308,25 +1361,47 @@ var CODIGOS_RENOMBRADOS = {
   'CHCIR350': 'CHCIR360',
   'CHDU350':  'CHDU360',
   'CRT600':   'CRT650',
-  'KIM600':   'KIM650'
+  'KIM600':   'KIM650',
+  'KIM340':   'KIM350',
+  'PIK360':   'PIK350'
 };
 
-function renombrarCodigos() {
-  var catalogo = {};
-  leerFilas('productos').forEach(function (p) { catalogo[p.cod] = true; });
+function renombrarCodigos() { return conCandado(renombrarCodigosAhora); }
 
-  var sinDestino = [];
+function renombrarCodigosAhora() {
+  var productos = leerFilas('productos');
+  var catalogo = {};
+  productos.forEach(function (p) { catalogo[p.cod] = true; });
+
+  // De cada par tiene que existir al menos una punta. Si no existe ninguna, es
+  // un error de tipeo en el mapa, y renombrar inventaría un producto fantasma
+  // en vez de arreglar el viejo.
+  var perdidos = [];
   Object.keys(CODIGOS_RENOMBRADOS).forEach(function (viejo) {
-    if (!catalogo[CODIGOS_RENOMBRADOS[viejo]]) sinDestino.push(CODIGOS_RENOMBRADOS[viejo]);
+    if (!catalogo[viejo] && !catalogo[CODIGOS_RENOMBRADOS[viejo]]) {
+      perdidos.push(viejo + ' → ' + CODIGOS_RENOMBRADOS[viejo]);
+    }
   });
-  if (sinDestino.length) {
-    return 'No se tocó nada: estos códigos nuevos no están en el catálogo — '
-         + sinDestino.join(', ') + '. Reviselos en la hoja de productos.';
+  if (perdidos.length) {
+    return 'No se tocó nada: de estos pares no existe ninguna de las dos puntas '
+         + 'en el catálogo — ' + perdidos.join('; ') + '.';
   }
 
   var ahora = Date.now();
   var cuenta = {};
   var tocadas = 0;
+
+  // Primero el catálogo, si el código viejo todavía está ahí. Al revés, la
+  // historia quedaría apuntando a un producto que aún no existe.
+  var enCatalogo = 0;
+  productos.forEach(function (p) {
+    var nuevo = CODIGOS_RENOMBRADOS[p.cod];
+    if (!nuevo || catalogo[nuevo]) return;      // ya renombrado a mano: no se duplica
+    p.cod = nuevo;
+    p.mod = ahora;
+    enCatalogo++;
+  });
+  if (enCatalogo) escribirFilas('productos', productos);
 
   ['ingresos', 'movimientos'].forEach(function (nombre) {
     var filas = leerFilas(nombre);
@@ -1343,12 +1418,13 @@ function renombrarCodigos() {
     if (cambio) escribirFilas(nombre, filas);
   });
 
-  if (!tocadas) return 'No había ningún código viejo que renombrar.';
+  if (!tocadas && !enCatalogo) return 'No había ningún código viejo que renombrar.';
 
   var detalle = Object.keys(cuenta).sort().map(function (k) {
     return '  • ' + k + ': ' + cuenta[k] + ' filas';
   }).join('\n');
-  var texto = 'Renombradas ' + tocadas + ' filas.\n' + detalle
+  var texto = 'Renombrados ' + enCatalogo + ' productos del catálogo y '
+    + tocadas + ' filas de la historia.\n' + detalle
     + '\nSincronizar desde un teléfono para que lo vean las dos.';
   Logger.log(texto);
   return texto;
@@ -1383,7 +1459,9 @@ function renombrarCodigos() {
 var RETROACTIVO_HASTA = '2026-08-31';
 var TIPOS_QUE_MUEVEN = ['venta', 'entrega', 'liquidacion', 'devolucion'];
 
-function devolverStockAlConteo() {
+function devolverStockAlConteo() { return conCandado(devolverStockAlConteoAhora); }
+
+function devolverStockAlConteoAhora() {
   var movimientos = leerFilas('movimientos');
   var sacados = [];
 
@@ -1417,6 +1495,36 @@ function devolverStockAlConteo() {
     + '\nSincronizar desde un teléfono para que lo vean las dos.';
   Logger.log(texto);
   return texto;
+}
+
+/* --------------------------------------------------------------------------
+   EL CANDADO DE LAS FUNCIONES DE MANTENIMIENTO
+
+   Las funciones que se corren a mano desde el editor leen una hoja entera, la
+   modifican y la vuelven a escribir. Si un teléfono sincroniza justo en el
+   medio, uno de los dos pisa al otro y se pierde lo que el otro escribió.
+
+   doPost ya toma este mismo candado, así que con esto la sincronización espera
+   su turno en vez de atropellar. Y al revés: si hay una sincronización en curso,
+   la función espera a que termine.
+
+   Las migraciones NO pasan por acá: corren dentro de asegurarEsquema(), que ya
+   está adentro del candado de doPost.
+   -------------------------------------------------------------------------- */
+
+function conCandado(tarea) {
+  var candado = LockService.getScriptLock();
+  try {
+    candado.waitLock(30000);
+  } catch (err) {
+    return 'No se pudo hacer: hay una sincronización en curso y no soltó el paso '
+         + 'en 30 segundos. Probá de nuevo en un minuto. No se tocó nada.';
+  }
+  try {
+    return tarea();
+  } finally {
+    candado.releaseLock();
+  }
 }
 
 /* ================= Auxiliares ================= */

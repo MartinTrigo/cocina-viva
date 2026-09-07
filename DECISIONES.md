@@ -1165,3 +1165,57 @@ base ninguna. Ni lo del 1 de septiembre en adelante, que es el uso real.
 
 Después de correrla, lo único que queda moviendo stock son los ajustes del
 conteo y seis movimientos de septiembre.
+
+## La hoja resumen apuntaba a las columnas equivocadas, tres veces
+
+Cada vez que se agregó una columna, las fórmulas de la hoja `resumen` siguieron
+apuntando al lugar de antes. **No dan error: muestran otro número.** Cuando lo
+notaron, el resumen decía:
+
+- Egresos totales: **$100** — sumaba `cantidad`, que es texto («100 kg»)
+- EGRESOS POR RUBRO: **`#VALUE!`**
+- Ingresos totales: **$1.038.120** — sumaba `precio` en vez de `subtotal`
+
+Lo peor es que ya me había pasado con `productos!D` al agregar el costo, y creé
+`letraDe()` justamente para eso… pero solo la apliqué a esa fórmula. Las otras
+cuatro siguieron con la letra escrita a mano y se rompieron calladas en cuanto
+entraron `pagado` y `persona`.
+
+Ahora **todas** las letras salen de `COLUMNAS` con `letraDe()`, y
+`arreglarFormulasDelResumen()` las reescribe de una. La llama sola la migración:
+agregar una columna ya no puede dejar el resumen mintiendo.
+
+La lección general, que vale más que el arreglo: **en una planilla, una fórmula
+que nombra una columna por su letra es una bomba de tiempo**. No falla, miente.
+Y miente en el número que uno mira para tomar decisiones.
+
+## Las funciones de mantenimiento toman el candado
+
+Surgió de una pregunta de Martín: estaban cargando egresos mientras yo
+trabajaba, y quiso saber si había problema.
+
+No lo había con lo mío —yo editaba código, no el libro—, pero sí lo habría al
+correr las funciones: leen una hoja entera, la modifican y la reescriben. Un
+teléfono sincronizando en el medio se pisa con eso, y uno de los dos pierde lo
+que escribió.
+
+`doPost` ya tomaba `LockService`; las funciones de mantenimiento no. Ahora pasan
+todas por `conCandado()`, así que la sincronización espera su turno en vez de
+atropellar, y al revés. Si en 30 segundos no consigue el paso, no hace nada y lo
+dice, en vez de escribir a medias.
+
+Las migraciones NO pasan por ahí: corren dentro de `asegurarEsquema()`, que ya
+está adentro del candado de `doPost`.
+
+## Renombrar un código ahora arregla también el catálogo
+
+La primera versión de `renombrarCodigos()` exigía que el código nuevo ya
+existiera en la hoja de productos, porque asumía que el renombre se había hecho
+a mano. Con `KIM340 → KIM350` y `PIK360 → PIK350` no era así: el catálogo tenía
+los viejos.
+
+Ahora renombra las dos cosas, y en el orden correcto: **primero el catálogo y
+después la historia**. Al revés, la historia quedaría un instante apuntando a un
+producto que todavía no existe. Y la condición pasó a ser que exista **al menos
+una** de las dos puntas: si no existe ninguna, es un error de tipeo en el mapa y
+no toca nada.
