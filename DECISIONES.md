@@ -1102,3 +1102,37 @@ exactamente el precio de `KIM600`.
 Esas filas muestran un producto fantasma en el resumen, y una de ellas además
 generó un movimiento: `CRT650` quedó en **−5** en el depósito, y las 5 unidades
 de `CRT600` que sí salieron nunca se descontaron.
+
+## Corrección: los códigos «650» no eran errores, eran la corrección
+
+Anoté antes que `KIM650`, `CRT650` y `CHDU360` eran errores de tipeo. **Me
+equivoqué.** Son los códigos correctos: el catálogo se había cargado con los
+gramajes de la planilla vieja, que estaban mal, y Martín los corrigió a mano en
+la hoja de productos. Los equivocados eran los que yo daba por buenos.
+
+Es exactamente lo que quedó anotado en PLAN.md desde el principio, en «revisar
+las presentaciones del catálogo»: `CHDU350` decía 360, y de ahí que el código
+real sea `CHDU360`.
+
+**Lo que sí era un problema, y sigue siéndolo, es lo que pasa después de
+renombrar.** Cambiar el código en la hoja de productos y nada más deja la
+historia huérfana: el stock se queda pegado al código que ya no existe y el
+producto nuevo arranca en cero. Con 22 filas de ingresos y 50 movimientos
+apuntando a los viejos, el depósito quedó repartido entre productos fantasma.
+
+`renombrarCodigos()` reescribe el código en `ingresos` y en `movimientos`, que
+es donde vive la historia. No toca la hoja de productos, que ya está corregida.
+Es idempotente, y **no hace nada si el código nuevo no existe en el catálogo**:
+un error de tipeo en el mapa inventaría un producto fantasma nuevo en vez de
+arreglar el viejo.
+
+**Son cuatro y no tres**: `CHCIR350` → `CHCIR360` también, que no estaba en la
+lista que me pasaron pero sí en el catálogo corregido.
+
+### Lo que esto deja pendiente
+
+El código de un producto **sigue sin poder editarse desde la app** —decisión de
+la fase 1, porque lo guardan todas las ventas—. Pero acabamos de comprobar que
+la necesidad existe de verdad. La app ya sabe hacer esto con los clientes y con
+las personas: al renombrar, reescribe la historia. A Productos le falta lo
+mismo, y mientras no lo tenga, cada corrección de código pasa por acá.

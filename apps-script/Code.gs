@@ -1286,6 +1286,74 @@ function fecharConsignacionImportada() {
   return texto;
 }
 
+/* --------------------------------------------------------------------------
+   RENOMBRAR CÓDIGOS DE PRODUCTO EN TODA LA HISTORIA
+
+   El código de un producto se decidió que no se edita, justamente porque lo
+   guardan todas las ventas y todos los movimientos. Pero a veces hay que
+   cambiarlo igual: el catálogo se cargó con los gramajes de la planilla vieja y
+   algunos estaban mal. Cambiar el código en la hoja de productos y nada más
+   deja la historia huérfana: el stock se queda pegado al código que ya no
+   existe, y el producto nuevo arranca en cero.
+
+   Esta función reescribe el código en «ingresos» y en «movimientos», que es
+   donde vive la historia. No toca la hoja de productos: eso ya se hizo a mano.
+
+   Es idempotente: la segunda vez no encuentra nada porque los viejos ya no
+   están. Y no hace nada si el código nuevo no existe en el catálogo, para que
+   un error de tipeo en el mapa no invente un producto fantasma.
+   -------------------------------------------------------------------------- */
+
+var CODIGOS_RENOMBRADOS = {
+  'CHCIR350': 'CHCIR360',
+  'CHDU350':  'CHDU360',
+  'CRT600':   'CRT650',
+  'KIM600':   'KIM650'
+};
+
+function renombrarCodigos() {
+  var catalogo = {};
+  leerFilas('productos').forEach(function (p) { catalogo[p.cod] = true; });
+
+  var sinDestino = [];
+  Object.keys(CODIGOS_RENOMBRADOS).forEach(function (viejo) {
+    if (!catalogo[CODIGOS_RENOMBRADOS[viejo]]) sinDestino.push(CODIGOS_RENOMBRADOS[viejo]);
+  });
+  if (sinDestino.length) {
+    return 'No se tocó nada: estos códigos nuevos no están en el catálogo — '
+         + sinDestino.join(', ') + '. Reviselos en la hoja de productos.';
+  }
+
+  var ahora = Date.now();
+  var cuenta = {};
+  var tocadas = 0;
+
+  ['ingresos', 'movimientos'].forEach(function (nombre) {
+    var filas = leerFilas(nombre);
+    var cambio = false;
+    filas.forEach(function (f) {
+      var nuevo = CODIGOS_RENOMBRADOS[f.cod];
+      if (!nuevo) return;
+      cuenta[f.cod + ' → ' + nuevo] = (cuenta[f.cod + ' → ' + nuevo] || 0) + 1;
+      f.cod = nuevo;
+      f.mod = ahora;              // para que le gane a la copia de los teléfonos
+      cambio = true;
+      tocadas++;
+    });
+    if (cambio) escribirFilas(nombre, filas);
+  });
+
+  if (!tocadas) return 'No había ningún código viejo que renombrar.';
+
+  var detalle = Object.keys(cuenta).sort().map(function (k) {
+    return '  • ' + k + ': ' + cuenta[k] + ' filas';
+  }).join('\n');
+  var texto = 'Renombradas ' + tocadas + ' filas.\n' + detalle
+    + '\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
+}
+
 /* ================= Auxiliares ================= */
 
 // La letra de una columna, calculada desde COLUMNAS. Escribir la letra a mano
