@@ -1056,3 +1056,49 @@ pasar, el estropicio dura una pantalla en vez de toda la sesión.
 
 Vale como regla: un `id` en esta app es global. Los botones que viven dentro de
 una pantalla llevan el nombre de la pantalla en el id.
+
+## Las ventas viejas entran sin mover el stock, y con los precios de entonces
+
+Se importaron 91 filas de julio y agosto que estaban en la planilla vieja. Dos
+reglas mandaron sobre todo lo demás.
+
+**No se toca el stock.** Esas ventas ya estaban descontadas cuando se contó el
+depósito el 21/8, así que moverlo ahora lo dejaría mal. Se generaron filas de
+`ingresos` y **ningún** movimiento. El modelo ya contemplaba este caso desde la
+fase 2: una venta sin movimiento asociado registra la plata y nada más, y al
+borrarla no devuelve stock a ningún lado. La pantalla de detalle lo dice sola.
+Comprobado: con las 91 filas cargadas el depósito queda idéntico, byte por byte.
+
+**El precio es el de entonces**, y sale de la propia fila de la planilla vieja.
+Varios subieron desde julio —el chucrut 660 de $9.800 a $10.200, el untable de
+kale de $5.900 a $6.150, el kimchi 600 de $10.000 a $10.500— y cargarlas al
+precio de hoy habría inflado la plata que dicen tener. Que esto salga gratis no
+es casualidad: la app guarda `precio` y `subtotal` **en cada fila** y no los
+recalcula nunca contra el catálogo, justamente para que la historia no se
+reescriba sola cuando cambian los precios.
+
+Un dato que dio confianza: en las 108 filas del período, **el total anotado
+coincide con unidades × precio en todas**. La planilla vieja era desprolija en
+formato pero consistente en los números.
+
+### Lo que quedó afuera
+
+- **6 filas ya cargadas** (verdu richard bari del 21/8). Se detectaron
+  comparando fecha + cliente, no fecha + cliente + código: ellas habían escrito
+  `CRT650` donde la planilla vieja decía `CRT600`, así que por código habrían
+  pasado como distintas y se habrían duplicado.
+- **9 filas de «consumo propio»** a precio cero. Se llevaron mercadería pero no
+  entró plata; como venta no dicen nada y ensuciarían «lo más vendido».
+- **1 ingreso de taller** de $202.500. Es plata real pero no es una venta de
+  producto: no tiene código ni cliente. La app no tiene hoy dónde ponerlo.
+
+### Un problema encontrado de paso
+
+Trece filas que ellas ya habían cargado usan códigos que **no existen en el
+catálogo**: `KIM650`, `CRT650` y `CHDU360`, donde los reales son `KIM600`,
+`CRT600` y `CHDU350`. Los precios lo confirman: `KIM650` a $10.500 es
+exactamente el precio de `KIM600`.
+
+Esas filas muestran un producto fantasma en el resumen, y una de ellas además
+generó un movimiento: `CRT650` quedó en **−5** en el depósito, y las 5 unidades
+de `CRT600` que sí salieron nunca se descontaron.
