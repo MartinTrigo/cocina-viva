@@ -1354,6 +1354,71 @@ function renombrarCodigos() {
   return texto;
 }
 
+/* --------------------------------------------------------------------------
+   DEVOLVER EL STOCK A LA BASE DEL CONTEO
+
+   Ellas cargaron en la app ventas, entregas y liquidaciones que ya habían
+   pasado ANTES de armar la app. Cada una movió el stock. El problema es que el
+   conteo con el que arrancó todo —263 unidades en el depósito, 142 en la
+   calle— salió de la planilla vieja, y esa planilla YA las tenía descontadas.
+   Así que se descontaron dos veces.
+
+   Comprobado con los números: sacando el efecto de todo lo anterior al 1/9, el
+   depósito vuelve exactamente a 263 unidades y $2.060.950, y la calle a 142 y
+   $1.032.650. Clavado. No es una estimación.
+
+   QUÉ SE BORRA: solo el MOVIMIENTO de mercadería de las operaciones retroactivas
+   —venta, entrega, liquidación y devolución— con fecha hasta el 31/8.
+
+   QUÉ NO SE TOCA:
+     · las filas de «ingresos», ni una. Esa plata entró de verdad y tiene que
+       seguir en el resumen. Una venta sin movimiento es un caso que la app ya
+       contempla: registra la plata y no mueve stock.
+     · los ajustes, que SON el conteo: si se borraran, no quedaría base ninguna.
+     · lo del 1 de septiembre en adelante, que es el uso real de la app y sí
+       tiene que mover el stock.
+   -------------------------------------------------------------------------- */
+
+// Hasta acá llega lo que ya estaba contado en la planilla vieja.
+var RETROACTIVO_HASTA = '2026-08-31';
+var TIPOS_QUE_MUEVEN = ['venta', 'entrega', 'liquidacion', 'devolucion'];
+
+function devolverStockAlConteo() {
+  var movimientos = leerFilas('movimientos');
+  var sacados = [];
+
+  var quedan = movimientos.filter(function (m) {
+    var mueve = TIPOS_QUE_MUEVEN.indexOf(m.tipo) >= 0;
+    if (mueve && m.fecha && m.fecha <= RETROACTIVO_HASTA) { sacados.push(m); return false; }
+    return true;
+  });
+
+  if (!sacados.length) return 'No había movimientos retroactivos que sacar.';
+
+  // Las lápidas hacen que la baja llegue también a los teléfonos que ya se
+  // habían bajado esos movimientos.
+  var borrados = {};
+  leerBorrados().forEach(function (b) { borrados[b.id] = b; });
+  var ahora = Date.now();
+  sacados.forEach(function (m) { borrados[m.id] = { id: m.id, mod: ahora }; });
+
+  escribirFilas('movimientos', quedan);
+  escribirBorrados(borrados);
+
+  var porTipo = {};
+  sacados.forEach(function (m) { porTipo[m.tipo] = (porTipo[m.tipo] || 0) + 1; });
+  var detalle = Object.keys(porTipo).sort().map(function (t) {
+    return '  • ' + t + ': ' + porTipo[t];
+  }).join('\n');
+
+  var texto = 'Sacados ' + sacados.length + ' movimientos de hasta el '
+    + RETROACTIVO_HASTA + '.\n' + detalle
+    + '\nLas filas de ingresos NO se tocaron: la plata sigue estando.'
+    + '\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
+}
+
 /* ================= Auxiliares ================= */
 
 // La letra de una columna, calculada desde COLUMNAS. Escribir la letra a mano

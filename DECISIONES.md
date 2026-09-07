@@ -1136,3 +1136,32 @@ la fase 1, porque lo guardan todas las ventas—. Pero acabamos de comprobar que
 la necesidad existe de verdad. La app ya sabe hacer esto con los clientes y con
 las personas: al renombrar, reescribe la historia. A Productos le falta lo
 mismo, y mientras no lo tenga, cada corrección de código pasa por acá.
+
+## El conteo de la planilla vieja ya tenía descontado todo agosto
+
+Ellas cargaron en la app ventas, entregas y liquidaciones que habían pasado
+antes de armarla. Cada una movió el stock. El problema: el conteo con el que
+arrancó todo salió de la planilla vieja, y esa planilla **ya las tenía
+descontadas**. Se descontaron dos veces.
+
+No hizo falta suponerlo. Sacando el efecto de todo lo anterior al 1 de
+septiembre, el depósito vuelve **exactamente** a 263 unidades y $2.060.950, y la
+calle a 142 y $1.032.650 — los dos números con los que arrancó la app, clavados
+al peso. Dos coincidencias exactas de ese tamaño no son casualidad: prueban que
+el corte real es el 31/8 y no el 21/8 que dice la etiqueta de la columna.
+
+`devolverStockAlConteo()` borra el **movimiento** de mercadería de las
+operaciones retroactivas —venta, entrega, liquidación y devolución— hasta el
+31/8. Son 87 de 174.
+
+**No toca las filas de `ingresos`, ni una.** Esa plata entró de verdad y tiene
+que seguir en el resumen. Que se pueda hacer esto sin romper nada es gracias a
+una decisión de la fase 2: una venta sin movimiento asociado es un caso
+contemplado, registra la plata y no mueve stock, y la pantalla de detalle lo
+dice sola.
+
+Tampoco toca los ajustes, que **son** el conteo: borrarlos dejaría a la app sin
+base ninguna. Ni lo del 1 de septiembre en adelante, que es el uso real.
+
+Después de correrla, lo único que queda moviendo stock son los ajustes del
+conteo y seis movimientos de septiembre.
