@@ -286,7 +286,10 @@ function leerFilas(nombre) {
 
     } else {
       o.id = String(o.id || '').trim() || ('man-' + Date.now().toString(36) + '-' + (contador++));
-      o.fecha = fechaIso(o.fecha) || fechaIso(new Date());
+      // Ojo: acá antes decía «|| fechaIso(new Date())». Una fila sin fecha salía
+      // con la de hoy, que es peor que vacía porque parece un dato bueno. Así
+      // fue como 140 ventas de julio y agosto terminaron diciendo 07/09/2026.
+      o.fecha = fechaIso(o.fecha);
     }
 
     if (nombre === 'ingresos') {
@@ -347,6 +350,16 @@ function leerFilas(nombre) {
 
     filas.push(o);
   }
+
+  // Una venta se guarda en varios renglones que comparten la fecha. Si a alguno
+  // le falta, se la presta un hermano; inventarla no.
+  if (nombre === 'ingresos') {
+    var deLaVenta = {};
+    filas.forEach(function (f) {
+      if (f.fecha && !deLaVenta[f.venta]) deLaVenta[f.venta] = f.fecha;
+    });
+    filas.forEach(function (f) { if (!f.fecha) f.fecha = deLaVenta[f.venta] || ''; });
+  }
   return filas;
 }
 
@@ -392,14 +405,31 @@ function escribirFilas(nombre, objetos) {
   var h = hoja(nombre);
   var cols = COLUMNAS[nombre];
   var ultima = h.getLastRow();
+
+  // Una fecha que ya está escrita no se pisa con un vacío. El 7 de septiembre
+  // la columna de fechas de «ingresos» quedó en blanco de golpe —138 filas de
+  // 143— y la escritura siguiente dejó el blanco firme. Ahora, si el renglón
+  // que entra viene sin fecha, se queda con la que tenía la planilla.
+  var fechaVieja = {};
+  var iId = cols.indexOf('id'), iFecha = cols.indexOf('fecha');
+  if (iId >= 0 && iFecha >= 0 && ultima > 1) {
+    h.getRange(2, 1, ultima - 1, cols.length).getValues().forEach(function (f) {
+      var id = String(f[iId] || '').trim();
+      var d = fechaIso(f[iFecha]);
+      if (id && d) fechaVieja[id] = d;
+    });
+  }
+
   if (ultima > 1) h.getRange(2, 1, ultima - 1, cols.length).clearContent();
   if (!objetos.length) return;
 
   var filas = objetos.map(function (o) {
     return cols.map(function (c) {
       var v = o[c];
-      if (c === 'fecha') return aFecha(v);
-      if (c === 'activo') return v === false ? 'no' : 'sí';
+      if (c === 'fecha') return aFecha(v || fechaVieja[o.id] || '');
+      // «pagado» sale sí/no como «activo»: la celda tiene ese desplegable y
+      // venía escribiendo TRUE, que la validación marca como valor de afuera.
+      if (c === 'activo' || c === 'pagado') return v === false ? 'no' : 'sí';
       return comoTexto(v);
     });
   });
@@ -1525,6 +1555,72 @@ function conCandado(tarea) {
   } finally {
     candado.releaseLock();
   }
+}
+
+/* --------------------------------------------------------------------------
+   DEVOLVERLE A CADA VENTA SU FECHA
+
+   El 7 de septiembre la columna «fecha» de la hoja ingresos apareció vacía en
+   138 de 143 filas. La lectura siguiente la rellenó sola con la fecha del día
+   —eso lo hacía leerFilas y ya no lo hace—, así que 140 ventas de julio y
+   agosto quedaron diciendo 07/09/2026 y el balance por mes dejó de servir.
+
+   Las fechas de acá abajo salen de tres copias del libro tomadas antes del
+   estropicio, a las 18:50, a las 19:13 y a las 20:31 del mismo día. Las tres
+   coinciden renglón por renglón: 79 de julio y 56 de agosto.
+
+   Las 8 ventas que no figuran en la lista —verdu richard bari y amarantus— sí
+   son del 7 de septiembre de verdad: sus movimientos, que nunca perdieron la
+   fecha, lo confirman. Por eso no se tocan.
+   -------------------------------------------------------------------------- */
+
+var FECHAS_DE_INGRESOS = {
+  '2026-07-10': 'viejo-001 viejo-002 viejo-003',
+  '2026-07-17': 'viejo-004 viejo-005 viejo-006 viejo-007 viejo-008 viejo-009 viejo-010 viejo-011 viejo-012 viejo-013 viejo-014 viejo-015 viejo-016 viejo-017 viejo-018 viejo-019 viejo-020 viejo-021 viejo-022 viejo-023 viejo-024 viejo-025 viejo-026 viejo-027 viejo-028 viejo-029 viejo-030 viejo-031 viejo-032 viejo-033 viejo-034 viejo-035 viejo-036 viejo-037 viejo-038 viejo-039 viejo-040 viejo-041 viejo-042 viejo-043 viejo-049',
+  '2026-07-31': 'viejo-044 viejo-045 viejo-046 viejo-047 viejo-048 viejo-050 viejo-051 viejo-052 viejo-053 viejo-054 viejo-055 viejo-056 viejo-057 viejo-058 viejo-059 viejo-060 viejo-061 viejo-062 viejo-063 viejo-064 viejo-065 viejo-066 viejo-067 viejo-068 viejo-069 viejo-070 viejo-071 viejo-072 viejo-073 viejo-074 viejo-075 viejo-076 viejo-077 viejo-078 viejo-079',
+  '2026-08-13': 'viejo-085 viejo-086 viejo-087 viejo-088 viejo-089 viejo-090 viejo-091',
+  '2026-08-14': 'a645797c-9a1d-48d2-babe-2ae16b9196cb',
+  '2026-08-21': 'viejo-080 viejo-081 viejo-082 viejo-083 viejo-084',
+  '2026-08-28': '028e7d70-402c-423f-8220-0fd641b1c706 0946a8bf-0597-4e24-b8ba-a4ae486decb4 1735bd30-31fa-40ba-9378-a3d6fb8f0c93 259d7965-db95-48af-8c75-751df54d1d0d 267e10a9-817e-44df-bf5b-653a52b5c5cc 320e7adf-ba57-4b81-88d2-298e87ade326 424c147b-08a9-4dd3-9a37-4a8348d6c6e8 4acd82f3-c160-43f6-9890-0da96e8c5e74 4bb48292-56a8-4d95-b40c-bd8409cba4a6 4cb197d0-2a34-4174-bb20-ad20baebeeb7 5392122e-b1b9-49e0-8461-f7a65ffac525 64212c95-abe8-4789-8aa6-90bae9413d8c 65c4a224-4918-4d4c-ba58-beea8163b67d 683d3b26-3def-4139-9887-e35dabbd0619 72c1a07e-590d-4e74-ae58-598cd23d5639 7caf04ae-f28a-4127-b5fc-1feeac01826e 7df29a25-4706-4cb0-9207-01bfd7706a97 87e9b864-3b40-4451-abaf-70560db622c5 8d4f7097-f781-437d-811f-141607ca29a1 8e8e47ac-2a34-410c-9b38-26394fd96868 936dd028-0fa7-4255-98ed-0b83fcf77bf2 9f373387-9634-4281-a0e1-5fa9e9be26d2 a0b2a573-51f8-41e1-8da8-2ab5e4bbd353 a44ac8a7-f4c8-472c-9fa8-0b09e49ce49b b04a5695-c447-40c2-9466-86ba9754320c b1cedcb1-2991-4591-b3cf-7f62ce0d0d12 b6500ee0-2ffa-461c-9346-d59329805f0d c0d37cba-a446-498a-ba54-9edcc3ad5cf3 cc324a1f-9610-4054-8cf2-2834b29678db d426d1ff-011d-4162-a170-199cf7dc54d8 d8cd54a0-f1a8-4af5-8243-94ac63b7be2d df916ef7-da65-4cec-8229-7c332751ac8b e32c4665-94b2-4b65-9673-2ea9e6a2af68 ed74c816-4397-41f6-b6ff-f72e14d33df6 f15c099e-d334-43f7-a1cd-be89ab2debea f4cdf9ef-8840-4b91-ae60-b43ee50f15ff fd6a54d6-bb78-412a-82f1-39e42e04606b',
+  '2026-08-31': '12de7d4f-40f1-4304-94f5-65a5cb38e2d1 226c227d-99cb-48e2-81a9-042b98afa299 38df549b-e9d5-4cd5-b70d-421ff2e6e080 521fcfeb-9c99-48d3-97a4-30f2d11f2439 7b5f6c8c-51f9-411d-98b8-95048a8a58ab d14d23ab-0979-4945-a78d-928614eafd6d'
+};
+
+function restaurarFechasDeIngresos() { return conCandado(restaurarFechasDeIngresosAhora); }
+
+function restaurarFechasDeIngresosAhora() {
+  var porId = {};
+  Object.keys(FECHAS_DE_INGRESOS).forEach(function (f) {
+    FECHAS_DE_INGRESOS[f].split(' ').forEach(function (id) { if (id) porId[id] = f; });
+  });
+
+  var filas = leerFilas('ingresos');
+  var ahora = Date.now();
+  var arregladas = 0, yaEstaban = 0, sinRespaldo = [];
+
+  filas.forEach(function (o) {
+    var buena = porId[o.id];
+    if (!buena) {
+      if (o.fecha) yaEstaban++; else sinRespaldo.push(o.id);
+      return;
+    }
+    if (o.fecha === buena) { yaEstaban++; return; }
+    o.fecha = buena;
+    // Sube el mod para que la fecha corregida le gane a la que los teléfonos
+    // ya se bajaron. Si no, al sincronizar volverían a subir la equivocada.
+    o.mod = ahora;
+    arregladas++;
+  });
+
+  if (arregladas) escribirFilas('ingresos', filas);
+
+  var texto = 'Fechas devueltas a ' + arregladas + ' renglones. '
+    + yaEstaban + ' ya estaban bien.';
+  if (sinRespaldo.length) {
+    texto += '\nQuedaron sin fecha y sin respaldo: ' + sinRespaldo.join(', ');
+  }
+  texto += '\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
 }
 
 /* ================= Auxiliares ================= */

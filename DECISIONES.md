@@ -1219,3 +1219,45 @@ después la historia**. Al revés, la historia quedaría un instante apuntando a
 producto que todavía no existe. Y la condición pasó a ser que exista **al menos
 una** de las dos puntas: si no existe ninguna, es un error de tipeo en el mapa y
 no toca nada.
+
+## Una fecha inventada es peor que una fecha vacía
+
+El 7 de septiembre la columna «fecha» de la hoja `ingresos` apareció vacía en
+**138 de 143 filas**. Ninguna otra hoja se tocó: `egresos` conservó sus 20
+fechas y `movimientos` sus 108, y esas 108 se escribieron en la **misma**
+llamada a `sincronizar` que dejó ingresos en blanco. El banco de pruebas corre
+el ida y vuelta completo —`escribirFilas` → `leerFilas` → `sincronizar`— y no
+pierde una sola fecha. O sea: no fue el código el que vació la columna.
+
+Lo que sí fue culpa del código es lo que pasó **después**. `leerFilas` decía:
+
+```js
+o.fecha = fechaIso(o.fecha) || fechaIso(new Date());
+```
+
+Una fila sin fecha legible salía con la fecha del día. La sincronización
+siguiente escribió ese invento en la planilla, y **140 ventas de julio y agosto
+pasaron a decir 07/09/2026**. El hueco duró horas; el dato falso quedó fijo, con
+cara de dato bueno, y el balance por mes dejó de servir sin que nada avisara.
+
+Un hueco se ve. Un invento no. Tres cambios:
+
+1. `leerFilas` ya no inventa nada: sin fecha legible, la fila sale sin fecha.
+2. Una venta ocupa varios renglones que comparten la fecha. Si a uno le falta,
+   **se la presta un hermano de la misma venta** — eso es recuperar el dato, no
+   fabricarlo.
+3. `escribirFilas` **no pisa con un vacío una fecha que ya está escrita**: lee
+   la columna antes de limpiarla y, si el renglón que entra viene sin fecha, se
+   queda con la que tenía la planilla. Con esto, el vaciado de aquel día se
+   habría curado solo en la sincronización siguiente.
+
+`restaurarFechasDeIngresos()` devuelve las fechas verdaderas. Salen de tres
+copias del libro tomadas antes del estropicio (18:50, 19:13 y 20:31 del mismo
+día): las tres coinciden renglón por renglón, 79 de julio y 56 de agosto. Las 8
+ventas que no están en esa lista —verdu richard bari y amarantus— sí son del 7
+de septiembre de verdad, y lo confirman sus movimientos, que nunca perdieron la
+fecha. La función sube el `mod` de lo que corrige: si no, los teléfonos, que ya
+se bajaron la fecha equivocada, la volverían a subir.
+
+De paso: `pagado` se escribía como `TRUE` en una celda cuyo desplegable dice
+sí/no. Ahora sale `sí`/`no`, como `activo`.

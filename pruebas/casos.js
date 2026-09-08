@@ -208,6 +208,94 @@
             "y este teléfono también lo pierde de vista");
   }
 
+  // ---------- las fechas ----------
+  //
+  // El 7 de septiembre la columna «fecha» de ingresos apareció vacía en 138 de
+  // 143 filas. Lo grave no fue el vaciado sino lo que vino después: leerFilas
+  // rellenaba una fecha ilegible con la del día, así que la sincronización
+  // siguiente convirtió el hueco en 07/09/2026 y 140 ventas de julio y agosto
+  // se volvieron ventas de hoy. Un dato inventado es peor que un hueco: el
+  // hueco se ve, el invento no.
+
+  function renglones(venta, fecha, cuantos) {
+    const filas = [];
+    for (let i = 0; i < cuantos; i++) {
+      filas.push({ id: venta + "-" + i, venta: venta, fecha: fecha, cliente: "amarantus",
+        lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
+        cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1787324400000 });
+    }
+    return filas;
+  }
+
+  // Lo que quedó escrito en la columna C, leído crudo de la hoja.
+  const columnaFecha = () => hoja("ingresos").filas.slice(1)
+    .filter((f) => f[0])
+    .map((f) => (f[2] instanceof Date
+      ? f[2].getFullYear() + "-" + ("0" + (f[2].getMonth() + 1)).slice(-2)
+        + "-" + ("0" + f[2].getDate()).slice(-2)
+      : ""));
+
+  async function casoFechasVaciadas() {
+    caso("La columna de fechas aparece vacía");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v1", "2026-07-10", 3).concat(renglones("v2", "2026-08-28", 2)));
+    afirmar(columnaFecha().join(",") === "2026-07-10,2026-07-10,2026-07-10,2026-08-28,2026-08-28",
+            "las fechas se escriben bien");
+
+    hoja("ingresos").filas.slice(1).forEach((f) => { if (f[0]) f[2] = ""; });   // el estropicio
+
+    afirmar(filasDe("ingresos").every((o) => !o.fecha),
+            "leerFilas NO las rellena con la fecha de hoy");
+    sincronizar({ ingresos: [] });
+    afirmar(columnaFecha().every((f) => !f),
+            "y la sincronización tampoco: el hueco sigue siendo hueco");
+  }
+
+  async function casoFechaDelHermano() {
+    caso("A un renglón solo le falta la fecha");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v3", "2026-08-13", 3));
+    hoja("ingresos").filas[2][2] = "";
+    afirmar(filasDe("ingresos").map((o) => o.fecha).join(",")
+            === "2026-08-13,2026-08-13,2026-08-13",
+            "se la presta otro renglón de la misma venta");
+  }
+
+  async function casoElTelefonoNoPisaLaFecha() {
+    caso("El teléfono manda un renglón sin fecha");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v4", "2026-08-21", 1));
+    sincronizar({ ingresos: [{ id: "v4-0", venta: "v4", fecha: "", cliente: "amarantus",
+      lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
+      cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: Date.now() }] });
+    afirmar(columnaFecha()[0] === "2026-08-21",
+            "la planilla conserva la fecha que ya tenía");
+  }
+
+  async function casoRestaurarFechas() {
+    caso("La reparación de las fechas perdidas");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", [{ id: "viejo-001", venta: "vieja-001", fecha: "2026-09-07",
+      cliente: "amarantus", lista: "mayorista", medio_pago: "Efectivo", pagado: true,
+      cod: "CRT650", cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1 }]);
+    restaurarFechasDeIngresosAhora();
+    afirmar(columnaFecha()[0] === "2026-07-10", "viejo-001 volvió al 10 de julio");
+
+    let cuantos = 0;
+    Object.keys(FECHAS_DE_INGRESOS).forEach((f) => {
+      cuantos += FECHAS_DE_INGRESOS[f].split(" ").length;
+    });
+    afirmar(cuantos === 135, "la tabla de respaldo tiene los 135 renglones");
+  }
+
+  async function casoPagadoSiONo() {
+    caso("«Pagado» se escribe como lo dice el desplegable");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v5", "2026-08-14", 1));
+    afirmar(hoja("ingresos").filas[1][6] === "sí",
+            "dice «sí» y no TRUE: " + JSON.stringify(hoja("ingresos").filas[1][6]));
+  }
+
   // ---------- correr ----------
 
   async function correr() {
@@ -215,6 +303,8 @@
     const casos = [
       casoClienteBorrado, casoClienteRehecho, casoVentaBorradaEnPleneVuelo,
       casoCargaEnPlenoVuelo, casoProductoBorrado, casoBorradoDesdeElOtroTelefono,
+      casoFechasVaciadas, casoFechaDelHermano, casoElTelefonoNoPisaLaFecha,
+      casoRestaurarFechas, casoPagadoSiONo,
     ];
     for (const c of casos) {
       try { await c(); }
