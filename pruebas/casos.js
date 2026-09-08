@@ -296,6 +296,86 @@
             "dice «sí» y no TRUE: " + JSON.stringify(hoja("ingresos").filas[1][6]));
   }
 
+  // ---------- borrar deja rastro ----------
+  //
+  // Hasta ahora la hoja «borrados» guardaba un id y una hora, y nada más. Cuando
+  // desaparecieron cuatro egresos de agosto no hubo forma de saber qué decían ni
+  // quién los borró: el dispositivo se dedujo cruzando la hora con la última
+  // actividad de cada teléfono, que es una corazonada, no un registro.
+
+  async function casoLaLapidaCuenta() {
+    caso("Al borrar queda anotado qué era y quién fue");
+    limpiarPlanilla();
+    enLaPlanilla("egresos", [{ id: "e1", fecha: "2026-08-23", rubro: "Insumos",
+      detalle: "Repollo", persona: "", cantidad: "100", monto: 179400,
+      medio_pago: "Brubank", obs: "Eppa", mod: 1000 }]);
+
+    sincronizar({ borrados: [{ id: "e1", mod: 2000 }] },
+                { persona: "luna", dispositivo: "d-luna" });
+
+    const lapidas = leerBorrados();
+    afirmar(lapidas.length === 1, "quedó una lápida");
+    const l = lapidas[0] || {};
+    afirmar((l.que || "").indexOf("Repollo") >= 0 && (l.que || "").indexOf("179400") >= 0,
+            "dice qué se borró: " + (l.que || "(nada)"));
+    afirmar(l.quien === "luna", "y quién lo borró: " + (l.quien || "(nadie)"));
+    afirmar(!filasDe("egresos").length, "el egreso se fue de la planilla");
+
+    // Y no se pierde en la sincronización siguiente, que es cuando importa.
+    sincronizar({}, { persona: "meli", dispositivo: "d-meli" });
+    const otra = leerBorrados()[0] || {};
+    afirmar(otra.quien === "luna", "sigue diciendo luna, no la última que sincronizó");
+  }
+
+  async function casoRestaurarEgresos() {
+    caso("Devolver los cuatro egresos borrados sin querer");
+    limpiarPlanilla();
+    // Como quedó la planilla: sin las filas y con las lápidas puestas.
+    const borrados = {};
+    EGRESOS_A_DEVOLVER.forEach((e) => { borrados[e.id] = { id: e.id, mod: 9000 }; });
+    escribirBorrados(borrados);
+
+    restaurarEgresosBorradosAhora();
+
+    const egresos = filasDe("egresos");
+    afirmar(egresos.length === 4, "volvieron los cuatro: " + egresos.length);
+    const total = egresos.reduce((n, e) => n + e.monto, 0);
+    afirmar(total === 236600, "y con su plata: $" + total);
+    afirmar(!leerBorrados().length,
+            "las lápidas se levantaron (si no, se borran de nuevo)");
+
+    // Lo que importa de verdad: que la próxima sincronización no se los lleve.
+    sincronizar({}, { persona: "luna" });
+    afirmar(filasDe("egresos").length === 4, "y siguen ahí después de sincronizar");
+
+    restaurarEgresosBorradosAhora();
+    afirmar(filasDe("egresos").length === 4, "correrla dos veces no los duplica");
+  }
+
+  async function casoRefecharVentasViejas() {
+    caso("La venta de verdu vuelve al 21 de agosto y deja de mover stock");
+    limpiarPlanilla();
+    const venta = "1c5b435d-681d-4d21-8d39-9e6f2cb50df4";
+    enLaPlanilla("ingresos", [{ id: "i1", venta: venta, fecha: "2026-09-07",
+      cliente: "verdu richard bari", lista: "mayorista", medio_pago: "Efectivo",
+      pagado: true, cod: "CRT650", cantidad: 5, precio: 10200, subtotal: 51000,
+      obs: "", mod: 1000 }]);
+    enLaPlanilla("movimientos", [{ id: "m1", fecha: "2026-09-07", tipo: "venta",
+      cod: "CRT650", cantidad: 5, desde: "DEPOSITO", hacia: "VENDIDO",
+      ref: venta, obs: "verdu richard bari", mod: 1000 }]);
+
+    refecharVentasViejasAhora();
+
+    const i = filasDe("ingresos")[0] || {};
+    afirmar(i.fecha === "2026-08-21", "la venta quedó en 21/08: " + i.fecha);
+    afirmar(i.subtotal === 51000, "la plata no se tocó: $" + i.subtotal);
+    afirmar(!filasDe("movimientos").length, "el movimiento de mercadería se fue");
+    afirmar(leerBorrados().length === 1, "y quedó su lápida, para los teléfonos");
+
+    refecharVentasViejasAhora();
+    afirmar(filasDe("ingresos").length === 1, "correrla dos veces no rompe nada");
+  }
+
   // ---------- correr ----------
 
   async function correr() {
@@ -305,6 +385,7 @@
       casoCargaEnPlenoVuelo, casoProductoBorrado, casoBorradoDesdeElOtroTelefono,
       casoFechasVaciadas, casoFechaDelHermano, casoElTelefonoNoPisaLaFecha,
       casoRestaurarFechas, casoPagadoSiONo,
+      casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
     ];
     for (const c of casos) {
       try { await c(); }

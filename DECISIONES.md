@@ -1289,3 +1289,58 @@ los respaldos se mudan con él.
 Esto se suma —no reemplaza— al historial de versiones de Google, que ya guarda
 todo cambio de la planilla y alcanza para volver atrás un rato. El respaldo
 diario sirve para lo otro: cuando el estropicio se descubre una semana después.
+
+## Una lápida que no dice nada no sirve para nada
+
+Cuando desaparecieron cuatro egresos de agosto, la hoja `borrados` tenía lo
+único que guardaba: un id y una hora. Con eso se sabe *cuándo*, y nada más. Qué
+decía la fila hubo que sacarlo de una copia del libro anterior al borrado, y el
+teléfono, de cruzar la hora del borrado con la última actividad de cada
+dispositivo. Eso último es una corazonada bien fundada, no un registro.
+
+Ahora `borrados` tiene cuatro columnas: `id`, `mod`, **`qué se borró`** y
+**`quién lo borró`**.
+
+- **Quién** sale de la credencial con la que entró el pedido: `permitido()`
+  devuelve el dispositivo y la persona, y `doPost` se los pasa a `sincronizar`.
+- **Qué** se anota en el único momento en que todavía se puede: cuando
+  `fusionar` descarta la fila por la lápida. Un renglón más tarde esa fila ya no
+  existe en ningún lado. Queda una línea del tipo
+  `egreso 2026-08-23 · Insumos · Repollo · $179400`.
+
+Lo primero que se escribe manda: una lápida que ya tiene autor no se lo cambia
+la próxima que sincronice. Las lápidas viejas quedan con esas dos columnas en
+blanco, que es honesto — de esas no se sabe.
+
+No guarda la fila entera a propósito. Alcanza con reconocer qué era y cuánta
+plata movía; el respaldo diario es el que tiene el dato completo.
+
+## Los cuatro egresos, y la venta que se pisó al pegar
+
+`restaurarEgresosBorrados()` repone los cuatro egresos de agosto, $236.600.
+Además de escribir las filas **levanta la lápida**: si quedara puesta, la
+sincronización siguiente los borraría otra vez, que es exactamente para lo que
+sirve.
+
+Y apareció algo más al mirar los respaldos. A las 17:56 la planilla tenía seis
+renglones de una venta a **verdu richard bari del 21/08**. A las 18:50 no
+estaban, y **no tienen lápida**: nadie los borró. Lo que pasó en el medio fue
+pegar las ventas viejas en la hoja, que las pisó. Luna volvió a cargar la venta
+el 7 de septiembre, así que quedó con esa fecha.
+
+`refecharVentasViejas()` la devuelve al 21/08 y le saca el movimiento de
+mercadería, como a todas las ventas anteriores al conteo. La cuenta lo confirma
+sola: sin esos movimientos, `CRT650` queda en 14 y `KIM350` en 12, que es
+exactamente lo que dio el conteo del 7 de septiembre. Con ellos, `CRT650` está
+en −1, que no puede ser.
+
+Va también la venta a **amarantus** (`CRT650` x10 y `KIM340` x8, $156.400): son
+dos renglones que en la planilla vieja tampoco tenían fecha, por eso la
+importación los salteó y Luna los cargó a mano. Quedan en **17/07**, que es la
+fecha del bloque bajo el que estaban escritos, y así lo dice su observación. Es
+una inferencia, no un dato; si Luna se acuerda de otra, se cambia en
+`VENTAS_MAL_FECHADAS` y listo.
+
+**La moraleja de las dos cosas es la misma: pegar filas a mano en la hoja es la
+operación más peligrosa que hay.** No avisa, no deja lápida y no se nota hasta
+que alguien suma. Con el respaldo diario andando, al menos se puede volver.

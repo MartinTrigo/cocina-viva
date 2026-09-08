@@ -77,7 +77,7 @@ var COLUMNAS = {
   // Cada rato de trabajo, con su fecha y su actividad.
   horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'obs', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'desde', 'hacia', 'ref', 'obs', 'mod'],
-  borrados:    ['id', 'mod']
+  borrados:    ['id', 'mod', 'que', 'quien']
 };
 
 var ENCABEZADOS = {
@@ -91,7 +91,7 @@ var ENCABEZADOS = {
   horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'observaciones', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'código', 'cantidad', 'desde', 'hacia', 'referencia',
                 'observaciones', 'mod'],
-  borrados:     ['id', 'mod'],
+  borrados:     ['id', 'mod', 'qué se borró', 'quién lo borró'],
   listas:       ['medios de pago', 'rubros de egreso'],
   invitaciones: ['código', 'para quién', 'estado', 'creada', 'usada el', 'dispositivo'],
   dispositivos: ['dispositivo', 'persona', 'activo', 'alta', 'última actividad', 'envíos', 'huella']
@@ -153,7 +153,7 @@ function doPost(e) {
     if (!permiso.ok) return json(permiso);
 
     asegurarEsquema();
-    var estado = sincronizar(pedido);
+    var estado = sincronizar(pedido, permiso);
     marcarActividad(permiso.fila, estado.guardados);
     return json(estado);
   } catch (err) {
@@ -168,10 +168,22 @@ function doPost(e) {
 // Un solo viaje hace las dos cosas: sube lo que el teléfono tenga pendiente y
 // baja el estado completo. La app se queda con lo que vuelve, así que después
 // de sincronizar todos los teléfonos muestran lo mismo.
-function sincronizar(pedido) {
+function sincronizar(pedido, quien) {
+  var deQuien = (quien && (quien.persona || quien.dispositivo)) || 'desconocido';
+
   var borrados = {};
   leerBorrados().forEach(function (b) { borrados[b.id] = b; });
-  (pedido.borrados || []).forEach(function (b) { borrados[b.id] = b; });
+  (pedido.borrados || []).forEach(function (b) {
+    // Una lápida que ya estaba conserva lo suyo: la primera vez es la que sabe
+    // quién borró y qué decía la fila.
+    var antes = borrados[b.id];
+    borrados[b.id] = {
+      id: b.id,
+      mod: b.mod,
+      que: (antes && antes.que) || '',
+      quien: (antes && antes.quien) || deQuien
+    };
+  });
 
   var guardados = 0;
   var resultado = { ok: true, api: API };
@@ -179,7 +191,7 @@ function sincronizar(pedido) {
   ['ingresos', 'egresos', 'movimientos', 'horas'].forEach(function (nombre) {
     var entrantes = pedido[nombre] || [];
     guardados += entrantes.length;
-    var fusionadas = fusionar(leerFilas(nombre), entrantes, borrados);
+    var fusionadas = fusionar(leerFilas(nombre), entrantes, borrados, nombre);
     escribirFilas(nombre, fusionadas);
     resultado[nombre] = fusionadas;
   });
@@ -189,7 +201,7 @@ function sincronizar(pedido) {
   [['productos', 'cod'], ['clientes', 'nombre'], ['personas', 'nombre']].forEach(function (par) {
     var entrantes = pedido[par[0]] || [];
     guardados += entrantes.length;
-    var fusionadas = fusionarPorClave(leerFilas(par[0]), entrantes, par[1], borrados);
+    var fusionadas = fusionarPorClave(leerFilas(par[0]), entrantes, par[1], borrados, par[0]);
     escribirFilas(par[0], fusionadas);
     resultado[par[0]] = fusionadas;
   });
@@ -207,10 +219,17 @@ function sincronizar(pedido) {
 // Gana la versión con el "mod" más alto. Es la regla más simple que funciona
 // con dos o tres personas cargando desde teléfonos distintos, y la misma que
 // venimos usando en bioma-mov.
-function fusionar(remotas, locales, borrados) {
+// Al descartar una fila por una lápida es el único momento en que todavía se ve
+// QUÉ decía: un renglón más tarde ya no existe en ningún lado. Así que se anota
+// ahí, y la lápida deja de ser un id suelto y pasa a poder leerse.
+function fusionar(remotas, locales, borrados, nombre) {
   var porId = {};
   remotas.concat(locales).forEach(function (f) {
-    if (!f || !f.id || borrados[f.id]) return;
+    if (!f || !f.id) return;
+    if (borrados[f.id]) {
+      if (!borrados[f.id].que) borrados[f.id].que = describirFila(nombre, f);
+      return;
+    }
     var previa = porId[f.id];
     if (!previa || (Number(f.mod) || 0) > (Number(previa.mod) || 0)) porId[f.id] = f;
   });
@@ -227,13 +246,16 @@ function fusionar(remotas, locales, borrados) {
 // Con los ingresos y los movimientos es al revés —ahí la lápida gana siempre—
 // porque sus ids son irrepetibles: nunca hay que revivir uno, y así la baja
 // aguanta aunque a la fila le falte el "mod".
-function fusionarPorClave(remotas, locales, clave, borrados) {
+function fusionarPorClave(remotas, locales, clave, borrados, nombre) {
   var porClave = {};
   remotas.concat(locales).forEach(function (f) {
     var k = String((f && f[clave]) || '').trim();
     if (!k) return;
     var lapida = borrados && borrados[k];
-    if (lapida && (Number(lapida.mod) || 0) >= (Number(f.mod) || 0)) return;
+    if (lapida && (Number(lapida.mod) || 0) >= (Number(f.mod) || 0)) {
+      if (!lapida.que) lapida.que = describirFila(nombre, f);
+      return;
+    }
     var previa = porClave[k];
     if (!previa || (Number(f.mod) || 0) > (Number(previa.mod) || 0)) porClave[k] = f;
   });
@@ -368,7 +390,14 @@ function leerBorrados() {
   var out = [];
   for (var i = 1; i < v.length; i++) {
     if (!v[i][0]) continue;
-    out.push({ id: String(v[i][0]), mod: Number(v[i][1]) || 0 });
+    out.push({
+      id: String(v[i][0]),
+      mod: Number(v[i][1]) || 0,
+      // Las dos de al lado son para poder mirar después qué se borró y desde
+      // qué teléfono. Una lápida vieja no las tiene y queda en blanco.
+      que: String(v[i][2] || ''),
+      quien: String(v[i][3] || '')
+    });
   }
   return out;
 }
@@ -395,6 +424,34 @@ function leerListas() {
 // vuelve igual.
 //
 // Solo aplica a los textos. Los números y las fechas se escriben como son.
+// Un renglón contado en una línea, para que la lápida diga algo. No se guarda la
+// fila entera: alcanza con reconocerla y saber cuánta plata era.
+function describirFila(nombre, f) {
+  if (!f) return '';
+  var plata = function (n) { return '$' + (Number(n) || 0); };
+  if (nombre === 'ingresos') {
+    return 'venta ' + (f.fecha || 'sin fecha') + ' · ' + (f.cliente || '?')
+         + ' · ' + (f.cod || '?') + ' x' + (f.cantidad || 0) + ' · ' + plata(f.subtotal);
+  }
+  if (nombre === 'egresos') {
+    return 'egreso ' + (f.fecha || 'sin fecha') + ' · ' + (f.rubro || '?')
+         + ' · ' + (f.detalle || '') + ' · ' + plata(f.monto);
+  }
+  if (nombre === 'movimientos') {
+    return 'movimiento ' + (f.fecha || 'sin fecha') + ' · ' + (f.tipo || '?')
+         + ' · ' + (f.cod || '?') + ' x' + (f.cantidad || 0)
+         + ' · ' + (f.desde || '-') + ' → ' + (f.hacia || '-');
+  }
+  if (nombre === 'horas') {
+    return 'horas ' + (f.fecha || 'sin fecha') + ' · ' + (f.persona || '?')
+         + ' · ' + (f.horas || 0) + ' h';
+  }
+  if (nombre === 'productos') return 'producto ' + (f.cod || '?') + ' · ' + (f.producto || '');
+  if (nombre === 'clientes') return 'cliente ' + (f.nombre || '?');
+  if (nombre === 'personas') return 'persona ' + (f.nombre || '?');
+  return nombre;
+}
+
 function comoTexto(v) {
   if (v == null) return '';
   if (typeof v !== 'string') return v;
@@ -440,11 +497,14 @@ function escribirFilas(nombre, objetos) {
 function escribirBorrados(borrados) {
   var h = hoja('borrados');
   var ultima = h.getLastRow();
-  if (ultima > 1) h.getRange(2, 1, ultima - 1, 2).clearContent();
+  if (ultima > 1) h.getRange(2, 1, ultima - 1, 4).clearContent();
+  h.getRange(1, 1, 1, 4).setValues([ENCABEZADOS.borrados]);
   var ids = Object.keys(borrados);
   if (!ids.length) return;
-  h.getRange(2, 1, ids.length, 2).setValues(ids.map(function (id) {
-    return [id, borrados[id].mod];
+  asegurarFilas(h, ids.length + 1);
+  h.getRange(2, 1, ids.length, 4).setValues(ids.map(function (id) {
+    var b = borrados[id];
+    return [id, b.mod, comoTexto(b.que || ''), comoTexto(b.quien || '')];
   }));
 }
 
@@ -622,7 +682,8 @@ function permitido(credencial) {
     if (!siNo(filas[i][2], true)) {
       return rechazo('Este teléfono fue dado de baja. Pedí un código nuevo.');
     }
-    return { ok: true, fila: i + 2, persona: String(filas[i][1] || '') };
+    return { ok: true, fila: i + 2, persona: String(filas[i][1] || ''),
+             dispositivo: String(filas[i][0] || '') };
   }
   return rechazo('Credencial desconocida. Pedí un código nuevo.');
 }
@@ -1707,6 +1768,149 @@ function respaldoDiario() {
   var texto = 'Respaldo guardado: ' + nombre + '. Quedan '
     + Math.min(copias.length, RESPALDOS_QUE_SE_GUARDAN) + ' copias'
     + (tirados ? ' (se tiraron ' + tirados + ' viejas).' : '.');
+  Logger.log(texto);
+  return texto;
+}
+
+/* --------------------------------------------------------------------------
+   DEVOLVER LOS CUATRO EGRESOS QUE SE FUERON SIN QUERER
+
+   El 7 de septiembre, a las 21:08, se borraron cuatro egresos de agosto desde
+   el teléfono de Luna, cuatro toques en tres segundos. Ninguna de las dos lo
+   hizo a propósito. Son $236.600.
+
+   Los datos salen de una copia del libro de las 21:18 de ese día, o sea diez
+   minutos después del borrado pero antes de que la sincronización se los
+   llevara de la planilla.
+
+   Además de reponer las filas hay que LEVANTAR LA LÁPIDA. Si quedara puesta,
+   la próxima sincronización volvería a borrarlos, que es justamente para lo
+   que sirve una lápida.
+   -------------------------------------------------------------------------- */
+
+var EGRESOS_A_DEVOLVER = [
+  { id: 'd869d959-3cc2-4a68-8412-2d4abbf94503', fecha: '2026-08-23', rubro: 'Insumos',
+    detalle: 'Repollo', persona: '', cantidad: '100', monto: 179400,
+    medio_pago: 'Brubank', obs: 'Eppa' },
+  { id: 'b80ec605-7006-4cec-8172-61caada356a7', fecha: '2026-08-24', rubro: 'Gastos Fijos',
+    detalle: 'Remis cemuco', persona: '', cantidad: '', monto: 13000,
+    medio_pago: 'Efectivo', obs: '' },
+  { id: 'c2fc990f-f063-4d4c-ba2c-7144145f8419', fecha: '2026-08-28', rubro: 'Gastos Fijos',
+    detalle: 'Nafta reparto', persona: '', cantidad: '', monto: 30000,
+    medio_pago: 'MP Luna', obs: '' },
+  { id: '05ac38aa-15d7-439d-b379-688a5bc286ac', fecha: '2026-08-31', rubro: 'Gastos Fijos',
+    detalle: 'transporte', persona: '', cantidad: '', monto: 14200,
+    medio_pago: 'Efectivo', obs: '' }
+];
+
+function restaurarEgresosBorrados() { return conCandado(restaurarEgresosBorradosAhora); }
+
+function restaurarEgresosBorradosAhora() {
+  var filas = leerFilas('egresos');
+  var estan = {};
+  filas.forEach(function (f) { estan[f.id] = true; });
+
+  var ahora = Date.now();
+  var puestos = [], yaEstaban = [];
+  EGRESOS_A_DEVOLVER.forEach(function (e) {
+    if (estan[e.id]) { yaEstaban.push(e.detalle); return; }
+    var copia = {};
+    Object.keys(e).forEach(function (k) { copia[k] = e[k]; });
+    copia.mod = ahora;
+    filas.push(copia);
+    puestos.push(e.detalle + ' $' + e.monto);
+  });
+
+  // La lápida se levanta igual aunque la fila ya estuviera: mientras siga
+  // puesta, el próximo teléfono que sincronice se los lleva de nuevo.
+  var borrados = {};
+  var levantadas = 0;
+  leerBorrados().forEach(function (b) {
+    var esDeEstos = false;
+    EGRESOS_A_DEVOLVER.forEach(function (e) { if (e.id === b.id) esDeEstos = true; });
+    if (esDeEstos) { levantadas++; return; }
+    borrados[b.id] = b;
+  });
+
+  if (puestos.length) escribirFilas('egresos', filas);
+  if (levantadas) escribirBorrados(borrados);
+
+  var texto = 'Egresos devueltos: ' + puestos.length + '.';
+  if (puestos.length) texto += '\n  • ' + puestos.join('\n  • ');
+  if (yaEstaban.length) texto += '\nYa estaban: ' + yaEstaban.join(', ') + '.';
+  texto += '\nLápidas levantadas: ' + levantadas
+        + ' (si quedaran puestas, se borrarían otra vez).';
+  texto += '\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
+}
+
+/* --------------------------------------------------------------------------
+   LA VENTA A VERDU RICHARD BARI ES DEL 21 DE AGOSTO, NO DE HOY
+
+   Esa venta —seis renglones, $264.900— estaba cargada con fecha 21/08. Al pegar
+   las ventas viejas en la hoja se pisó sin querer, y Luna la volvió a cargar el
+   7 de septiembre, así que quedó con la fecha de ese día. Es la misma venta:
+   mismos seis productos, mismos precios, uno solo de diferencia en el chucrut.
+
+   Junto a ella va la de amarantus —CRT650 x10 y KIM340 x8, $156.400—, que es un
+   par de renglones de la planilla vieja que ahí TAMPOCO tenían fecha; por eso la
+   importación los salteó y Luna los cargó a mano. Van al 17/07 porque es la
+   fecha del bloque bajo el que estaban escritos, y queda dicho en la
+   observación. Si Luna se acuerda de otra, se cambia acá y listo.
+
+   Las dos son anteriores al conteo, así que NO tienen que mover stock, igual
+   que todas las demás ventas viejas. La cuenta lo confirma sola: sacándoles el
+   movimiento, CRT650 queda en 14 y KIM350 en 12, que es exactamente lo que dio
+   el conteo del 7 de septiembre. Hoy CRT650 está en -1, que es imposible.
+   -------------------------------------------------------------------------- */
+
+var VENTAS_MAL_FECHADAS = {
+  '1c5b435d-681d-4d21-8d39-9e6f2cb50df4': { fecha: '2026-08-21', nota: '' },
+  '689b660e-f6a5-47c2-84a2-9fa366cf478d': { fecha: '2026-07-17',
+    nota: 'De la planilla vieja · sin fecha en el origen' }
+};
+
+function refecharVentasViejas() { return conCandado(refecharVentasViejasAhora); }
+
+function refecharVentasViejasAhora() {
+  var ahora = Date.now();
+
+  var filas = leerFilas('ingresos');
+  var tocadas = 0;
+  filas.forEach(function (o) {
+    var arreglo = VENTAS_MAL_FECHADAS[o.venta];
+    if (!arreglo || o.fecha === arreglo.fecha) return;
+    o.fecha = arreglo.fecha;
+    if (arreglo.nota) o.obs = arreglo.nota;
+    o.mod = ahora;
+    tocadas++;
+  });
+  if (tocadas) escribirFilas('ingresos', filas);
+
+  // Y el movimiento de mercadería se va, como el de todas las ventas viejas.
+  var movimientos = leerFilas('movimientos');
+  var sacados = [];
+  var quedan = movimientos.filter(function (m) {
+    if (VENTAS_MAL_FECHADAS[m.ref]) { sacados.push(m); return false; }
+    return true;
+  });
+
+  if (sacados.length) {
+    var borrados = {};
+    leerBorrados().forEach(function (b) { borrados[b.id] = b; });
+    sacados.forEach(function (m) {
+      borrados[m.id] = { id: m.id, mod: ahora, que: describirFila('movimientos', m),
+                         quien: 'arreglo de fechas' };
+    });
+    escribirFilas('movimientos', quedan);
+    escribirBorrados(borrados);
+  }
+
+  var texto = 'Refechados ' + tocadas + ' renglones de ingresos y sacados '
+    + sacados.length + ' movimientos de mercadería.'
+    + '\nLa plata de esas ventas NO se tocó: sigue estando, con la fecha que va.'
+    + '\nSincronizar desde un teléfono para que lo vean las dos.';
   Logger.log(texto);
   return texto;
 }
