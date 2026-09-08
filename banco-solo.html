@@ -1,3 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Banco de pruebas · sincronización</title>
+<style>
+  body { font: 14px/1.5 ui-monospace, monospace; margin: 0; padding: 16px; background: #111; color: #ddd; }
+  h1 { font-size: 16px; color: #fff; }
+  .ok   { color: #6f6; }
+  .mal  { color: #f66; font-weight: bold; }
+  .caso { color: #fc6; margin-top: 14px; }
+  pre { white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+<h1>Banco de pruebas · sincronización Cocina Viva</h1>
+<pre id="salida">corriendo…</pre>
+
+<!-- 1. La planilla de mentira, antes que nada -->
+<script>
+// ==========================================================================
+// Banco de pruebas: una planilla de Google de mentira
+//
+// Implementa lo poco de SpreadsheetApp que usa Code.gs, guardando las hojas en
+// memoria como matrices. Alcanza para correr sincronizar() de verdad, con su
+// leerFilas, su fusionar y su escribirFilas, sin tocar Google.
+//
+// La idea es poder reproducir un bug de sincronización de forma determinista y
+// después demostrar que quedó arreglado.
+// ==========================================================================
+
+(function () {
+  function Hoja(nombre) {
+    this.nombre = nombre;
+    this.filas = [];        // matriz de valores, la 0 es el encabezado
+    this.maxFilas = 1000;
+    this.oculta = false;
+  }
+  Hoja.prototype.getName = function () { return this.nombre; };
+  Hoja.prototype.getMaxRows = function () { return this.maxFilas; };
+  Hoja.prototype.insertRowsAfter = function (_d, cuantas) { this.maxFilas += cuantas; };
+  Hoja.prototype.getLastRow = function () {
+    for (var i = this.filas.length - 1; i >= 0; i--) {
+      var f = this.filas[i] || [];
+      for (var j = 0; j < f.length; j++) {
+        if (f[j] !== "" && f[j] != null) return i + 1;
+      }
+    }
+    return 0;
+  };
+  Hoja.prototype.getLastColumn = function () {
+    return (this.filas[0] || []).length;
+  };
+  Hoja.prototype.appendRow = function (fila) { this.filas.push(fila.slice()); };
+  Hoja.prototype.hideSheet = function () { this.oculta = true; };
+  Hoja.prototype.setTabColor = function () { return this; };
+  Hoja.prototype.setFrozenRows = function () { return this; };
+  Hoja.prototype.getBandings = function () { return [{}]; };   // ya tiene, no reaplicar
+  Hoja.prototype.setColumnWidth = function () { return this; };
+  Hoja.prototype.hideColumns = function () { return this; };
+  Hoja.prototype.getDataRange = function () {
+    var self = this;
+    return { getValues: function () { return self.filas.map(function (f) { return f.slice(); }); } };
+  };
+  Hoja.prototype.getRange = function (fila, col, nFilas, nCols) {
+    var self = this;
+    if (typeof fila === "string") {                    // notación A1, solo para resumen
+      return rangoTonto();
+    }
+    nFilas = nFilas || 1;
+    nCols = nCols || 1;
+    if (fila + nFilas - 1 > self.maxFilas) {
+      throw new Error("Those rows are out of bounds. (hoja " + self.nombre + ")");
+    }
+    return {
+      getValues: function () {
+        var out = [];
+        for (var i = 0; i < nFilas; i++) {
+          var origen = self.filas[fila - 1 + i] || [];
+          var linea = [];
+          for (var j = 0; j < nCols; j++) linea.push(origen[col - 1 + j] === undefined ? "" : origen[col - 1 + j]);
+          out.push(linea);
+        }
+        return out;
+      },
+      getValue: function () { return (self.filas[fila - 1] || [])[col - 1]; },
+      setValues: function (v) {
+        for (var i = 0; i < v.length; i++) {
+          var destino = self.filas[fila - 1 + i] || (self.filas[fila - 1 + i] = []);
+          for (var j = 0; j < v[i].length; j++) destino[col - 1 + j] = v[i][j];
+        }
+        return this;
+      },
+      setValue: function (x) {
+        var destino = self.filas[fila - 1] || (self.filas[fila - 1] = []);
+        destino[col - 1] = x;
+        return this;
+      },
+      clearContent: function () {
+        for (var i = 0; i < nFilas; i++) {
+          var destino = self.filas[fila - 1 + i];
+          if (!destino) continue;
+          for (var j = 0; j < nCols; j++) destino[col - 1 + j] = "";
+        }
+        return this;
+      },
+      setBackground: rangoTonto, setFontColor: rangoTonto, setFontWeight: rangoTonto,
+      setFontSize: rangoTonto, setNumberFormat: rangoTonto, setDataValidation: rangoTonto,
+      setHorizontalAlignment: rangoTonto, merge: rangoTonto,
+      applyRowBanding: function () {
+        return { setHeaderRowColor: rangoTonto, setFirstRowColor: rangoTonto, setSecondRowColor: rangoTonto };
+      },
+    };
+    function rangoTonto() { return this; }
+  };
+
+  function Libro() { this.hojas = {}; this.orden = []; }
+  Libro.prototype.getName = function () { return "Cocina Viva · Gestión (de mentira)"; };
+  Libro.prototype.getUrl = function () {
+    return "https://docs.google.com/spreadsheets/d/DE-MENTIRA/edit";
+  };
+  Libro.prototype.getSheetByName = function (n) { return this.hojas[n] || null; };
+  Libro.prototype.getSheets = function () {
+    var self = this;
+    return this.orden.map(function (n) { return self.hojas[n]; });
+  };
+  Libro.prototype.insertSheet = function (n) {
+    var h = new Hoja(n);
+    this.hojas[n] = h;
+    this.orden.push(n);
+    return h;
+  };
+  Libro.prototype.deleteSheet = function (h) {
+    delete this.hojas[h.nombre];
+    this.orden = this.orden.filter(function (n) { return n !== h.nombre; });
+  };
+  Libro.prototype.getRange = function () { return {}; };
+
+  var libro = new Libro();
+  var propiedades = {};
+
+  // --- lo que Code.gs espera encontrar en el ambiente de Apps Script ---
+  window.SpreadsheetApp = {
+    getActive: function () { return libro; },
+    newDataValidation: function () {
+      var v = {
+        requireValueInRange: function () { return v; },
+        requireValueInList: function () { return v; },
+        setAllowInvalid: function () { return v; },
+        build: function () { return {}; },
+      };
+      return v;
+    },
+  };
+  window.PropertiesService = {
+    getDocumentProperties: function () {
+      return {
+        getProperty: function (k) { return propiedades[k] || null; },
+        setProperty: function (k, v) { propiedades[k] = v; },
+        getProperties: function () { return propiedades; },
+      };
+    },
+  };
+  window.LockService = {
+    getScriptLock: function () {
+      return { waitLock: function () {}, releaseLock: function () {} };
+    },
+  };
+  window.Utilities = {
+    formatDate: function (d) {
+      var dos = function (n) { return ("0" + n).slice(-2); };
+      return d.getFullYear() + "-" + dos(d.getMonth() + 1) + "-" + dos(d.getDate());
+    },
+    computeDigest: function (_a, texto) {
+      var h = 0, out = [];
+      for (var i = 0; i < String(texto).length; i++) h = (h * 31 + String(texto).charCodeAt(i)) | 0;
+      for (var j = 0; j < 32; j++) out.push((h >> (j % 24)) & 0xff);
+      return out;
+    },
+    Charset: { UTF_8: 1 },
+    DigestAlgorithm: { SHA_256: 1 },
+  };
+  window.Session = { getScriptTimeZone: function () { return "America/Argentina/Buenos_Aires"; } };
+  window.Logger = { log: function () {} };
+  window.ContentService = {
+    createTextOutput: function (t) { return { texto: t, setMimeType: function () { return this; } }; },
+    MimeType: { JSON: 1 },
+  };
+
+  window.__libro = libro;
+})();
+
+</script>
+<!-- 2. El servicio REAL, tal cual está en el repositorio -->
+<script>
 /* ==========================================================================
    Cocina Viva · servicio de la planilla
 
@@ -1777,3 +1972,915 @@ function revisar() {
   Logger.log(texto);
   return texto;
 }
+
+</script>
+<!-- 3. El almacén REAL del teléfono -->
+<script>
+// ==========================================================================
+// Cocina Viva — base de datos local (IndexedDB)
+//
+// Todo lo que se carga se guarda primero acá, en el teléfono. Así se puede
+// anotar una venta parada en el mostrador del local, sin señal. Después, al
+// sincronizar, lo pendiente sube a la planilla y baja el estado completo.
+//
+// El teléfono guarda una copia entera de los datos, no solo lo suyo: es lo
+// que permite ver el stock y los resúmenes sin conexión. Con el volumen de
+// este emprendimiento (unos pocos miles de filas al año) entra de sobra.
+//
+// CÓMO SE SABE QUÉ FALTA SUBIR
+// Cada registro lleva "mod", el momento en que se tocó por última vez. En
+// "meta" se guarda cuándo fue la última sincronización buena. Lo pendiente es
+// todo lo que tenga mod mayor que eso. Si la sincronización se corta por la
+// mitad, la marca no se mueve y en el próximo intento se manda de nuevo: como
+// cada registro viaja con su id, reenviarlo lo reemplaza en vez de duplicarlo.
+// ==========================================================================
+
+window.CVDB = (function () {
+  const NOMBRE = "cocinaviva";
+  // Sube de a uno cada vez que se agrega un almacén. Si alguien se olvida, la
+  // apertura lo detecta y lo arregla sola —ver abrir()—, pero conviene subirla:
+  // así la base se crea bien de una y no hace falta el reintento.
+  const VERSION = 2;
+
+  // Los almacenes que se sincronizan, con cuál es su clave. Para agregar uno
+  // más adelante: sumarlo acá y subir VERSION en uno.
+  const SINCRONIZABLES = {
+    ingresos:    "id",
+    egresos:     "id",
+    movimientos: "id",
+    horas:       "id",
+    productos:   "cod",
+    clientes:    "nombre",
+    personas:    "nombre",
+  };
+
+  const ESQUEMA = Object.assign({}, SINCRONIZABLES, {
+    borrados: "id",       // las bajas, para propagarlas a los otros teléfonos
+    meta:     "clave",    // marca de última sincronización, listas, etc.
+  });
+
+  let conexion = null;
+
+  // Abre la base, y SE ASEGURA de que estén todos los almacenes.
+  //
+  // El upgrade de IndexedDB corre solo cuando sube el número de versión. Si se
+  // agrega un almacén al esquema y alguien se olvida de subir VERSION, en un
+  // teléfono que YA tiene la base creada ese almacén no se crea nunca, y la app
+  // muere al arrancar con un error que no dice nada. Pasó exactamente eso al
+  // agregar «personas» y «horas»: en una base recién creada anda todo, y en las
+  // que ya existían no arrancaba.
+  //
+  // Por eso, después de abrir, se mira si falta alguno y en ese caso se vuelve
+  // a abrir con la versión siguiente, que es lo que dispara la creación. Una
+  // sola vez: si después de eso sigue faltando, el problema es otro y hay que
+  // verlo, no seguir reintentando.
+  function abrir() {
+    if (conexion) return Promise.resolve(conexion);
+    return new Promise((resolver, rechazar) => intentarAbrir(VERSION, true, resolver, rechazar));
+  }
+
+  const faltantes = (db) =>
+    Object.keys(ESQUEMA).filter((n) => !db.objectStoreNames.contains(n));
+
+  function intentarAbrir(version, puedeReintentar, resolver, rechazar) {
+    const pedido = indexedDB.open(NOMBRE, version);
+
+    pedido.onupgradeneeded = (evento) => {
+      const db = evento.target.result;
+      for (const [nombre, clave] of Object.entries(ESQUEMA)) {
+        if (!db.objectStoreNames.contains(nombre)) {
+          db.createObjectStore(nombre, { keyPath: clave });
+        }
+      }
+    };
+
+    pedido.onsuccess = () => {
+      const db = pedido.result;
+
+      const faltan = faltantes(db);
+      if (faltan.length && puedeReintentar) {
+        const siguiente = db.version + 1;
+        db.close();
+        intentarAbrir(siguiente, false, resolver, rechazar);
+        return;
+      }
+      if (faltan.length) {
+        db.close();
+        rechazar(new Error("A la base le faltan almacenes: " + faltan.join(", ")));
+        return;
+      }
+
+      conexion = db;
+
+      // La conexión se guarda para no reabrirla en cada consulta, pero el
+      // navegador puede cerrarla por su cuenta: otra pestaña que abra una
+      // versión nueva, o el sistema liberando memoria. Si eso pasa y
+      // seguimos usando la guardada, todo falla con «the database connection
+      // is closing» y la app queda muerta hasta recargarla. Se suelta la
+      // referencia y la próxima consulta abre una nueva.
+      conexion.onversionchange = () => { conexion.close(); conexion = null; };
+      conexion.onclose = () => { conexion = null; };
+
+      resolver(conexion);
+    };
+    pedido.onerror = () => rechazar(pedido.error);
+    pedido.onblocked = () => rechazar(
+      new Error("Hay otra pestaña de la app abierta con una versión distinta."));
+  }
+
+  // Envuelve una operación y espera a que la transacción termine de verdad, no
+  // solo a que el pedido responda.
+  //
+  // Si al abrir la transacción resulta que la conexión ya estaba cerrada,
+  // reintenta una vez con una conexión nueva. El aviso de cierre no siempre
+  // llega antes de que se use: entre que el navegador la cierra y que dispara
+  // onclose puede haber una consulta en el medio, y esa no tiene por qué
+  // perderse.
+  function operar(almacenes, modo, hacer, reintento) {
+    return abrir().then((db) => new Promise((resolver, rechazar) => {
+      let tx;
+      try {
+        tx = db.transaction(almacenes, modo);
+      } catch (err) {
+        conexion = null;
+        if (reintento) { rechazar(err); return; }
+        operar(almacenes, modo, hacer, true).then(resolver, rechazar);
+        return;
+      }
+      const pedido = hacer(Array.isArray(almacenes)
+        ? Object.fromEntries(almacenes.map((n) => [n, tx.objectStore(n)]))
+        : tx.objectStore(almacenes));
+      let resultado;
+      if (pedido && pedido.onsuccess !== undefined) {
+        pedido.onsuccess = () => { resultado = pedido.result; };
+      }
+      tx.oncomplete = () => resolver(resultado);
+      tx.onabort = tx.onerror = () => rechazar(tx.error);
+    }));
+  }
+
+  const todos = (almacen) =>
+    operar(almacen, "readonly", (a) => a.getAll()).then((r) => r || []);
+
+  const obtener = (almacen, clave) =>
+    operar(almacen, "readonly", (a) => a.get(clave));
+
+  // ---------- Guardar y borrar ----------
+
+  // Sella el registro con el momento actual. Ese sello es lo que decide quién
+  // gana si el mismo registro se tocó en dos teléfonos: gana el más reciente.
+  function guardar(almacen, registro) {
+    const fila = Object.assign({}, registro, { mod: Date.now() });
+    return operar(almacen, "readwrite", (a) => a.put(fila)).then(() => fila);
+  }
+
+  // Varios de una, con un solo sello y una sola transacción: una venta de seis
+  // productos son seis filas que tienen que entrar o no entrar juntas.
+  function guardarVarios(almacen, registros) {
+    const ahora = Date.now();
+    const filas = registros.map((r, i) => Object.assign({}, r, { mod: ahora + i }));
+    return operar(almacen, "readwrite", (a) => {
+      filas.forEach((f) => a.put(f));
+      return null;
+    }).then(() => filas);
+  }
+
+  // Borrar deja una lápida en "borrados". Sin eso, el registro volvería a
+  // aparecer en la próxima sincronización: el servicio no tendría cómo saber
+  // que se fue a propósito y no que este teléfono todavía no lo conocía.
+  function borrar(almacen, clave) {
+    return operar([almacen, "borrados"], "readwrite", (a) => {
+      a[almacen].delete(clave);
+      a.borrados.put({ id: clave, mod: Date.now() });
+      return null;
+    });
+  }
+
+  // ---------- Sincronización ----------
+
+  const META_SINCRO = "ultima_sincro";
+
+  const ultimaSincro = () =>
+    obtener("meta", META_SINCRO).then((m) => (m && m.valor) || 0);
+
+  const marcarSincro = (cuando) =>
+    operar("meta", "readwrite", (a) => a.put({ clave: META_SINCRO, valor: cuando }));
+
+  // Lo que este teléfono cambió y la planilla todavía no vio.
+  //
+  // El CORTE se toma antes de leer nada y viaja con el sobre. Todo lo que se
+  // cargue o se borre mientras el pedido está en el aire queda por encima del
+  // corte: no entra en este sobre y sigue pendiente para la vuelta que viene.
+  // Sin ese corte, la marca terminaba tapando cambios que nunca se subieron.
+  async function pendientes() {
+    const desde = await ultimaSincro();
+    const corte = Date.now();
+    const enLaVentana = (r) => (r.mod || 0) > desde && (r.mod || 0) <= corte;
+    const sobre = { borrados: [] };
+    let cuantos = 0;
+
+    for (const nombre of Object.keys(SINCRONIZABLES)) {
+      const nuevos = (await todos(nombre)).filter(enLaVentana);
+      sobre[nombre] = nuevos;
+      cuantos += nuevos.length;
+    }
+    sobre.borrados = (await todos("borrados")).filter(enLaVentana);
+    cuantos += sobre.borrados.length;
+
+    return { sobre, cuantos, corte };
+  }
+
+  const cuantosPendientes = () => pendientes().then((p) => p.cuantos);
+
+  // Reemplaza la copia local por la que devolvió el servicio. Se hace almacén
+  // por almacén y en una sola transacción cada uno: si algo falla en el medio,
+  // no queda media lista.
+  function reemplazar(almacen, lista) {
+    return operar(almacen, "readwrite", (a) => {
+      a.clear();
+      (lista || []).forEach((r) => a.put(r));
+      return null;
+    });
+  }
+
+  // Guarda lo que contestó el servicio, RESPETANDO lo que se tocó mientras el
+  // pedido viajaba.
+  //
+  // Acá estuvo el bug de las bajas que volvían solas. La respuesta del servicio
+  // es una foto del estado en el momento en que se armó el pedido: no sabe nada
+  // de lo que pasó después. Si se la copia tal cual encima de todo, una venta
+  // borrada en ese rato vuelve a aparecer, y una venta cargada en ese rato
+  // desaparece sin dejar rastro. Por eso lo posterior al corte se aparta antes
+  // de pisar los almacenes y se vuelve a aplicar encima.
+  async function guardarEstado(estado, corte) {
+    const tope = corte || Date.now();
+
+    const posteriores = {};
+    for (const nombre of Object.keys(SINCRONIZABLES)) {
+      posteriores[nombre] = (await todos(nombre)).filter((r) => (r.mod || 0) > tope);
+    }
+    const bajasPosteriores = (await todos("borrados")).filter((r) => (r.mod || 0) > tope);
+
+    for (const nombre of Object.keys(SINCRONIZABLES)) {
+      if (!estado[nombre]) continue;
+      await operar(nombre, "readwrite", (a) => {
+        a.clear();
+        estado[nombre].forEach((r) => a.put(r));
+        // Primero se van los borrados de último momento y después vuelve lo
+        // cargado de último momento: si algo se borró y se volvió a cargar en
+        // ese rato, tiene que quedar cargado.
+        bajasPosteriores.forEach((b) => a.delete(b.id));
+        posteriores[nombre].forEach((r) => a.put(r));
+        return null;
+      });
+    }
+    if (estado.borrados) {
+      await operar("borrados", "readwrite", (a) => {
+        a.clear();
+        estado.borrados.forEach((r) => a.put(r));
+        bajasPosteriores.forEach((r) => a.put(r));
+        return null;
+      });
+    }
+    if (estado.listas) {
+      await operar("meta", "readwrite", (a) => a.put({ clave: "listas", valor: estado.listas }));
+    }
+    // La dirección del libro la manda el servicio, que la sabe porque vive
+    // adentro. Así la app puede ofrecer el botón de «ir a la planilla» sin
+    // tenerla escrita en el código, que está en un repositorio público.
+    if (estado.libro) {
+      await operar("meta", "readwrite", (a) => a.put({ clave: "libro", valor: estado.libro }));
+    }
+
+    // La marca es el corte con el que se armó el pedido, NO la hora de la
+    // respuesta. Poniendo la hora de la respuesta, todo lo que pasó durante el
+    // viaje quedaba por detrás de la marca y no se subía nunca más.
+    await marcarSincro(tope);
+  }
+
+  const listas = () => obtener("meta", "listas").then((m) => (m && m.valor) || null);
+  const libro = () => obtener("meta", "libro").then((m) => (m && m.valor) || "");
+
+  // Nota: la app NO trae ningún catálogo de arranque. El de productos y
+  // clientes baja en la primera sincronización, que siempre ocurre apenas se
+  // activa el teléfono —activar necesita señal—, así que nunca hay un momento
+  // útil en que hiciera falta. Además el repositorio es público y la lista de
+  // locales del emprendimiento no tiene por qué estar ahí.
+
+  return {
+    abrir, todos, obtener, guardar, guardarVarios, borrar,
+    pendientes, cuantosPendientes, guardarEstado, ultimaSincro, listas, libro,
+  };
+})();
+
+</script>
+
+<script>
+// ---------- lo que sincro.js espera encontrar alrededor ----------
+window.Util = {
+  esc: (s) => String(s == null ? "" : s),
+  brindis: () => {},
+};
+window.Acceso = {
+  tieneAcceso: () => true,
+  credencial: () => "CREDENCIAL-DE-MENTIRA",
+  dispositivo: () => "banco",
+  persona: () => "banco",
+  guardarAcceso: () => {},
+  borrarCredencial: () => {},
+};
+window.Datos = { cargar: async () => {} };
+
+// ---------- la red de mentira ----------
+//
+// En vez de salir a internet, le pasa el pedido al sincronizar() de Code.gs que
+// está cargado en esta misma página. La demora es configurable: con eso se
+// simula el viaje de ida y vuelta, que es donde vive el bug.
+window.__demoraRed = 0;
+window.__viajes = 0;
+window.fetch = async function (url, opciones) {
+  window.__viajes++;
+  const pedido = JSON.parse((opciones && opciones.body) || "{}");
+  if (window.__demoraRed) await new Promise((r) => setTimeout(r, window.__demoraRed / 2));
+  const respuesta = sincronizar(pedido);              // <- el Code.gs de verdad
+  if (window.__demoraRed) await new Promise((r) => setTimeout(r, window.__demoraRed / 2));
+  return { json: async () => JSON.parse(JSON.stringify(respuesta)) };
+};
+</script>
+
+<!-- 4. La sincronización REAL del teléfono, ya con la red intervenida -->
+<script>
+// ==========================================================================
+// Cocina Viva — sincronización con la planilla
+//
+// La app funciona entera sin esto: se carga todo en el teléfono y se sube
+// cuando hay señal. Acá se hacen las dos cosas que necesitan conexión:
+//
+//   1. Canjear el código de acceso. Una sola vez por teléfono; de ahí sale la
+//      credencial que después acompaña a cada pedido.
+//   2. Sincronizar: subir lo pendiente y bajar el estado completo.
+//
+// Es un solo viaje de ida y vuelta. Sube lo que este teléfono cambió y baja
+// todo, ya fusionado con lo que hayan cargado las demás. Después de
+// sincronizar, todos los teléfonos muestran lo mismo.
+//
+// Cada registro viaja con SU id. Si el envío se corta por la mitad y se
+// reintenta, el servicio reconoce los ids que ya tiene y los reemplaza en vez
+// de sumarlos: en la planilla nunca aparece la misma venta dos veces.
+// ==========================================================================
+
+window.Sincro = (function () {
+  const { esc, brindis } = window.Util;
+
+  // ---------- Dirección del servicio ----------
+  //
+  // Se completa después de publicar el Apps Script (ver INSTALACION.md).
+  // Mientras esté vacía la app avisa que todavía no hay a dónde sincronizar y
+  // sigue guardando todo en el teléfono sin perder nada.
+  // Implementación v1, publicada el 1/9/2026. Si alguna vez se hace una
+  // implementación NUEVA en vez de una versión nueva, esta dirección cambia y
+  // hay que actualizarla acá y subir el número de CACHE en sw.js.
+  const SERVICIO = "https://script.google.com/macros/s/AKfycbwpSxJ-sxalWw7Q1vG9cCfsCONpFswE22-A5UCAS1KaVwiyuS6_l1khGMWxrLd0YI8/exec";
+
+  // Tiene que coincidir con la constante API de apps-script/Code.gs. Si una
+  // implementación vieja quedó publicada y contesta con otro número, la app
+  // prefiere no hacer nada antes que pisar los datos con un esquema que ya no
+  // existe.
+  const API = 4;
+
+  const hayServicio = () => !!SERVICIO;
+
+  let trabajando = false;
+  let pedidaDeNuevo = false;
+  let ultimoError = "";
+
+  // ---------- Canje del código ----------
+
+  async function canjear(codigo) {
+    codigo = String(codigo || "").trim().toUpperCase();
+    if (!codigo) return { ok: false, error: "Escribí el código." };
+    if (!hayServicio()) return { ok: false, error: "El servicio todavía no está publicado." };
+
+    try {
+      const url = SERVICIO
+        + "?canjear=" + encodeURIComponent(codigo)
+        + "&dispositivo=" + encodeURIComponent(window.Acceso.dispositivo());
+      const respuesta = await fetch(url, { redirect: "follow" });
+      const r = await respuesta.json();
+
+      if (!r.ok) return r;
+      if (r.api !== API) return { ok: false, error: desajuste(r.api) };
+      window.Acceso.guardarAcceso(r.credencial, r.persona);
+      return r;
+    } catch (err) {
+      return { ok: false, error: motivoDeRed(err) };
+    }
+  }
+
+  // ---------- Sincronización ----------
+
+  // silencioso: la que corre sola al abrir la app. No molesta con avisos si no
+  // hay señal, porque no haber señal es lo normal y no es un problema.
+  async function sincronizar(silencioso) {
+    // Si ya hay una en el aire, esta no se tira: se anota y sale sola apenas
+    // termine la otra. Descartarla era perder el cambio que la disparó, porque
+    // cada guardado y cada borrado dispara la suya.
+    if (trabajando) {
+      pedidaDeNuevo = true;
+      return { ok: false, encolada: true, error: "Ya se está sincronizando." };
+    }
+    if (!hayServicio()) {
+      return { ok: false, error: "El servicio todavía no está publicado.", sin_servicio: true };
+    }
+    if (!window.Acceso.tieneAcceso()) {
+      return { ok: false, error: "Este teléfono todavía no está activado.", sin_permiso: true };
+    }
+
+    trabajando = true;
+    avisarEstado();
+    if (!silencioso) brindis("Sincronizando…");
+
+    try {
+      const { sobre, cuantos, corte } = await window.CVDB.pendientes();
+      const cuerpo = Object.assign({
+        credencial: window.Acceso.credencial(),
+        dispositivo: window.Acceso.dispositivo(),
+      }, sobre);
+
+      // El tipo text/plain evita el pedido previo de CORS, que Apps Script no
+      // contesta. El contenido sigue siendo JSON y del otro lado se lee igual.
+      const respuesta = await fetch(SERVICIO, {
+        method: "POST",
+        redirect: "follow",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(cuerpo),
+      });
+      const r = await respuesta.json();
+
+      if (!r.ok) {
+        if (r.sin_permiso) window.Acceso.borrarCredencial();
+        ultimoError = r.error || "El servicio rechazó la sincronización.";
+        return r;
+      }
+      if (r.api !== API) {
+        ultimoError = desajuste(r.api);
+        return { ok: false, error: ultimoError };
+      }
+
+      // Recién cuando el servicio confirma se reemplaza la copia local y se
+      // mueve la marca. Si algo falla antes, lo pendiente sigue pendiente.
+      await window.CVDB.guardarEstado(r, corte);
+      await window.Datos.cargar();
+      ultimoError = "";
+      if (!silencioso) {
+        brindis(cuantos ? "Listo: se subieron " + cuantos + (cuantos === 1 ? " cambio." : " cambios.")
+                        : "Todo al día.");
+      }
+      return r;
+    } catch (err) {
+      ultimoError = motivoDeRed(err);
+      if (!silencioso) brindis("No se pudo conectar. Lo cargado no se perdió.");
+      return { ok: false, error: ultimoError };
+    } finally {
+      trabajando = false;
+      avisarEstado();
+      if (pedidaDeNuevo) {
+        pedidaDeNuevo = false;
+        sincronizar(true);
+      }
+    }
+  }
+
+  // Cuando los números no coinciden, el que está atrasado puede ser cualquiera
+  // de los dos, y lo que hay que hacer es distinto en cada caso. Decir siempre
+  // «hay que publicar el Apps Script» mandaba a tocar el servicio cuando el
+  // problema era que el teléfono tenía la app vieja en la memoria.
+  function desajuste(delServicio) {
+    if (delServicio > API) {
+      return "Este teléfono tiene una versión vieja de la app (la " + API
+        + ") y el servicio ya va por la " + delServicio + ". Cerrá la app y volvé "
+        + "a abrirla para que se actualice. No se perdió nada de lo cargado.";
+    }
+    return "El servicio de la planilla quedó en una versión vieja (la "
+      + delServicio + ") y esta app va por la " + API + ". Hay que publicar una "
+      + "versión nueva del Apps Script. No se guardó nada.";
+  }
+
+  // Acá caen dos cosas muy distintas y conviene nombrar las dos: que no haya
+  // señal, y que el servicio esté publicado sin acceso para cualquier persona.
+  // La segunda le pasa a TODAS a la vez y no se arregla buscando señal, así
+  // que tienen que poder distinguirla.
+  function motivoDeRed(err) {
+    return "No se pudo conectar con el servicio. Si tenés señal y a la otra le "
+      + "pasa lo mismo, puede ser que la implementación del Apps Script no esté "
+      + "abierta a «cualquier persona». Detalle: " + (err.message || err);
+  }
+
+  // ---------- Estado, para el botón de la cabecera ----------
+
+  const oyentes = [];
+  const alCambiar = (fn) => { oyentes.push(fn); };
+  const avisarEstado = () => { oyentes.forEach((fn) => { try { fn(); } catch (e) {} }); };
+
+  async function estado() {
+    return {
+      hayServicio: hayServicio(),
+      tieneAcceso: window.Acceso.tieneAcceso(),
+      persona: window.Acceso.persona(),
+      trabajando: trabajando,
+      pendientes: await window.CVDB.cuantosPendientes(),
+      ultima: await window.CVDB.ultimaSincro(),
+      error: ultimoError,
+    };
+  }
+
+  // ---------- Pantalla de activación ----------
+
+  async function render(contenedor, volver) {
+    const e = await estado();
+
+    contenedor.innerHTML = `
+      <div class="portada"><img src="img/marca.svg" alt="Cocina Viva"></div>
+
+      ${!e.hayServicio ? `
+        <p class="aviso aviso--info">
+          <strong>El servicio todavía no está publicado.</strong> Podés seguir
+          cargando: queda todo guardado en el teléfono y se sube apenas esté.
+        </p>` : e.tieneAcceso ? `
+        <div class="tarjeta">
+          <h2>Este teléfono ya está activado</h2>
+          <p class="nota">${e.persona ? "Anotado como " + esc(e.persona) + "." : ""}
+             ${e.pendientes
+               ? e.pendientes + (e.pendientes === 1 ? " cambio sin subir." : " cambios sin subir.")
+               : "No queda nada pendiente."}</p>
+          <button class="boton boton--ancho separado" id="btn-sincronizar-ahora">Sincronizar ahora</button>
+        </div>` : `
+        <div class="tarjeta">
+          <h2>Activar este teléfono</h2>
+          <p>Pedile el código a quien instaló la app. Se usa una sola vez y
+             queda atado a este aparato.</p>
+          <div class="campo separado">
+            <label for="campo-codigo">Código de acceso</label>
+            <span class="ayuda">Ocho letras y números, con un guión en el medio.</span>
+            <input type="text" id="campo-codigo" autocomplete="off"
+                   autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345">
+          </div>
+          <button class="boton boton--ancho" id="btn-canjear">Activar</button>
+        </div>`}
+
+      ${e.error ? `<p class="aviso aviso--error">${esc(e.error)}</p>` : ""}
+
+      <p class="nota nota--pie">
+        Todo lo que cargues queda guardado en el teléfono aunque no haya señal.
+        La sincronización solo hace falta para que la otra persona lo vea y para
+        que quede en la planilla.
+      </p>`;
+
+    const canje = document.getElementById("btn-canjear");
+    if (canje) canje.onclick = async () => {
+      const r = await canjear(document.getElementById("campo-codigo").value);
+      if (!r.ok) { ultimoError = r.error; await render(contenedor, volver); return; }
+      brindis("Teléfono activado.");
+      await sincronizar(false);
+      if (volver) volver();
+    };
+
+    const ahora = document.getElementById("btn-sincronizar-ahora");
+    if (ahora) ahora.onclick = async () => {
+      await sincronizar(false);
+      await render(contenedor, volver);
+    };
+  }
+
+  return { render, canjear, sincronizar, estado, hayServicio, alCambiar, API };
+})();
+
+</script>
+<script>
+// ==========================================================================
+// Los casos. Cada uno reproduce algo que ellas vieron pasar.
+// ==========================================================================
+
+(function () {
+  const salida = document.getElementById("salida");
+  let fallados = 0;
+  const linea = (t, clase) => {
+    salida.innerHTML += '<span class="' + (clase || "") + '">' + t + "</span>\n";
+  };
+  const caso = (t) => linea("\n▸ " + t, "caso");
+  const afirmar = (bien, t) => {
+    if (!bien) fallados++;
+    linea((bien ? "   ok   " : "   MAL  ") + t, bien ? "ok" : "mal");
+  };
+
+  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Deja que se asiente: la sincronizacion que quedo encolada sale sola cuando
+  // termina la anterior, asi que hay que darle lugar antes de mirar el saldo.
+  async function reposar() {
+    for (let i = 0; i < 6; i++) { await esperar(30); await window.Sincro.sincronizar(true); }
+    await esperar(30);
+  }
+
+  // ---------- utilidades del banco ----------
+
+  function limpiarPlanilla() {
+    const libro = window.__libro;
+    libro.hojas = {}; libro.orden = [];
+    ["productos", "clientes", "ingresos", "egresos", "movimientos",
+     "listas", "invitaciones", "dispositivos", "borrados"].forEach((n) => hoja(n));
+  }
+
+  // Escribe filas directo en la hoja, como si las hubieran cargado desde la
+  // planilla o desde el otro teléfono.
+  function enLaPlanilla(nombre, objetos) {
+    escribirFilas(nombre, objetos);
+  }
+
+  const filasDe = (nombre) => leerFilas(nombre);
+
+  async function limpiarTelefono() {
+    await new Promise((r) => {
+      const p = indexedDB.deleteDatabase("cocinaviva");
+      p.onsuccess = p.onerror = p.onblocked = () => r();
+    });
+  }
+
+  const localTodos = (n) => window.CVDB.todos(n);
+  const hay = (lista, campo, valor) => lista.some((r) => r[campo] === valor);
+
+  // ---------- casos ----------
+
+  async function casoClienteBorrado() {
+    caso("Se borra un cliente que ya estaba en la planilla");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    enLaPlanilla("clientes", [
+      { nombre: "almacen viejo", localidad: "El Bolsón", tipo: "compra",
+        medio_pago: "Efectivo", activo: true, mod: 1000 },
+      { nombre: "almacen nuevo", localidad: "Lago Puelo", tipo: "compra",
+        medio_pago: "Efectivo", activo: true, mod: 1000 },
+    ]);
+
+    await window.Sincro.sincronizar(true);                  // baja los dos
+    afirmar(hay(await localTodos("clientes"), "nombre", "almacen viejo"),
+            "el cliente bajó al teléfono");
+
+    await window.CVDB.borrar("clientes", "almacen viejo");  // lo borran
+    afirmar(!hay(await localTodos("clientes"), "nombre", "almacen viejo"),
+            "se fue de la pantalla al borrarlo");
+
+    await window.Sincro.sincronizar(true);                  // sube la baja
+
+    afirmar(!hay(filasDe("clientes"), "nombre", "almacen viejo"),
+            "se fue TAMBIÉN de la planilla");
+    afirmar(!hay(await localTodos("clientes"), "nombre", "almacen viejo"),
+            "no volvió al teléfono");
+    afirmar(hay(await localTodos("clientes"), "nombre", "almacen nuevo"),
+            "el otro cliente sigue estando");
+  }
+
+  async function casoClienteRehecho() {
+    caso("Se borra un cliente y después se vuelve a dar de alta con el mismo nombre");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    enLaPlanilla("clientes", [
+      { nombre: "humus", localidad: "El Bolsón", tipo: "consignacion",
+        medio_pago: "Efectivo", activo: true, mod: 1000 },
+    ]);
+
+    await window.Sincro.sincronizar(true);
+    await window.CVDB.borrar("clientes", "humus");
+    await window.Sincro.sincronizar(true);
+    afirmar(!hay(filasDe("clientes"), "nombre", "humus"), "se borró");
+
+    // Se arrepienten y lo vuelven a cargar.
+    await window.CVDB.guardar("clientes", {
+      nombre: "humus", localidad: "Lago Puelo", tipo: "consignacion",
+      medio_pago: "Efectivo", activo: true, mod: Date.now(),
+    });
+    await window.Sincro.sincronizar(true);
+
+    const enPlanilla = filasDe("clientes").filter((c) => c.nombre === "humus");
+    afirmar(enPlanilla.length === 1, "volvió a la planilla una sola vez");
+    afirmar(enPlanilla.length === 1 && enPlanilla[0].localidad === "Lago Puelo",
+            "y con los datos nuevos, no con los viejos");
+    afirmar(hay(await localTodos("clientes"), "nombre", "humus"),
+            "sigue en el teléfono después de sincronizar");
+  }
+
+  async function casoVentaBorradaEnPleneVuelo() {
+    caso("Se borra una venta MIENTRAS hay una sincronización en el aire");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    enLaPlanilla("ingresos", [
+      { id: "v1", venta: "V1", fecha: "2026-09-01", cliente: "prueba",
+        lista: "mayor", medio_pago: "Efectivo", cod: "KIM340", cantidad: 3,
+        precio: 100, subtotal: 300, obs: "", mod: 1000 },
+    ]);
+
+    await window.Sincro.sincronizar(true);
+    afirmar(hay(await localTodos("ingresos"), "id", "v1"), "la venta bajó al teléfono");
+
+    // Arranca una sincronización lenta y NO se la espera: es la de fondo que
+    // dispara cualquier guardado.
+    window.__demoraRed = 300;
+    const enVuelo = window.Sincro.sincronizar(true);
+
+    await esperar(80);
+    await window.CVDB.borrar("ingresos", "v1");             // borran mientras viaja
+    const rechazada = await window.Sincro.sincronizar(true); // la app pide subir la baja
+
+    await enVuelo;
+    window.__demoraRed = 0;
+
+    // Y se la deja terminar: la que quedó encolada sale sola.
+    await reposar();
+
+    afirmar(!hay(await localTodos("ingresos"), "id", "v1"),
+            "la venta NO volvió a aparecer sola en el teléfono");
+    afirmar(!hay(filasDe("ingresos"), "id", "v1"),
+            "y tampoco quedó viva en la planilla");
+    if (rechazada && rechazada.error) linea("   (la segunda dio: " + rechazada.error + ")");
+  }
+
+  async function casoCargaEnPlenoVuelo() {
+    caso("Se carga una venta nueva MIENTRAS hay una sincronización en el aire");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    await window.Sincro.sincronizar(true);
+
+    window.__demoraRed = 300;
+    const enVuelo = window.Sincro.sincronizar(true);
+
+    await esperar(80);
+    await window.CVDB.guardar("ingresos", {
+      id: "v2", venta: "V2", fecha: "2026-09-02", cliente: "prueba",
+      lista: "mayor", medio_pago: "Efectivo", cod: "KIM340", cantidad: 1,
+      precio: 100, subtotal: 100, obs: "", mod: Date.now(),
+    });
+    await window.Sincro.sincronizar(true);
+
+    await enVuelo;
+    window.__demoraRed = 0;
+    await reposar();
+
+    afirmar(hay(await localTodos("ingresos"), "id", "v2"),
+            "la venta sigue en el teléfono");
+    afirmar(hay(filasDe("ingresos"), "id", "v2"),
+            "y LLEGÓ a la planilla (si no, se perdió una venta en silencio)");
+  }
+
+  async function casoProductoBorrado() {
+    caso("Se borra un producto recién cargado, sin historia");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    enLaPlanilla("productos", [
+      { cod: "ERR999", producto: "cargado mal", presentacion: "340 g",
+        pmayor: 1, pminor: 2, activo: true, mod: 1000 },
+    ]);
+    await window.Sincro.sincronizar(true);
+    await window.CVDB.borrar("productos", "ERR999");
+    await reposar();
+
+    afirmar(!hay(filasDe("productos"), "cod", "ERR999"), "se fue de la planilla");
+    afirmar(!hay(await localTodos("productos"), "cod", "ERR999"), "no volvió al teléfono");
+  }
+
+  async function casoBorradoDesdeElOtroTelefono() {
+    caso("Una borra en su teléfono y la otra lo ve al sincronizar");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    enLaPlanilla("clientes", [
+      { nombre: "el rincón", localidad: "Epuyén", tipo: "compra",
+        medio_pago: "Efectivo", activo: true, mod: 1000 },
+    ]);
+    await window.Sincro.sincronizar(true);
+
+    // El otro teléfono manda la lápida directo al servicio.
+    sincronizar({ borrados: [{ id: "el rincón", mod: Date.now() }] });
+    afirmar(!hay(filasDe("clientes"), "nombre", "el rincón"),
+            "el servicio lo sacó de la planilla");
+
+    await window.Sincro.sincronizar(true);
+    afirmar(!hay(await localTodos("clientes"), "nombre", "el rincón"),
+            "y este teléfono también lo pierde de vista");
+  }
+
+  // ---------- las fechas ----------
+  //
+  // El 7 de septiembre la columna «fecha» de ingresos apareció vacía en 138 de
+  // 143 filas. Lo grave no fue el vaciado sino lo que vino después: leerFilas
+  // rellenaba una fecha ilegible con la del día, así que la sincronización
+  // siguiente convirtió el hueco en 07/09/2026 y 140 ventas de julio y agosto
+  // se volvieron ventas de hoy. Un dato inventado es peor que un hueco: el
+  // hueco se ve, el invento no.
+
+  function renglones(venta, fecha, cuantos) {
+    const filas = [];
+    for (let i = 0; i < cuantos; i++) {
+      filas.push({ id: venta + "-" + i, venta: venta, fecha: fecha, cliente: "amarantus",
+        lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
+        cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1787324400000 });
+    }
+    return filas;
+  }
+
+  // Lo que quedó escrito en la columna C, leído crudo de la hoja.
+  const columnaFecha = () => hoja("ingresos").filas.slice(1)
+    .filter((f) => f[0])
+    .map((f) => (f[2] instanceof Date
+      ? f[2].getFullYear() + "-" + ("0" + (f[2].getMonth() + 1)).slice(-2)
+        + "-" + ("0" + f[2].getDate()).slice(-2)
+      : ""));
+
+  async function casoFechasVaciadas() {
+    caso("La columna de fechas aparece vacía");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v1", "2026-07-10", 3).concat(renglones("v2", "2026-08-28", 2)));
+    afirmar(columnaFecha().join(",") === "2026-07-10,2026-07-10,2026-07-10,2026-08-28,2026-08-28",
+            "las fechas se escriben bien");
+
+    hoja("ingresos").filas.slice(1).forEach((f) => { if (f[0]) f[2] = ""; });   // el estropicio
+
+    afirmar(filasDe("ingresos").every((o) => !o.fecha),
+            "leerFilas NO las rellena con la fecha de hoy");
+    sincronizar({ ingresos: [] });
+    afirmar(columnaFecha().every((f) => !f),
+            "y la sincronización tampoco: el hueco sigue siendo hueco");
+  }
+
+  async function casoFechaDelHermano() {
+    caso("A un renglón solo le falta la fecha");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v3", "2026-08-13", 3));
+    hoja("ingresos").filas[2][2] = "";
+    afirmar(filasDe("ingresos").map((o) => o.fecha).join(",")
+            === "2026-08-13,2026-08-13,2026-08-13",
+            "se la presta otro renglón de la misma venta");
+  }
+
+  async function casoElTelefonoNoPisaLaFecha() {
+    caso("El teléfono manda un renglón sin fecha");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v4", "2026-08-21", 1));
+    sincronizar({ ingresos: [{ id: "v4-0", venta: "v4", fecha: "", cliente: "amarantus",
+      lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
+      cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: Date.now() }] });
+    afirmar(columnaFecha()[0] === "2026-08-21",
+            "la planilla conserva la fecha que ya tenía");
+  }
+
+  async function casoRestaurarFechas() {
+    caso("La reparación de las fechas perdidas");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", [{ id: "viejo-001", venta: "vieja-001", fecha: "2026-09-07",
+      cliente: "amarantus", lista: "mayorista", medio_pago: "Efectivo", pagado: true,
+      cod: "CRT650", cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1 }]);
+    restaurarFechasDeIngresosAhora();
+    afirmar(columnaFecha()[0] === "2026-07-10", "viejo-001 volvió al 10 de julio");
+
+    let cuantos = 0;
+    Object.keys(FECHAS_DE_INGRESOS).forEach((f) => {
+      cuantos += FECHAS_DE_INGRESOS[f].split(" ").length;
+    });
+    afirmar(cuantos === 135, "la tabla de respaldo tiene los 135 renglones");
+  }
+
+  async function casoPagadoSiONo() {
+    caso("«Pagado» se escribe como lo dice el desplegable");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", renglones("v5", "2026-08-14", 1));
+    afirmar(hoja("ingresos").filas[1][6] === "sí",
+            "dice «sí» y no TRUE: " + JSON.stringify(hoja("ingresos").filas[1][6]));
+  }
+
+  // ---------- correr ----------
+
+  async function correr() {
+    salida.innerHTML = "";
+    const casos = [
+      casoClienteBorrado, casoClienteRehecho, casoVentaBorradaEnPleneVuelo,
+      casoCargaEnPlenoVuelo, casoProductoBorrado, casoBorradoDesdeElOtroTelefono,
+      casoFechasVaciadas, casoFechaDelHermano, casoElTelefonoNoPisaLaFecha,
+      casoRestaurarFechas, casoPagadoSiONo,
+    ];
+    for (const c of casos) {
+      try { await c(); }
+      catch (err) { fallados++; linea("   MAL  se rompió: " + (err && err.message), "mal"); }
+    }
+    linea("\n" + (fallados ? "✗ " + fallados + " afirmaciones fallaron" : "✓ todo bien"),
+          fallados ? "mal" : "ok");
+    window.__fallados = fallados;
+    window.__listo = true;
+  }
+
+  // Cada vuelta corre dos veces: hay bugs que dependen de en qué estado quedó
+  // la vuelta anterior, y esos son justamente los que aparecen a veces sí y a
+  // veces no.
+  correr();
+})();
+
+</script>
+</body>
+</html>

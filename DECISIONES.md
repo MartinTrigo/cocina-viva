@@ -1261,3 +1261,31 @@ se bajaron la fecha equivocada, la volverían a subir.
 
 De paso: `pagado` se escribía como `TRUE` en una celda cuyo desplegable dice
 sí/no. Ahora sale `sí`/`no`, como `activo`.
+
+## Los teléfonos no son un respaldo
+
+Conviene decirlo claro porque es fácil suponer lo contrario: **la planilla es la
+única copia de verdad**. Cada sincronización le reemplaza al teléfono lo que
+tiene por lo que dice la planilla (`reemplazar()` vacía el almacén y escribe la
+lista que vino), y el teléfono solo sube **lo que cambió desde la última vez**.
+
+De ahí salen dos cosas:
+
+- Una fila borrada en la planilla desaparece de los dos teléfonos en la
+  sincronización siguiente. No hay quien la devuelva.
+- Un teléfono no puede reponer lo que no tocó, porque no lo manda.
+
+Eso está bien mientras la planilla esté sana, que es casi siempre. Pero el 7 de
+septiembre no lo estuvo, y las fechas verdaderas se recuperaron de copias que
+existían de casualidad.
+
+`respaldoDiario()` deja una copia por día en una carpeta al lado del libro y
+guarda las últimas treinta. Se enciende una sola vez con
+`activarRespaldoDiario()`, que crea el disparador de las 3 de la mañana; la
+primera corrida pide permiso de Drive, que hace falta para copiar el archivo. La
+carpeta va al lado del libro y no en la raíz, así que si alguien mueve el libro
+los respaldos se mudan con él.
+
+Esto se suma —no reemplaza— al historial de versiones de Google, que ya guarda
+todo cambio de la planilla y alcanza para volver atrás un rato. El respaldo
+diario sirve para lo otro: cuando el estropicio se descubre una semana después.
