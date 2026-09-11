@@ -641,7 +641,10 @@ window.Honorarios = (function () {
         <div class="acciones">
           <button class="boton" id="btn-compartir">Compartir</button>
           <button class="boton boton--secundario" id="btn-imprimir">Imprimir</button>
-        </div>`;
+        </div>
+        <p class="nota">Para mandarlo por WhatsApp o a la impresora térmica, usá
+           <strong>Compartir</strong> y elegí la app. <strong>Imprimir</strong> abre el
+           diálogo del sistema, para las impresoras que el teléfono ya ve.</p>`;
       document.getElementById("btn-compartir").onclick = async () => {
         const r = await window.Remito.compartir(datos);
         if (r.como === "descargado") window.Util.brindis("Descargado: " + r.nombre);
