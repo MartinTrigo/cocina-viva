@@ -1344,3 +1344,44 @@ una inferencia, no un dato; si Luna se acuerda de otra, se cambia en
 **La moraleja de las dos cosas es la misma: pegar filas a mano en la hoja es la
 operación más peligrosa que hay.** No avisa, no deja lápida y no se nota hasta
 que alguien suma. Con el respaldo diario andando, al menos se puede volver.
+
+## Imprimir directo en la térmica, sin pasar por otra app
+
+Llegó la «mini printer» de gatito y el plan era compartirle el remito a Fun
+Print. No funcionó: **Fun Print no se anota como destino de imágenes**, así que
+no aparece en el menú de compartir. Y tampoco aparece entre las impresoras del
+sistema, porque no trae complemento de impresión de Android. Quedaba guardar el
+archivo, abrir la otra app y buscarlo: tres pasos para un papelito, y encima no
+había botón de guardar — había que mandárselo a alguien por WhatsApp y bajarlo
+de ahí.
+
+Resulta que no hacía falta nada de eso. Estas impresoras —GB01, GB02, GT01,
+MX05, MX06 y compañía, todas la misma máquina con distinta carcasa— hablan un
+protocolo propio por Bluetooth de bajo consumo que está reverseado y publicado
+desde hace años. Fun Print (que por dentro es Kitty Print) hace exactamente
+esto. La app ahora lo hace sola, en `docs/js/impresora.js`:
+
+- servicio `0xAE30`, se escribe en la característica `0xAE01`
+- cada orden es `51 78 <orden> 00 <largo ×2> <datos> <crc8> FF`
+- el CRC8 es el común: polinomio `0x07`, arranca en cero
+- la imagen va renglón por renglón, 384 puntos = 48 bytes, un bit por punto y
+  con los bits de cada byte al revés
+
+El remito ya se dibujaba a 384 puntos, que es el ancho exacto del papel de
+58 mm, así que no hubo que rediseñar nada: `dibujar()` acepta la escala y la
+térmica pide la de 1:1. Ni un punto de reescalado.
+
+**Lo que no se puede: iPhone.** Bluetooth desde el navegador existe en Chrome
+—Android y computadora— pero Safari no lo implementa, y en iPhone todos los
+navegadores son Safari por dentro. Ahí el botón no aparece y queda el camino de
+siempre. Por eso **Guardar** ahora es un botón de verdad y no un rodeo por
+WhatsApp.
+
+Los bytes se prueban sin impresora, en `pruebas/impresora.html`, contra dos
+paquetes publicados que sirven de piedra de toque. Un error ahí sacaría el papel
+en blanco sin ninguna pista.
+
+De paso, los tres lugares que sacan papel —la venta, la entrega en consignación
+y el recibo de honorarios— tenían cada uno su copia de los botones, iguales
+salvo por el nombre de los ids. Ya había pasado que una mejora entrara en una
+sola de las tres. Ahora los arma `Remito.mostrar()`, una vez.

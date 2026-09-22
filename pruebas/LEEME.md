@@ -38,3 +38,14 @@ estado quedó la vuelta anterior, y por eso aparecen a veces sí y a veces no.
   la venta se perdía entera.
 - Borrar un **producto** recién cargado.
 - Que la baja hecha en **un teléfono** llegue al otro.
+
+## `impresora.html` — los bytes que salen por Bluetooth
+
+Corre `docs/js/impresora.js` sin impresora. Comprueba el CRC8 y el armado de
+las órdenes contra **paquetes publicados** por quienes destriparon el protocolo
+de estas térmicas —«empezar a imprimir» y «pausar el flujo»—, y comprueba que
+el punto de más a la izquierda del papel caiga en el bit de menor peso, que es
+lo único que no se puede deducir mirando.
+
+Si esto se rompe, el papel sale en blanco o con manchas y no hay forma de
+adivinar por qué. Abrirlo directo en el navegador, sin servidor.

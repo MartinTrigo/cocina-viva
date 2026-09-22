@@ -417,7 +417,7 @@ a.boton { text-decoration: none; }
 
 /* ---------- Fila de acciones arriba de una lista ---------- */
 
-.acciones { display: flex; gap: 8px; margin-bottom: 12px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 
 /* Padding y cuerpo más chicos que un botón suelto: son dos en una fila y en un
    teléfono de 375 px, con el padding normal, «+ Producto nuevo» cae en dos
@@ -872,6 +872,7 @@ h3.subtitulo {
 /* Un botón secundario que acompaña, no que manda: el de agregar otro producto
    no compite con el de guardar. */
 .boton--chico { min-height: 38px; padding: 8px 12px; font-size: 14px; }
+.remito__otra { margin-top: 10px; }
 
 /* ==========================================================================
    Aviso de versión nueva

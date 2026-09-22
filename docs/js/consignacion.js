@@ -612,22 +612,7 @@ window.Consignacion = (function () {
     vista.insertBefore(caja, vista.firstChild);
     caja.innerHTML = `<p class="nota">Armando el remito…</p>`;
     try {
-      const url = await window.Remito.vistaPrevia(datos);
-      caja.innerHTML = `
-        <figure class="remito"><img src="${url}" alt="Remito de entrega para ${esc(datos.cliente)}"></figure>
-        <div class="acciones">
-          <button class="boton" id="cg-compartir">Compartir</button>
-          <button class="boton boton--secundario" id="cg-imprimir">Imprimir</button>
-        </div>
-        <p class="nota">Para mandarlo por WhatsApp o a la impresora térmica, usá
-           <strong>Compartir</strong> y elegí la app. <strong>Imprimir</strong> abre el
-           diálogo del sistema, para las impresoras que el teléfono ya ve.</p>`;
-      document.getElementById("cg-compartir").onclick = async () => {
-        const r = await window.Remito.compartir(datos);
-        if (r.como === "descargado") window.Util.brindis("Descargado: " + r.nombre);
-        if (r.como === "compartido") window.Util.brindis("Enviado.");
-      };
-      document.getElementById("cg-imprimir").onclick = () => window.Remito.imprimir(datos);
+      await window.Remito.mostrar(caja, datos, "Remito de entrega para " + datos.cliente);
       caja.scrollIntoView({ block: "start" });
     } catch (err) {
       caja.innerHTML = `<p class="aviso aviso--error">No se pudo armar el remito.

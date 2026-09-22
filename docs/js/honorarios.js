@@ -635,22 +635,7 @@ window.Honorarios = (function () {
     };
 
     try {
-      const url = await window.Remito.vistaPrevia(datos);
-      caja.innerHTML = `
-        <figure class="remito"><img src="${url}" alt="Recibo para ${esc(egreso.persona)}"></figure>
-        <div class="acciones">
-          <button class="boton" id="btn-compartir">Compartir</button>
-          <button class="boton boton--secundario" id="btn-imprimir">Imprimir</button>
-        </div>
-        <p class="nota">Para mandarlo por WhatsApp o a la impresora térmica, usá
-           <strong>Compartir</strong> y elegí la app. <strong>Imprimir</strong> abre el
-           diálogo del sistema, para las impresoras que el teléfono ya ve.</p>`;
-      document.getElementById("btn-compartir").onclick = async () => {
-        const r = await window.Remito.compartir(datos);
-        if (r.como === "descargado") window.Util.brindis("Descargado: " + r.nombre);
-        if (r.como === "compartido") window.Util.brindis("Enviado.");
-      };
-      document.getElementById("btn-imprimir").onclick = () => window.Remito.imprimir(datos);
+      await window.Remito.mostrar(caja, datos, "Recibo para " + egreso.persona);
     } catch (err) {
       caja.innerHTML = `<p class="aviso aviso--error">El pago se guardó, pero el recibo
         no se pudo armar. Detalle: ${esc(err.message || err)}</p>`;

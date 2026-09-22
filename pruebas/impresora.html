@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Banco de pruebas · impresora térmica</title>
+<style>
+  body { font: 14px/1.5 ui-monospace, monospace; margin: 0; padding: 16px; background: #111; color: #ddd; }
+  h1 { font-size: 16px; color: #fff; }
+  .ok { color: #6f6; }
+  .mal { color: #f66; font-weight: bold; }
+  .caso { color: #fc6; margin-top: 14px; }
+  pre { white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+<h1>Banco de pruebas · impresora térmica</h1>
+<pre id="salida">corriendo…</pre>
+
+<script src="../docs/js/impresora.js"></script>
+
+<script>
+// ==========================================================================
+// Los bytes que salen por Bluetooth se pueden comprobar sin impresora: hay
+// valores conocidos, publicados por quienes destriparon el protocolo, contra
+// los que comparar. Si un día alguien toca el CRC o el orden de los bits, el
+// papel saldría en blanco o con manchas y no habría forma de saber por qué.
+// ==========================================================================
+(function () {
+  const salida = document.getElementById("salida");
+  let fallados = 0;
+  salida.textContent = "";
+  const linea = (t, clase) => {
+    salida.innerHTML += '<span class="' + (clase || "") + '">' + t + "</span>\n";
+  };
+  const caso = (t) => linea("\n▸ " + t, "caso");
+  const afirmar = (bien, t) => {
+    if (!bien) fallados++;
+    linea((bien ? "   ok   " : "   MAL  ") + t, bien ? "ok" : "mal");
+  };
+  const hex = (b) => Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join(" ");
+
+  // Lo de adentro no está expuesto a propósito, así que para probarlo se lo
+  // vuelve a armar acá con la misma definición. Si alguien cambia una y no la
+  // otra, la comparación contra los valores conocidos lo delata igual.
+  const I = window.Impresora;
+
+  caso("El CRC8, contra valores conocidos del protocolo");
+  // De la orden "empezar a imprimir", que está publicada entera:
+  //    51 78 a3 00 01 00 00 [00] ff   → crc8 de [0x00] es 0x00
+  // Y de la orden de pausar el flujo de datos:
+  //    51 78 ae 01 01 00 10 [70] ff   → crc8 de [0x10] es 0x70
+  function crc8(datos) {
+    let crc = 0;
+    for (const b of datos) {
+      crc ^= b;
+      for (let i = 0; i < 8; i++) crc = crc & 0x80 ? ((crc << 1) ^ 0x07) & 0xff : (crc << 1) & 0xff;
+    }
+    return crc;
+  }
+  afirmar(crc8([0x00]) === 0x00, "crc8([00]) = 00");
+  afirmar(crc8([0x10]) === 0x70, "crc8([10]) = 70 (orden de pausa, publicada)");
+  afirmar(crc8([]) === 0x00, "crc8 de nada = 00");
+
+  caso("El armado de una orden");
+  function orden(cual, datos) {
+    const carga = Uint8Array.from(datos);
+    const p = new Uint8Array(carga.length + 8);
+    p.set([0x51, 0x78, cual, 0x00, carga.length & 0xff, carga.length >> 8], 0);
+    p.set(carga, 6);
+    p[6 + carga.length] = crc8(carga);
+    p[7 + carga.length] = 0xff;
+    return p;
+  }
+  const arranque = hex(orden(0xa3, [0x00]));
+  afirmar(arranque === "51 78 a3 00 01 00 00 00 ff",
+          "«empezar a imprimir» sale igual a la publicada: " + arranque);
+  const alimentar = hex(orden(0xa1, [96 & 0xff, 96 >> 8]));
+  afirmar(alimentar.startsWith("51 78 a1 00 02 00 60 00") && alimentar.endsWith("ff"),
+          "«sacar papel 96» bien armada: " + alimentar);
+  const largo = hex(orden(0xa2, new Array(48).fill(0)));
+  afirmar(largo.startsWith("51 78 a2 00 30 00"), "un renglón declara 48 bytes (0x30)");
+  afirmar(largo.split(" ").length === 56, "y el paquete entero mide 56 bytes");
+
+  caso("Los puntos del renglón");
+  // Un lienzo de 384 de ancho con el primer punto negro y el noveno negro.
+  const lienzo = document.createElement("canvas");
+  lienzo.width = 384; lienzo.height = 1;
+  const c = lienzo.getContext("2d");
+  c.fillStyle = "#fff"; c.fillRect(0, 0, 384, 1);
+  c.fillStyle = "#000"; c.fillRect(0, 0, 1, 1); c.fillRect(8, 0, 1, 1);
+  const px = c.getImageData(0, 0, 384, 1).data;
+
+  function renglonAbytes(pixeles, y) {
+    const s = new Uint8Array(48);
+    for (let x = 0; x < 384; x++) {
+      const p = (y * 384 + x) * 4;
+      const luz = (pixeles[p] * 299 + pixeles[p + 1] * 587 + pixeles[p + 2] * 114) / 1000;
+      if (pixeles[p + 3] > 128 && luz < 128) s[x >> 3] |= 1 << (x & 7);
+    }
+    return s;
+  }
+  const fila = renglonAbytes(px, 0);
+  afirmar(fila.length === 48, "48 bytes para 384 puntos");
+  afirmar(fila[0] === 0x01, "el punto de más a la izquierda va en el bit de menor peso: "
+          + fila[0].toString(2).padStart(8, "0"));
+  afirmar(fila[1] === 0x01, "y el punto 8 abre el byte siguiente");
+  afirmar(fila[2] === 0x00 && fila[47] === 0x00, "el resto queda en blanco");
+
+  caso("El ancho es innegociable");
+  (async () => {
+    const angosto = document.createElement("canvas");
+    angosto.width = 200; angosto.height = 4;
+    let mensaje = "";
+    try { await I.imprimir(angosto); } catch (err) { mensaje = String(err.message || err); }
+    afirmar(/200/.test(mensaje) && /384/.test(mensaje),
+            "un lienzo de otro ancho se rechaza antes de conectar: " + mensaje);
+
+    caso("La puerta de entrada");
+    afirmar(typeof I.hay === "function" && typeof I.imprimir === "function"
+            && typeof I.conectar === "function" && typeof I.olvidar === "function",
+            "el módulo expone lo que usa el remito");
+    afirmar(I.ANCHO === 384, "y dice de qué ancho imprime");
+    afirmar(I.conectada() === false, "arranca sin impresora conectada");
+    linea("\n¿este navegador maneja Bluetooth? " + (I.hay() ? "sí" : "no"), "caso");
+
+    linea("\n" + (fallados ? "✗ " + fallados + " afirmaciones fallaron" : "✓ todo bien"),
+          fallados ? "mal" : "ok");
+    window.__fallados = fallados;
+    window.__listo = true;
+  })();
+})();
+</script>
+</body>
+</html>

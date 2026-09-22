@@ -29,7 +29,7 @@
 // ==========================================================================
 
 window.Remito = (function () {
-  const { dinero, numero, fecha } = window.Util;
+  const { dinero, numero, fecha, esc } = window.Util;
 
   const ANCHO = 384;          // los puntos que imprime una térmica de 58 mm
   const ESCALA = 2;           // 768 px reales: nítido en pantalla, exacto al reducir
@@ -78,17 +78,20 @@ window.Remito = (function () {
   // saber cuánto alto va a necesitar. Medir por adelantado obligaría a repetir
   // toda la lógica de los saltos de renglón en una función aparte, y esas dos
   // copias se desincronizan al primer cambio.
-  async function dibujar(datos) {
+  // La escala es 2 para mirarlo en pantalla o mandarlo por WhatsApp, y 1 para
+  // la térmica, que quiere los 384 puntos exactos del papel y ni uno más.
+  async function dibujar(datos, escala) {
     await cargarLogo();
+    const cuanto = escala || ESCALA;
 
     const medidor = document.createElement("canvas").getContext("2d");
     const alto = pintar(medidor, datos, false);
 
     const lienzo = document.createElement("canvas");
-    lienzo.width = ANCHO * ESCALA;
-    lienzo.height = Math.ceil(alto) * ESCALA;
+    lienzo.width = ANCHO * cuanto;
+    lienzo.height = Math.ceil(alto) * cuanto;
     const c = lienzo.getContext("2d");
-    c.scale(ESCALA, ESCALA);
+    c.scale(cuanto, cuanto);
     pintar(c, datos, true);
     return lienzo;
   }
@@ -338,6 +341,16 @@ window.Remito = (function () {
     return { como: "descargado", nombre: nombre };
   }
 
+  // Guardar sin pasar por el menún de compartir. Hasta ahora, para tener el
+  // archivo había que mandárselo a alguien por WhatsApp y bajarlo de ahí.
+  async function guardar(datos) {
+    const lienzo = await dibujar(datos);
+    const blob = await aBlob(lienzo);
+    const nombre = nombreArchivo(datos);
+    descargar(blob, nombre);
+    return nombre;
+  }
+
   function descargar(blob, nombre) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -388,6 +401,13 @@ window.Remito = (function () {
     setTimeout(limpiar, 60000);
   }
 
+  // ---------- La térmica, directo ----------
+
+  async function aLaTermica(datos, avisar) {
+    const lienzo = await dibujar(datos, 1);      // 384 puntos clavados
+    return window.Impresora.imprimir(lienzo, avisar);
+  }
+
   // Para mostrarlo en pantalla antes de mandarlo.
   async function vistaPrevia(datos) {
     const lienzo = await dibujar(datos);
@@ -395,5 +415,76 @@ window.Remito = (function () {
     return URL.createObjectURL(blob);
   }
 
-  return { dibujar, compartir, imprimir, vistaPrevia };
+  /* ----------------------------------------------------------------------
+     LOS BOTONES
+
+     Los tres lugares que sacan papel —la venta, la entrega en consignación y
+     el recibo de honorarios— tenían cada uno su copia de estos botones. Eran
+     iguales salvo por el nombre de los ids, y ya pasó que una mejora entrara
+     en una sola de las tres. Ahora los arma este archivo, una vez.
+     ---------------------------------------------------------------------- */
+
+  async function mostrar(caja, datos, alt) {
+    const conBluetooth = window.Impresora && window.Impresora.hay();
+    const url = await vistaPrevia(datos);
+
+    caja.innerHTML = `
+      <figure class="remito"><img src="${esc(url)}" alt="${esc(alt || "Remito")}"></figure>
+      <div class="acciones">
+        <button class="boton" id="rm-imprimir">Imprimir</button>
+        <button class="boton boton--secundario" id="rm-compartir">Compartir</button>
+        <button class="boton boton--secundario" id="rm-guardar">Guardar</button>
+      </div>
+      <p class="nota" id="rm-estado">${conBluetooth
+        ? "<strong>Imprimir</strong> lo manda a la impresora térmica por Bluetooth. "
+          + "La primera vez hay que elegirla de la lista y prenderla antes."
+        : "<strong>Imprimir</strong> abre el diálogo del sistema. Este navegador no "
+          + "maneja Bluetooth —en iPhone no se puede—, así que para la térmica hay que "
+          + "<strong>Guardar</strong> y abrir el archivo desde la app de la impresora."}</p>
+      ${conBluetooth
+        ? '<button class="boton boton--secundario boton--chico remito__otra" id="rm-otra">Otra impresora</button>'
+        : ""}`;
+
+    const estado = caja.querySelector("#rm-estado");
+    const decir = (t) => { estado.textContent = t; };
+
+    const deSistema = () => imprimir(datos);
+
+    caja.querySelector("#rm-imprimir").onclick = conBluetooth
+      ? async (ev) => {
+          const boton = ev.currentTarget;
+          boton.disabled = true;
+          try {
+            const quien = await aLaTermica(datos, decir);
+            decir("Listo, salió por " + quien + ".");
+          } catch (err) {
+            // Que cancelen la lista de aparatos no es un error, es que se
+            // arrepintieron. Lo demás sí hay que contarlo, y completo: sin el
+            // detalle no hay forma de saber si fue el Bluetooth apagado, la
+            // impresora dormida o el papel.
+            const m = String((err && err.message) || err);
+            decir(/cancel|User cancelled|chooser/i.test(m)
+              ? "No se eligió ninguna impresora."
+              : "No se pudo imprimir: " + m);
+          } finally {
+            boton.disabled = false;
+          }
+        }
+      : deSistema;
+
+    caja.querySelector("#rm-compartir").onclick = async () => {
+      const r = await compartir(datos);
+      if (r.como === "descargado") window.Util.brindis("Descargado: " + r.nombre);
+      if (r.como === "compartido") window.Util.brindis("Enviado.");
+    };
+
+    caja.querySelector("#rm-guardar").onclick = async () => {
+      window.Util.brindis("Guardado: " + (await guardar(datos)));
+    };
+
+    const otra = caja.querySelector("#rm-otra");
+    if (otra) otra.onclick = deSistema;
+  }
+
+  return { dibujar, compartir, guardar, imprimir, aLaTermica, vistaPrevia, mostrar };
 })();
