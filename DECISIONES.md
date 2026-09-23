@@ -1452,3 +1452,34 @@ De yapa, la MXW01 cuenta por qué no imprime: sin papel, tapa abierta, papel
 atascado, recalentada, batería baja. Eso ahora se traduce y se muestra. Un papel
 que no sale porque la tapa quedó floja no tiene por qué parecer un error del
 programa.
+
+### Que se lea: el calor, el umbral y el tamaño
+
+Salió el papel, pero flojo y con la letra chica. Tres cosas, y la del medio es
+la que más se nota.
+
+**El calor, al máximo.** La MXW01 lo toma por la orden `0xA2` y **lo recorta en
+100**; estaba en 93. Es la mejora más chica de las tres, y la única que tiene
+techo de fábrica.
+
+**El umbral, de 128 a 170.** El papel térmico no tiene medios tonos: cada punto
+sale negro o no sale. Los bordes suavizados de las letras son grises, y con el
+corte en la mitad **no se imprimían**: los palos salían finitos y despintados.
+Subiendo el corte, esos bordes entran, el trazo engorda medio punto de cada lado
+y la letra chica se lee. No cuesta nada y es lo que más cambia.
+
+**El tamaño, +17%.** Acá había una trampa: subirle dos puntos a la tipografía y
+nada más habría encimado los renglones, porque el interlineado, las rayas y los
+espacios son números fijos que acompañan al cuerpo de la letra. En vez de tocar
+los treinta números del dibujo uno por uno, **el remito ahora está dibujado en
+un espacio de 328 puntos y se agranda para llenar los 384 del papel**. Crece
+todo junto y en proporción: letra, interlineado, rayas, logo. El cuerpo 12 del
+nombre del producto sale en 14, que es lo que se pidió.
+
+Y el margen bajó de 16 a 5 unidades de dibujo, o sea de 2 mm a 0,73 mm. El
+contenido pasó de 352 a 372 puntos de papel. **Los 3 mm de cada lado que se
+pedían no existen**: el papel tiene 384 puntos y ya se usaban 352, así que todo
+lo que había para ganar era poco más de un milímetro por lado, y se ganó.
+
+Un remito de cuatro productos mide ahora 532 puntos, unos 66 mm, contra 57 mm
+antes. Más la cola en blanco para cortar, unos 76 mm por remito.

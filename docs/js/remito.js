@@ -31,9 +31,20 @@
 window.Remito = (function () {
   const { dinero, numero, fecha, esc } = window.Util;
 
-  const ANCHO = 384;          // los puntos que imprime una térmica de 58 mm
-  const ESCALA = 2;           // 768 px reales: nítido en pantalla, exacto al reducir
-  const MARGEN = 16;
+  const ANCHO_PAPEL = 384;    // los puntos que imprime una térmica de 58 mm
+
+  // El remito está dibujado en un espacio más chico que el papel y después se
+  // agranda para llenarlo. Es la forma de subirle dos puntos a la letra sin
+  // tocar los treinta números del dibujo: si se agrandara solo la tipografía,
+  // los renglones quedarían encimados. Así crece todo junto y en proporción
+  // —letra, interlineado, rayas, logo— y el ritmo no se mueve.
+  const ANCHO = 328;
+  const CRECE = ANCHO_PAPEL / ANCHO;      // 1,17: el cuerpo 12 sale en 14
+  const ESCALA = 2;           // el doble en pantalla: nítido, y exacto al reducir
+
+  // Un margen de 5 acá son 6 puntos de papel, menos de un milímetro. Más al
+  // borde no conviene: el rollo nunca entra perfectamente derecho.
+  const MARGEN = 5;
   const UTIL = ANCHO - MARGEN * 2;
 
   const NEGRO = "#000000";
@@ -88,10 +99,10 @@ window.Remito = (function () {
     const alto = pintar(medidor, datos, false);
 
     const lienzo = document.createElement("canvas");
-    lienzo.width = ANCHO * cuanto;
-    lienzo.height = Math.ceil(alto) * cuanto;
+    lienzo.width = ANCHO_PAPEL * cuanto;
+    lienzo.height = Math.ceil(alto * CRECE) * cuanto;
     const c = lienzo.getContext("2d");
-    c.scale(cuanto, cuanto);
+    c.scale(CRECE * cuanto, CRECE * cuanto);
     pintar(c, datos, true);
     return lienzo;
   }
@@ -102,7 +113,7 @@ window.Remito = (function () {
 
     if (dibuja) {
       c.fillStyle = "#ffffff";
-      c.fillRect(0, 0, ANCHO, 10000);
+      c.fillRect(0, 0, ANCHO, 20000);
       c.textBaseline = "alphabetic";
     }
 

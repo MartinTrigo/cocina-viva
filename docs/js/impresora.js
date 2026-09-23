@@ -40,13 +40,20 @@ window.Impresora = (function () {
 
   const ANCHO = 384;            // puntos de una térmica de 58 mm
   const BYTES_POR_RENGLON = ANCHO / 8;
+
+  // A partir de qué gris se quema el punto. El papel térmico no tiene medios
+  // tonos: cada punto sale negro o no sale. Con el corte en la mitad (128) los
+  // bordes suavizados de las letras —que son grises— no se imprimen y los
+  // palos quedan finitos y despintados. Subiéndolo, esos bordes entran, el
+  // trazo engorda medio punto de cada lado y la letra chica se lee.
+  const UMBRAL = 170;
   const MINIMO_DE_DATOS = 90 * BYTES_POR_RENGLON;   // la MXW01 no acepta menos
   const COLA = 80;              // renglones en blanco al final, para cortar
 
   // Cuánto calienta el cabezal. Más es más negro y más lento; pasarse quema el
   // papel. Cada familia lo mide con su propia escala.
   const CALOR_CLASICO = 24000;
-  const CALOR_MXW01 = 0x5d;
+  const CALOR_MXW01 = 100;      // el máximo que acepta: más arriba lo recorta ella
   const VELOCIDAD = 32;         // solo la clásica; al revés de lo que suena:
                                 // más alto, más lento
 
@@ -107,7 +114,7 @@ window.Impresora = (function () {
       const p = (y * ANCHO + x) * 4;
       // Un punto se quema si es oscuro. El alfa cuenta: lo transparente es papel.
       const luz = (pixeles[p] * 299 + pixeles[p + 1] * 587 + pixeles[p + 2] * 114) / 1000;
-      if (pixeles[p + 3] > 128 && luz < 128) salida[x >> 3] |= 1 << (x & 7);
+      if (pixeles[p + 3] > 128 && luz < UMBRAL) salida[x >> 3] |= 1 << (x & 7);
     }
     return salida;
   }

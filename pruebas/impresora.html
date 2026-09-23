@@ -127,14 +127,17 @@
   const c = lienzo.getContext("2d");
   c.fillStyle = "#fff"; c.fillRect(0, 0, 384, 1);
   c.fillStyle = "#000"; c.fillRect(0, 0, 1, 1); c.fillRect(8, 0, 1, 1);
+  // Un gris de borde de letra, de los que antes no se imprimían.
+  c.fillStyle = "#999999"; c.fillRect(16, 0, 1, 1);
   const px = c.getImageData(0, 0, 384, 1).data;
 
+  const UMBRAL = 170;
   function renglonAbytes(pixeles, y) {
     const s = new Uint8Array(48);
     for (let x = 0; x < 384; x++) {
       const p = (y * 384 + x) * 4;
       const luz = (pixeles[p] * 299 + pixeles[p + 1] * 587 + pixeles[p + 2] * 114) / 1000;
-      if (pixeles[p + 3] > 128 && luz < 128) s[x >> 3] |= 1 << (x & 7);
+      if (pixeles[p + 3] > 128 && luz < UMBRAL) s[x >> 3] |= 1 << (x & 7);
     }
     return s;
   }
@@ -143,7 +146,10 @@
   afirmar(fila[0] === 0x01, "el punto de más a la izquierda va en el bit de menor peso: "
           + fila[0].toString(2).padStart(8, "0"));
   afirmar(fila[1] === 0x01, "y el punto 8 abre el byte siguiente");
-  afirmar(fila[2] === 0x00 && fila[47] === 0x00, "el resto queda en blanco");
+  afirmar(fila[2] === 0x01, "y el gris del borde de la letra AHORA se quema: "
+          + "con el corte en la mitad no salía, y por eso la letra chica se leía mal");
+  afirmar(fila[3] === 0x00 && fila[47] === 0x00, "el resto queda en blanco");
+  afirmar(UMBRAL > 128 && UMBRAL < 200, "el umbral no se fue de mambo: " + UMBRAL);
 
   caso("El ancho es innegociable");
   (async () => {
