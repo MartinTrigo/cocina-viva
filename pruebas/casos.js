@@ -376,6 +376,44 @@
     afirmar(filasDe("ingresos").length === 1, "correrla dos veces no rompe nada");
   }
 
+  // ---------- que la versión y el caché vayan juntos ----------
+  //
+  // La app avisa «hay una versión nueva» comparándole al servidor el VERSION de
+  // app.js contra el que está corriendo. Y el service worker decide qué
+  // archivos rebajar por el nombre de su CACHE. Son dos números distintos para
+  // una sola cosa, y ya pasó lo obvio: seis publicaciones seguidas subiendo el
+  // CACHE y olvidando el VERSION. La app se actualizaba en silencio, el cartel
+  // no aparecía nunca, y del otro lado no había forma de saber si la versión
+  // que se estaba usando era la nueva o la vieja.
+
+  // El banco le pisa el fetch a la página, así que para leer archivos de verdad
+  // hay que ir por el camino viejo.
+  function leerArchivo(ruta) {
+    return new Promise((listo) => {
+      const p = new XMLHttpRequest();
+      p.open("GET", ruta, true);
+      p.onload = () => listo(p.status >= 200 && p.status < 300 ? p.responseText : "");
+      p.onerror = () => listo("");
+      p.send();
+    });
+  }
+
+  async function casoLaVersionYElCache() {
+    caso("La versión de la app y la del caché son la misma");
+    const app = await leerArchivo("../docs/js/app.js");
+    const sw = await leerArchivo("../docs/sw.js");
+    afirmar(!!app && !!sw, "se pudieron leer app.js y sw.js");
+    if (!app || !sw) return;
+
+    const enApp = (app.match(/const VERSION = "([\d.]+)/) || [])[1];
+    const enCache = (sw.match(/const CACHE = "cocinaviva-v([\d.]+)"/) || [])[1];
+    afirmar(!!enApp, "app.js dice su versión: " + (enApp || "NO SE ENCONTRÓ"));
+    afirmar(!!enCache, "sw.js dice la del caché: " + (enCache || "NO SE ENCONTRÓ"));
+    afirmar(enApp === enCache,
+            "y son la misma —si no, el cartel de versión nueva no aparece nunca—: "
+            + enApp + " vs " + enCache);
+  }
+
   // ---------- correr ----------
 
   async function correr() {
@@ -386,6 +424,7 @@
       casoFechasVaciadas, casoFechaDelHermano, casoElTelefonoNoPisaLaFecha,
       casoRestaurarFechas, casoPagadoSiONo,
       casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
+      casoLaVersionYElCache,
     ];
     for (const c of casos) {
       try { await c(); }

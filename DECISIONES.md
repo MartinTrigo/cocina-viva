@@ -1547,3 +1547,27 @@ así que lo que se ve es lo que va a salir.
 Y el banco pasó a cargar también `remito.js`, para cuidar lo único que no se
 puede romper: que el remito salga de **384 puntos exactos** en los tres tamaños.
 Uno de más o de menos y la impresora lo rechaza o lo saca corrido.
+
+## El cartel de «versión nueva» llevaba seis publicaciones sin aparecer
+
+Después de subir los tres tamaños, del otro lado no se veían. No era la app: el
+selector estaba bien. El teléfono seguía con la versión vieja **y no había forma
+de saberlo**.
+
+La app tiene desde hace rato un aviso de versión nueva, y está bien pensado: le
+pide al servidor el `app.js` sin caché y compara el `VERSION` de adentro con el
+que está corriendo. Si difieren, muestra el cartel.
+
+El problema es que hay **dos números para una sola cosa**: el `VERSION` de
+`app.js`, que es el que dispara el cartel, y el `CACHE` de `sw.js`, que es el que
+hace que el service worker rebaje los archivos. En seis publicaciones seguidas
+subí el segundo y me olvidé del primero. Resultado: los archivos se actualizaban
+—o no—, el cartel no aparecía nunca, y del otro lado no había con qué distinguir
+una cosa de la otra. La versión en el pie decía **1.7.2** todo el tiempo.
+
+Ahora los dos llevan el mismo número —`1.8.0`— y hay un caso en el banco que lee
+los dos archivos y falla si se separan. No alcanza con acordarse: acordarse ya
+falló seis veces seguidas.
+
+El `VERSION` también es lo que se lee en el pie de la app y en la pantalla de
+arranque, así que ahora «¿se actualizó?» se contesta mirando.
