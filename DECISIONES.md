@@ -1483,3 +1483,42 @@ lo que había para ganar era poco más de un milímetro por lado, y se ganó.
 
 Un remito de cuatro productos mide ahora 532 puntos, unos 66 mm, contra 57 mm
 antes. Más la cola en blanco para cortar, unos 76 mm por remito.
+
+### El tope que no era tope, y por qué la letra salía rota
+
+Seguía saliendo despintado, y la app de fábrica imprimía mejor. Dos causas, y
+la primera es un error mío.
+
+**La densidad iba de 0 a 255, no hasta 100.** Yo la había puesto en 100
+creyendo que era el máximo del aparato. No lo es: 100 es el límite que se pone
+por prudencia una de las implementaciones de referencia. La documentación del
+protocolo dice `0x00`–`0xFF`. O sea que cuando escribí «calor al máximo» lo
+dejé en el 39% de lo que la máquina puede dar.
+
+Ahora hay tres densidades, las mismas tres que ofrece la app de fábrica:
+claro `0x5D`, medio `0xA0`, oscuro `0xE0`, elegibles desde el remito y
+recordadas. Arranca en **oscuro**. Hace falta que se pueda tocar: depende del
+rollo, y un rollo viejo necesita más.
+
+**Y la letra se rompía por cómo está dibujada, no por el calor.** Un palo de
+letra de un punto de ancho, con los bordes suavizados que pone el navegador,
+sale entrecortado en un papel que solo sabe quemar o no quemar. Subir el umbral
+ayudó; lo que faltaba es **dibujar cada texto dos veces: el relleno y un hilo de
+contorno del mismo color**. Eso le agrega un pelo de grosor a cada trazo. En
+pantalla no se nota y en el papel es la diferencia entre leerlo y adivinarlo.
+Pasa por `poner()`, que es por donde ahora sale todo el texto del remito.
+
+**No hay modo texto.** La idea de mandarle un `.txt` en vez de una imagen no
+existe en este protocolo: la MXW01 solo recibe mapas de bits, y la app de
+fábrica también convierte el texto en imagen antes de mandarlo. Lo que hace
+mejor es dibujarlo mejor, que es lo que se acaba de arreglar.
+
+**De paso, una lectura equivocada del estado.** Venía interpretando el byte 6 de
+la respuesta como una bolsa de banderitas —sin papel, tapa abierta, atascado—.
+La documentación dice otra cosa: el **byte 12** avisa si hay problema y el
+**13** cuál es. Con la lectura vieja, una impresora sana podía decir «no hay
+papel» de la nada. Corregido, con su caso en el banco.
+
+Queda sin explorar el modo **HD** de la app de fábrica, que se sospecha que
+manda 4 bits por punto en vez de 1 para que la impresora haga ella misma los
+medios tonos. Para texto no debería hacer falta.

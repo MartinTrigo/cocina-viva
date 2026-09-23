@@ -47,6 +47,20 @@ window.Remito = (function () {
   const MARGEN = 5;
   const UTIL = ANCHO - MARGEN * 2;
 
+  // El papel térmico no tiene medios tonos: un palo de letra de un punto de
+  // ancho sale roto o no sale. Un hilo de contorno del mismo color engorda cada
+  // trazo un pelo de cada lado, y es la diferencia entre leerlo y adivinarlo.
+  // En pantalla no se nota; en el papel sí.
+  const ENGROSAR = 0.35;
+
+  function poner(c, texto, x, y) {
+    c.fillText(texto, x, y);
+    c.lineWidth = ENGROSAR;
+    c.lineJoin = "round";
+    c.strokeStyle = c.fillStyle;
+    c.strokeText(texto, x, y);
+  }
+
   const NEGRO = "#000000";
   const GRIS = "#555555";     // lo más claro que una térmica todavía distingue
 
@@ -131,7 +145,7 @@ window.Remito = (function () {
         c.fillStyle = NEGRO;
         c.font = letra(24, "700");
         c.textAlign = "center";
-        c.fillText("Cocina Viva", centro, y);
+        poner(c, "Cocina Viva", centro, y);
       }
       y += 6;
     }
@@ -186,7 +200,7 @@ window.Remito = (function () {
         c.fillStyle = GRIS;
         c.font = letra(9);
         c.textAlign = "right";
-        c.fillText(l.cod, ANCHO - MARGEN, y);
+        poner(c, l.cod, ANCHO - MARGEN, y);
         c.textAlign = "left";
       }
 
@@ -244,7 +258,7 @@ window.Remito = (function () {
       c.fillStyle = color;
       c.font = fuente;
       c.textAlign = "left";
-      c.fillText(texto, x, y);
+      poner(c, texto, x, y);
     }
     return y;
   }
@@ -254,7 +268,7 @@ window.Remito = (function () {
       c.fillStyle = color;
       c.font = fuente;
       c.textAlign = "center";
-      c.fillText(texto, ANCHO / 2, y);
+      poner(c, texto, ANCHO / 2, y);
       c.textAlign = "left";
     }
     return y;
@@ -265,7 +279,7 @@ window.Remito = (function () {
       c.fillStyle = color;
       c.font = fuente;
       c.textAlign = "right";
-      c.fillText(texto, ANCHO - MARGEN, y);
+      poner(c, texto, ANCHO - MARGEN, y);
       c.textAlign = "left";
     }
     return y;
@@ -453,7 +467,12 @@ window.Remito = (function () {
           + "maneja Bluetooth —en iPhone no se puede—, así que para la térmica hay que "
           + "<strong>Guardar</strong> y abrir el archivo desde la app de la impresora."}</p>
       ${conBluetooth
-        ? '<button class="boton boton--secundario boton--chico remito__otra" id="rm-otra">Otra impresora</button>'
+        ? '<div class="remito__tinta"><label for="rm-tinta">Tinta</label>'
+          + '<select id="rm-tinta">'
+          + ["claro", "medio", "oscuro"].map((t) => '<option value="' + t + '"'
+              + (t === window.Impresora.tinta() ? " selected" : "") + ">" + t + "</option>").join("")
+          + '</select></div>'
+          + '<button class="boton boton--secundario boton--chico remito__otra" id="rm-otra">Otra impresora</button>'
           + '<button class="boton boton--secundario boton--chico remito__otra" id="rm-probar" hidden>'
           + '¿No salió? Probar la impresora</button>'
           + '<pre class="remito__informe" id="rm-informe" hidden></pre>'
@@ -526,6 +545,16 @@ window.Remito = (function () {
 
     const otra = caja.querySelector("#rm-otra");
     if (otra) otra.onclick = deSistema;
+
+    // Cuánto quemar el papel. Es lo mismo que ofrece la app de fábrica, y hace
+    // falta poder tocarlo: depende del rollo, y un rollo viejo necesita más.
+    const tinta = caja.querySelector("#rm-tinta");
+    if (tinta) {
+      tinta.onchange = () => {
+        window.Impresora.ponerTinta(tinta.value);
+        decir("Tinta en " + tinta.value + ". Probá de imprimir.");
+      };
+    }
   }
 
   return { dibujar, compartir, guardar, imprimir, aLaTermica, vistaPrevia, mostrar };

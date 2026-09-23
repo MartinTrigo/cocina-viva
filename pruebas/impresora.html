@@ -101,24 +101,44 @@
           "y el calor va por la orden a2");
 
   caso("Lo que la impresora cuenta de sí misma");
-  // El byte 6 de lo que contesta dice por qué no imprime. Sin esto, un papel
-  // que no sale porque la tapa quedó floja parece un error del programa.
+  // El byte 12 dice si hay problema y el 13 cuál es. Hay otra lectura dando
+  // vuelta —el byte 6 como bolsa de banderitas— con la que un aparato sano
+  // puede dar «no hay papel» de la nada. Esta es la de la documentación.
   function queLePasa(estado) {
-    if (!estado || estado.length < 7) return "";
-    const b = estado[6];
-    if (b & 0x04) return "No hay papel.";
-    if (b & 0x08) return "La tapa está abierta.";
-    if (b & 0x02) return "El papel está atascado.";
-    if (b & 0x20) return "Se recalentó. Esperá un minuto.";
-    if (b & 0x10) return "La batería está muy baja.";
-    return "";
+    if (!estado || estado.length < 14) return "";
+    if (!estado[12]) return "";
+    const codigo = estado[13];
+    if (codigo === 1 || codigo === 9) return "No hay papel.";
+    if (codigo === 4) return "Se recalentó. Esperá un minuto.";
+    if (codigo === 8) return "La batería está muy baja.";
+    return "La impresora avisa un problema (código " + codigo + ").";
   }
-  const estadoCon = (b) => Uint8Array.from([0, 0, 0, 0, 0, 0, b]);
-  afirmar(queLePasa(estadoCon(0x00)) === "", "todo bien no dice nada");
-  afirmar(/papel/.test(queLePasa(estadoCon(0x04))), "sin papel lo dice");
-  afirmar(/tapa/.test(queLePasa(estadoCon(0x08))), "la tapa abierta lo dice");
-  afirmar(/recalent/.test(queLePasa(estadoCon(0x20))), "el recalentamiento lo dice");
-  afirmar(queLePasa(estadoCon(0x01)) === "", "y estar imprimiendo no es un problema");
+  const respuesta = (bandera, codigo) => {
+    const a = new Uint8Array(14);
+    a[12] = bandera; a[13] = codigo || 0;
+    return a;
+  };
+  afirmar(queLePasa(respuesta(0, 0)) === "", "sin bandera de error no dice nada");
+  afirmar(/papel/.test(queLePasa(respuesta(1, 1))), "sin papel lo dice");
+  afirmar(/papel/.test(queLePasa(respuesta(1, 9))), "y el otro código de sin papel también");
+  afirmar(/recalent/.test(queLePasa(respuesta(1, 4))), "el recalentamiento lo dice");
+  afirmar(/bater/.test(queLePasa(respuesta(1, 8))), "la batería baja lo dice");
+  afirmar(/99/.test(queLePasa(respuesta(1, 99))), "y un código que no conoce lo muestra igual");
+  // Lo que pedía el arreglo: un aparato imprimiendo, sin bandera de error.
+  const sano = new Uint8Array(14); sano[6] = 0x04;
+  afirmar(queLePasa(sano) === "", "un byte 6 con un 4 y sin bandera YA NO dice «sin papel»");
+  afirmar(queLePasa(new Uint8Array(7)) === "", "una respuesta corta no se inventa nada");
+
+  caso("La densidad de tinta");
+  // Estaba clavada en 100 porque creí que era el techo, y no lo era: el
+  // aparato acepta hasta 255. Por eso salía despintado aun al «máximo».
+  afirmar(I.TINTAS && I.TINTAS.claro < I.TINTAS.medio && I.TINTAS.medio < I.TINTAS.oscuro,
+          "las tres van de menos a más: " + JSON.stringify(I.TINTAS));
+  afirmar(I.TINTAS.oscuro > 100 && I.TINTAS.oscuro <= 255,
+          "y la oscura pasa de 100, que era el tope equivocado: " + I.TINTAS.oscuro);
+  afirmar(I.ponerTinta("medio") === "medio" && I.tinta() === "medio", "se puede elegir");
+  afirmar(I.ponerTinta("carbonísimo") === "medio", "y una que no existe no rompe nada");
+  I.ponerTinta("oscuro");
 
   caso("Los puntos del renglón");
   // Un lienzo de 384 de ancho con el primer punto negro y el noveno negro.

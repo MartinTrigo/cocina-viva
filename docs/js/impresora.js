@@ -53,7 +53,28 @@ window.Impresora = (function () {
   // Cuánto calienta el cabezal. Más es más negro y más lento; pasarse quema el
   // papel. Cada familia lo mide con su propia escala.
   const CALOR_CLASICO = 24000;
-  const CALOR_MXW01 = 100;      // el máximo que acepta: más arriba lo recorta ella
+
+  // La densidad de la MXW01 va de 0 a 255. La había dejado en 100 creyendo que
+  // ese era el techo, y no lo es: 100 era el límite que se pone por prudencia
+  // una de las implementaciones de referencia, no el del aparato. Por eso
+  // seguía saliendo despintado. Estos tres valores son los mismos tres que
+  // ofrece la app de fábrica.
+  const TINTAS = { claro: 0x5d, medio: 0xa0, oscuro: 0xe0 };
+  const TINTA_POR_DEFECTO = "oscuro";
+
+  function tinta() {
+    try {
+      const guardada = localStorage.getItem("cv-tinta");
+      if (guardada && TINTAS[guardada]) return guardada;
+    } catch (err) { /* da igual */ }
+    return TINTA_POR_DEFECTO;
+  }
+
+  function ponerTinta(cual) {
+    if (!TINTAS[cual]) return tinta();
+    try { localStorage.setItem("cv-tinta", cual); } catch (err) { /* da igual */ }
+    return cual;
+  }
   const VELOCIDAD = 32;         // solo la clásica; al revés de lo que suena:
                                 // más alto, más lento
 
@@ -261,14 +282,17 @@ window.Impresora = (function () {
   // Lo que la impresora cuenta de sí misma cuando se le pregunta. Sin esto, un
   // papel que no sale porque la tapa está floja parece un error del programa.
   function queLePasa(estado) {
-    if (!estado || estado.length < 7) return "";
-    const b = estado[6];
-    if (b & 0x04) return "No hay papel.";
-    if (b & 0x08) return "La tapa está abierta.";
-    if (b & 0x02) return "El papel está atascado.";
-    if (b & 0x20) return "Se recalentó. Esperá un minuto.";
-    if (b & 0x10) return "La batería está muy baja.";
-    return "";
+    // El byte 12 dice si hay problema y el 13 cuál es. Antes leía el byte 6
+    // como si fuera una bolsa de banderitas, que es otra lectura que anda
+    // dando vuelta: con esa, un aparato sano podía dar «no hay papel» de la
+    // nada. El 12 y el 13 son los que dice la documentación del protocolo.
+    if (!estado || estado.length < 14) return "";
+    if (!estado[12]) return "";
+    const codigo = estado[13];
+    if (codigo === 1 || codigo === 9) return "No hay papel.";
+    if (codigo === 4) return "Se recalentó. Esperá un minuto.";
+    if (codigo === 8) return "La batería está muy baja.";
+    return "La impresora avisa un problema (código " + codigo + ").";
   }
 
   async function imprimirMXW01(lienzo, decir) {
@@ -279,7 +303,7 @@ window.Impresora = (function () {
     const { tira, renglones } = aBytes(lienzo);
 
     decir("Preparando…");
-    await escribirOrden(moderno(0xa2, [CALOR_MXW01]));      // cuánto calentar
+    await escribirOrden(moderno(0xa2, [TINTAS[tinta()]]));  // cuánto calentar
     await esperar(60);
 
     const pregunta = esperarRespuesta(0xa1, 5000);
@@ -461,5 +485,5 @@ window.Impresora = (function () {
   }
 
   return { hay, conectar, conectada, imprimir, olvidar, comoSeLlama, diagnostico,
-           ANCHO, familia: () => familia };
+           tinta, ponerTinta, TINTAS, ANCHO, familia: () => familia };
 })();
