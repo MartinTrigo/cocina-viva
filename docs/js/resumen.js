@@ -16,7 +16,7 @@
 // ==========================================================================
 
 window.Resumen = (function () {
-  const { esc, dinero, numero, mesDe, mesLargo, hoy } = window.Util;
+  const { esc, dinero, numero, aNumero, fecha, mesDe, mesLargo, hoy } = window.Util;
 
   const VERDE = "#4a6b3a";
   const TIERRA = "#a9722f";
@@ -138,6 +138,10 @@ window.Resumen = (function () {
           "Lo que entró menos lo que salió, medio de pago por medio de pago.",
           balancePorMedio(p), true) : ""}
 
+        ${periodo ? bloque("Cuadrar el mes",
+          "Si al contar la plata sobró o faltó, se anota acá y el mes cierra.",
+          cuadrarElMes(p), true) : ""}
+
         ${p.egresos.length ? bloque("En qué se fue",
           "Los egresos por rubro.",
           dona(agrupar(p.egresos, (e) => e.rubro, (e) => e.monto), p.totalEgresos)) : ""}
@@ -189,6 +193,20 @@ window.Resumen = (function () {
     pintarBarras();
     document.getElementById("r-periodo").onchange = (ev) => { periodo = ev.target.value; pintar(); };
     document.getElementById("r-imprimir").onclick = () => window.print();
+
+    const abrir = document.getElementById("r-abrir-correccion");
+    if (abrir) {
+      abrir.onclick = () => {
+        document.getElementById("r-correccion").hidden = false;
+        abrir.hidden = true;
+        document.getElementById("c-monto").focus();
+      };
+      document.getElementById("c-cancelar").onclick = () => {
+        document.getElementById("r-correccion").hidden = true;
+        abrir.hidden = false;
+      };
+      window.Util.unaVez(document.getElementById("c-guardar"), guardarCorreccion);
+    }
     vista.querySelectorAll("[data-bajar]").forEach((b) => {
       b.onclick = () => bajar(b.dataset.bajar);
     });
@@ -221,6 +239,193 @@ window.Resumen = (function () {
           </ul>
         </div>`;
     }).join("");
+  }
+
+  /* ------------------------------------------------------------------------
+     CUADRAR EL MES
+
+     A fin de mes la plata contada casi nunca coincide con la anotada: una venta
+     que nadie cargó, un egreso que salió distinto, un vuelto. Antes esa
+     diferencia no tenía dónde ir y se arrastraba para siempre; el mes siguiente
+     arrancaba con un error de arriba.
+
+     La corrección se guarda donde va, no en una tabla aparte: si sobró plata es
+     un ingreso, si faltó es un egreso. La plata entró o salió de verdad, y
+     esconderla en un ajuste invisible sería justamente lo que hace que después
+     nadie entienda un número.
+
+     Por eso también se listan las que ya se hicieron, con su motivo: una
+     corrección sin explicación es una diferencia con otro nombre.
+     ------------------------------------------------------------------------ */
+
+  // El último día del mes que se está cerrando. Si ese mes todavía no terminó,
+  // hoy: fechar algo en el futuro descoloca cualquier cuenta que mire fechas.
+  function diaDeCierre(mes) {
+    const p = String(mes).split("-");
+    const ultimo = new Date(Number(p[0]), Number(p[1]), 0);
+    const dos = (n) => String(n).padStart(2, "0");
+    const cierre = ultimo.getFullYear() + "-" + dos(ultimo.getMonth() + 1) + "-" + dos(ultimo.getDate());
+    return cierre > hoy() ? hoy() : cierre;
+  }
+
+  function correccionesDe(p) {
+    const sobraron = p.ingresos.filter(window.Datos.esCorreccion).map((f) => ({
+      fecha: f.fecha, cuanto: Number(f.subtotal) || 0, medio: f.medio_pago,
+      por: f.obs, sobro: true,
+    }));
+    const faltaron = p.egresos.filter(window.Datos.esCorreccion).map((e) => ({
+      fecha: e.fecha, cuanto: Number(e.monto) || 0, medio: e.medio_pago,
+      por: e.obs || e.detalle, sobro: false,
+    }));
+    return sobraron.concat(faltaron).sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }
+
+  function cuadrarElMes(p) {
+    const hechas = correccionesDe(p);
+    const medios = window.Datos.todo().listas
+      ? (window.Datos.todo().listas.medios_pago || [])
+      : [];
+    // Si por lo que sea no bajaron las listas, se ofrecen los medios que ya
+    // aparecen en el mes: siempre es mejor que un desplegable vacío.
+    const vistos = {};
+    p.ingresos.concat(p.egresos).forEach((f) => { if (f.medio_pago) vistos[f.medio_pago] = true; });
+    const opciones = (medios.length ? medios : Object.keys(vistos).sort());
+
+    const yaHecho = hechas.reduce((n, c) => n + (c.sobro ? c.cuanto : -c.cuanto), 0);
+
+    return `
+      ${hechas.length ? `
+        <ul class="renglones">
+          ${hechas.map((c) => `
+            <li class="renglon">
+              <span class="renglon__texto">
+                <span class="renglon__que">${c.sobro ? "Sobró" : "Faltó"} plata</span>
+                <span class="renglon__detalle">${esc(fecha(c.fecha))}
+                  · ${esc(c.medio || "—")}${c.por ? " · " + esc(c.por) : ""}</span>
+              </span>
+              <span class="renglon__cuanto${c.sobro ? "" : " negativo"}">
+                ${c.sobro ? "+" : "−"}${dinero(c.cuanto)}</span>
+            </li>`).join("")}
+        </ul>
+        <p class="nota">Ya corregido en este mes: <strong>${dinero(yaHecho)}</strong>.</p>`
+        : `<p class="nota">Todavía no hay ninguna corrección en este mes.</p>`}
+
+      <button class="boton boton--ancho separado no-imprimir" id="r-abrir-correccion">
+        Anotar una corrección</button>
+
+      <div id="r-correccion" class="no-imprimir" hidden>
+        <div class="campo">
+          <label for="c-que">¿Qué pasó?</label>
+          <select id="c-que">
+            <option value="falto">Faltó plata — hay menos de lo anotado</option>
+            <option value="sobro">Sobró plata — hay más de lo anotado</option>
+          </select>
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="c-monto">Cuánto <span class="obliga">•</span></label>
+            <input type="number" id="c-monto" inputmode="numeric" min="0" step="1" placeholder="0">
+          </div>
+          <div class="campo">
+            <label for="c-medio">Medio de pago</label>
+            <select id="c-medio">
+              ${opciones.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="campo">
+          <label for="c-por">Por qué</label>
+          <input type="text" id="c-por" maxlength="120"
+                 placeholder="una venta que no se anotó, un gasto que salió distinto…">
+          <span class="ayuda">Dentro de un mes, esto es lo único que va a explicar el número.</span>
+        </div>
+        <p class="nota">Se va a guardar con fecha <strong>${esc(diaDeCierre(periodo))}</strong>,
+          como un ingreso o un egreso normal, para poder verla y corregirla
+          después.</p>
+        <div class="acciones">
+          <button class="boton" id="c-guardar">Guardar la corrección</button>
+          <button class="boton boton--secundario" id="c-cancelar">Cancelar</button>
+        </div>
+        <p class="aviso aviso--error" id="c-error" hidden></p>
+      </div>`;
+  }
+
+  // Guardarla es escribir un ingreso o un egreso común y corriente. La única
+  // seña es el nombre «Corrección», que es lo que después permite listarlas
+  // acá y sacarlas de donde no van —las ventas, los productos más vendidos—.
+  async function guardarCorreccion() {
+    const falto = document.getElementById("c-que").value === "falto";
+    const monto = Math.abs(aNumero(document.getElementById("c-monto").value));
+    const medio = document.getElementById("c-medio").value || "";
+    const por = document.getElementById("c-por").value.trim();
+    const error = document.getElementById("c-error");
+
+    if (!monto) {
+      error.textContent = "Falta poner cuánto sobró o faltó.";
+      error.hidden = false;
+      return;
+    }
+    error.hidden = true;
+
+    const cuando = diaDeCierre(periodo);
+    const nota = por || (falto ? "Faltó plata" : "Sobró plata");
+
+    if (falto) {
+      await window.CVDB.guardar("egresos", {
+        id: window.Util.nuevoId(),
+        fecha: cuando,
+        rubro: window.Datos.CORRECCION,
+        detalle: "faltó plata",
+        persona: "",
+        cantidad: "",
+        monto: monto,
+        medio_pago: medio,
+        obs: nota,
+        mod: Date.now(),
+      });
+    } else {
+      // Un ingreso sin producto: registra la plata y no toca el stock, que es
+      // el mismo caso de las ventas viejas importadas.
+      await asegurarElCliente();
+      const id = window.Util.nuevoId();
+      await window.CVDB.guardar("ingresos", {
+        id: id,
+        venta: id,
+        fecha: cuando,
+        cliente: window.Datos.CORRECCION,
+        lista: "mayorista",
+        medio_pago: medio,
+        pagado: true,
+        cod: "",
+        cantidad: 0,
+        precio: 0,
+        subtotal: monto,
+        obs: nota,
+        mod: Date.now(),
+      });
+    }
+
+    await window.Datos.cargar();
+    window.Sincro.sincronizar(true);
+    window.Util.brindis((falto ? "Anotado que faltaron " : "Anotado que sobraron ") + dinero(monto));
+    pintar();
+  }
+
+  // La planilla valida el cliente contra la hoja de clientes: sin esta fila, la
+  // celda queda marcada como valor de afuera. Va dada de baja a propósito, así
+  // no aparece en el desplegable al cargar una venta.
+  async function asegurarElCliente() {
+    const hay = (window.Datos.todo().clientes || [])
+      .some((c) => c.nombre === window.Datos.CORRECCION);
+    if (hay) return;
+    await window.CVDB.guardar("clientes", {
+      nombre: window.Datos.CORRECCION,
+      localidad: "",
+      tipo: "compra",
+      medio_pago: "",
+      activo: false,
+      mod: Date.now(),
+    });
   }
 
   function bloque(titulo, nota, contenido, ancho) {
@@ -465,6 +670,7 @@ window.Resumen = (function () {
   function loQueDejo(ingresos) {
     const porCod = {};
     ingresos.forEach((f) => {
+      if (window.Datos.esCorreccion(f)) return;   // no tiene producto
       if (!porCod[f.cod]) porCod[f.cod] = { cod: f.cod, unidades: 0, vendido: 0 };
       porCod[f.cod].unidades += Number(f.cantidad) || 0;
       porCod[f.cod].vendido += Number(f.subtotal) || 0;
@@ -532,6 +738,7 @@ window.Resumen = (function () {
   function tablaProductos(ingresos) {
     const porCod = {};
     ingresos.forEach((f) => {
+      if (window.Datos.esCorreccion(f)) return;   // no tiene producto
       if (!porCod[f.cod]) porCod[f.cod] = { cod: f.cod, unidades: 0, plata: 0 };
       porCod[f.cod].unidades += Number(f.cantidad) || 0;
       porCod[f.cod].plata += Number(f.subtotal) || 0;

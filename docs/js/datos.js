@@ -369,8 +369,26 @@ window.Datos = (function () {
     };
   }
 
+  /* ------------------------------------------------------------------------
+     LAS CORRECCIONES DE FIN DE MES
+
+     A fin de mes la plata contada no siempre coincide con la anotada: una venta
+     que nadie cargó, un egreso que salió distinto, un vuelto que se perdió.
+     Esa diferencia se anota como una corrección, y se guarda donde va: si sobró
+     plata es un ingreso, si faltó es un egreso. No hay una tabla aparte ni un
+     ajuste invisible, porque la plata entró o salió de verdad.
+
+     Lo único que la distingue de una venta o de un gasto común es el nombre:
+     «Corrección» como cliente en los ingresos, «Corrección» como rubro en los
+     egresos. Tiene que ser el mismo texto en los dos lados, y por eso vive acá
+     y no en cada pantalla.
+     ------------------------------------------------------------------------ */
+  const CORRECCION = "Corrección";
+  const esCorreccion = (f) => !!f && (f.cliente === CORRECCION || f.rubro === CORRECCION);
+
   return {
     DEPOSITO, PRODUCCION, VENDIDO, MERMA, RESERVADAS,
+    CORRECCION, esCorreccion,
     cargar, hay, todo,
     producto, productosActivos, clientesActivos, localesDeConsignacion,
     persona, personasActivas, precioHora,

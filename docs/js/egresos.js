@@ -30,6 +30,9 @@ window.Egresos = (function () {
     "Insumos": ["envases", "verdura", "fruta", "condimentos", "etiquetas"],
     "Gastos Fijos": ["transporte", "alquiler"],
     "Inversión": ["equipamiento", "marca", "infraestructura", "administración"],
+    // Las correcciones de fin de mes se cargan desde el resumen, no desde acá,
+    // pero si alguien abre una para corregirla tiene que encontrar su lista.
+    "Corrección": ["faltó plata", "sobró plata"],
   };
 
   // El rubro que no tiene lista —«Otros Gastos»— sigue con texto libre: es

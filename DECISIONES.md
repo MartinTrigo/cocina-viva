@@ -1595,3 +1595,44 @@ cargado» sigue estando, primero en la lista.
 De paso, la línea de ajustes chicos del remito —tamaño y tinta— y la del orden
 del depósito son la misma cosa, así que pasaron a compartir estilo en
 `.ajustes-linea` en vez de tener cada una el suyo.
+
+## Cuadrar el mes
+
+A fin de mes la plata contada casi nunca coincide con la anotada: una venta que
+nadie cargó, un egreso que salió distinto, un vuelto. Antes esa diferencia no
+tenía dónde ir, así que se arrastraba: el mes siguiente arrancaba con un error
+de arriba y nadie sabía de cuándo venía.
+
+En el resumen, con un mes elegido, aparece **Cuadrar el mes**: se dice si sobró
+o faltó plata, cuánto, de qué medio de pago y por qué.
+
+**La corrección se guarda donde va, no en una tabla aparte.** Si sobró plata es
+un ingreso; si faltó, un egreso. La plata entró o salió de verdad, y esconderla
+en un ajuste invisible sería justamente lo que hace que después nadie entienda
+un número. Con esto, «Egresos por rubro» muestra *Corrección* como un rubro más
+y se ve de un vistazo cuánto hubo que emparchar.
+
+Lo único que la distingue de una venta o de un gasto común es el nombre:
+**`Corrección` como cliente** en los ingresos, **`Corrección` como rubro** en los
+egresos. Es el mismo texto de los dos lados y vive en `Datos.CORRECCION`, porque
+tres pantallas lo necesitan y si se escribiera a mano en cada una se despegarían.
+
+De ahí salen tres exclusiones, que son la parte fácil de olvidar:
+
+- no aparecen entre las **últimas ventas**, porque no tienen productos y al
+  tocarlas abrirían un formulario vacío;
+- no entran en **lo que más se vende** ni en el ranking por producto, porque no
+  tienen código y armarían una fila fantasma sin nombre;
+- sí entran en todos los totales, en el balance y en el cuadro por medio de
+  pago, que es para lo que existen.
+
+Dos detalles de plomería. El cliente `Corrección` se crea solo la primera vez y
+**dado de baja a propósito**: la planilla valida el cliente contra la hoja de
+clientes —sin esa fila la celda queda marcada como valor de afuera— pero dado de
+baja no aparece en el desplegable al cargar una venta. Y la fecha es el último
+día del mes que se cierra, salvo que ese mes todavía no haya terminado, en cuyo
+caso es hoy: fechar algo en el futuro descoloca cualquier cuenta que mire fechas.
+
+**Falta un paso a mano:** agregar `Corrección` como rubro en la hoja `listas`,
+columna B. Sin eso la planilla marca esas celdas con un triangulito de «valor
+fuera de la lista». No rompe nada y no hace falta tocar el código del servicio.

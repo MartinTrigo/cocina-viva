@@ -545,7 +545,11 @@ window.Ingresos = (function () {
   // una sola cosa con sus renglones adentro, que es como se cargó.
   function ventasArmadas() {
     const porId = {};
+    // Una corrección de fin de mes es un ingreso, pero no es una venta: no tiene
+    // productos ni cliente de verdad. Aparecería acá como una venta vacía que
+    // al tocarla abre un formulario sin nada.
     (window.Datos.todo().ingresos || []).forEach((f) => {
+      if (window.Datos.esCorreccion(f)) return;
       const id = f.venta || f.id;
       if (!porId[id]) {
         porId[id] = {
