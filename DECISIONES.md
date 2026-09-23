@@ -1420,3 +1420,35 @@ detrás. Devuelve todo eso como texto que se puede copiar.
 Que salga o no salga esa raya parte el problema en dos: si sale, lo que falla
 es el dibujo del remito; si no sale nada, no le está llegando. Sin eso no hay
 más que probar a ciegas.
+
+### Tercera vuelta: no era una impresora, eran dos
+
+El diagnóstico devolvió el dato que faltaba. La impresora **no se llama WXW01
+sino MXW01**, expone seis canales (`ae01` a `ae10`), y —lo importante— a la
+pregunta de siempre **no contestó absolutamente nada**.
+
+La MXW01 no es una variante rara de las clásicas: es **otra máquina**, con un
+protocolo que no se parece:
+
+| | clásicas (GB01, GT01, MX05…) | MXW01 |
+|---|---|---|
+| encabezado | `51 78` | `22 21` |
+| la imagen va por | `ae01`, mezclada con las órdenes | `ae03`, un canal aparte |
+| antes de imprimir | nada | **pide permiso**: dice cuántos renglones vienen y espera el sí |
+| al terminar | no avisa | avisa por `ae02` |
+| el calor | orden `0xAF`, 0–65535 | orden `0xA2`, un byte |
+
+Lo que pasó fue exactamente eso: le hablábamos en otro idioma. Escuchaba
+`51 78`, no entendía una palabra, no contestaba y no movía el papel. No estaba
+rota ni mal configurada.
+
+Ahora `impresora.js` habla los dos y **averigua solo cuál toca**: al conectar le
+pregunta en el idioma nuevo y espera un segundo y medio. Si contesta, es una
+MXW01; si no, es una clásica —ni se enteró de la pregunta, porque descarta todo
+lo que no empiece con `51 78`—. Preguntar no molesta a ninguna de las dos, que
+es lo que hace que la detección sea gratis.
+
+De yapa, la MXW01 cuenta por qué no imprime: sin papel, tapa abierta, papel
+atascado, recalentada, batería baja. Eso ahora se traduce y se muestra. Un papel
+que no sale porque la tapa quedó floja no tiene por qué parecer un error del
+programa.

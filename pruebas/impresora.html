@@ -62,15 +62,19 @@
   afirmar(crc8([]) === 0x00, "crc8 de nada = 00");
 
   caso("El armado de una orden");
-  function orden(cual, datos) {
+  // El encabezado es lo único que cambia entre las dos familias: 51 78 las
+  // clásicas, 22 21 la MXW01.
+  function armar(uno, dos, cual, datos) {
     const carga = Uint8Array.from(datos);
     const p = new Uint8Array(carga.length + 8);
-    p.set([0x51, 0x78, cual, 0x00, carga.length & 0xff, carga.length >> 8], 0);
+    p.set([uno, dos, cual, 0x00, carga.length & 0xff, carga.length >> 8], 0);
     p.set(carga, 6);
     p[6 + carga.length] = crc8(carga);
     p[7 + carga.length] = 0xff;
     return p;
   }
+  const orden = (cual, datos) => armar(0x51, 0x78, cual, datos);
+  const moderno = (cual, datos) => armar(0x22, 0x21, cual, datos);
   const arranque = hex(orden(0xa3, [0x00]));
   afirmar(arranque === "51 78 a3 00 01 00 00 00 ff",
           "«empezar a imprimir» sale igual a la publicada: " + arranque);
@@ -80,6 +84,41 @@
   const largo = hex(orden(0xa2, new Array(48).fill(0)));
   afirmar(largo.startsWith("51 78 a2 00 30 00"), "un renglón declara 48 bytes (0x30)");
   afirmar(largo.split(" ").length === 56, "y el paquete entero mide 56 bytes");
+
+  caso("La MXW01, que habla distinto");
+  // Es la nuestra, y es la que no imprimía: escuchaba 51 78 y no entendía una
+  // palabra. Su encabezado es 22 21 y antes de imprimir pide permiso diciendo
+  // cuántos renglones vienen.
+  const comoEstas = hex(moderno(0xa1, [0x00]));
+  afirmar(comoEstas === "22 21 a1 00 01 00 00 00 ff",
+          "«¿cómo estás?» sale con el encabezado nuevo: " + comoEstas);
+  afirmar(comoEstas.slice(0, 5) !== "51 78", "y NO con el viejo, que es lo que fallaba");
+
+  const pedirPermiso = hex(moderno(0xa9, [600 & 0xff, 600 >> 8, 0x30, 0x00]));
+  afirmar(pedirPermiso.startsWith("22 21 a9 00 04 00 58 02 30 00"),
+          "el pedido de permiso lleva los 600 renglones en dos bytes: " + pedirPermiso);
+  afirmar(hex(moderno(0xa2, [0x5d])).startsWith("22 21 a2 00 01 00 5d"),
+          "y el calor va por la orden a2");
+
+  caso("Lo que la impresora cuenta de sí misma");
+  // El byte 6 de lo que contesta dice por qué no imprime. Sin esto, un papel
+  // que no sale porque la tapa quedó floja parece un error del programa.
+  function queLePasa(estado) {
+    if (!estado || estado.length < 7) return "";
+    const b = estado[6];
+    if (b & 0x04) return "No hay papel.";
+    if (b & 0x08) return "La tapa está abierta.";
+    if (b & 0x02) return "El papel está atascado.";
+    if (b & 0x20) return "Se recalentó. Esperá un minuto.";
+    if (b & 0x10) return "La batería está muy baja.";
+    return "";
+  }
+  const estadoCon = (b) => Uint8Array.from([0, 0, 0, 0, 0, 0, b]);
+  afirmar(queLePasa(estadoCon(0x00)) === "", "todo bien no dice nada");
+  afirmar(/papel/.test(queLePasa(estadoCon(0x04))), "sin papel lo dice");
+  afirmar(/tapa/.test(queLePasa(estadoCon(0x08))), "la tapa abierta lo dice");
+  afirmar(/recalent/.test(queLePasa(estadoCon(0x20))), "el recalentamiento lo dice");
+  afirmar(queLePasa(estadoCon(0x01)) === "", "y estar imprimiendo no es un problema");
 
   caso("Los puntos del renglón");
   // Un lienzo de 384 de ancho con el primer punto negro y el noveno negro.
@@ -117,8 +156,10 @@
 
     caso("La puerta de entrada");
     afirmar(typeof I.hay === "function" && typeof I.imprimir === "function"
-            && typeof I.conectar === "function" && typeof I.olvidar === "function",
+            && typeof I.conectar === "function" && typeof I.olvidar === "function"
+            && typeof I.diagnostico === "function" && typeof I.familia === "function",
             "el módulo expone lo que usa el remito");
+    afirmar(I.familia() === null, "y todavía no sabe de qué familia es");
     afirmar(I.ANCHO === 384, "y dice de qué ancho imprime");
     afirmar(I.conectada() === false, "arranca sin impresora conectada");
     linea("\n¿este navegador maneja Bluetooth? " + (I.hay() ? "sí" : "no"), "caso");
