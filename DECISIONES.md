@@ -1385,3 +1385,38 @@ De paso, los tres lugares que sacan papel —la venta, la entrega en consignaci�
 y el recibo de honorarios— tenían cada uno su copia de los botones, iguales
 salvo por el nombre de los ids. Ya había pasado que una mejora entrara en una
 sola de las tres. Ahora los arma `Remito.mostrar()`, una vez.
+
+### Segunda vuelta: conectaba, decía que sí, y no salía nada
+
+La primera versión conectó con la impresora —una **WXW01**—, mandó todo sin un
+error y avisó «listo». No salió papel. Ese es el peor síntoma que hay: por
+Bluetooth nadie avisa si la máquina entendió los bytes o los tiró a la basura.
+
+Comparando contra la implementación de referencia aparecieron tres cosas que yo
+había tomado por opcionales y no lo son:
+
+1. **Hay que suscribirse a lo que la impresora contesta (`0xAE02`) antes de
+   mandarle nada.** Varias de estas máquinas no arrancan hasta que alguien las
+   escucha; es un patrón común en firmware BLE barato.
+2. **No se le manda una escritura por orden.** Se junta todo en una tira de
+   bytes y se escribe de a 200, con 20 ms entre tanda y tanda. Ella lee un
+   chorro, no paquetes sueltos.
+3. **Ella pide pausa cuando se le llena la memoria**, y lo avisa por `0xAE02`
+   con un `0xAE`/`0x10`. Si uno no escucha, le sigue mandando encima.
+
+Y una cuarta, de la tabla de modelos conocidos: en varios (MX05, MX06, MX08,
+MX09, MX10) **la orden de sacar papel no hace nada**. Aceptan el `0xA1` y no
+mueven un milímetro. El camino que funciona en todos es mandarles renglones en
+blanco, que es por donde sale la tinta. Ahora se hace así siempre.
+
+### El diagnóstico
+
+Aun con todo eso, «conecta y no sale nada» puede tener diez causas. Después de
+intentar imprimir aparece **«¿No salió? Probar la impresora»**, que lista los
+canales que expone el aparato con lo que cada uno permite, se suscribe, le
+pregunta cómo está, y le manda una **raya negra** con renglones en blanco
+detrás. Devuelve todo eso como texto que se puede copiar.
+
+Que salga o no salga esa raya parte el problema en dos: si sale, lo que falla
+es el dibujo del remito; si no sale nada, no le está llegando. Sin eso no hay
+más que probar a ciegas.

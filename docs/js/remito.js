@@ -443,10 +443,15 @@ window.Remito = (function () {
           + "<strong>Guardar</strong> y abrir el archivo desde la app de la impresora."}</p>
       ${conBluetooth
         ? '<button class="boton boton--secundario boton--chico remito__otra" id="rm-otra">Otra impresora</button>'
+          + '<button class="boton boton--secundario boton--chico remito__otra" id="rm-probar" hidden>'
+          + '¿No salió? Probar la impresora</button>'
+          + '<pre class="remito__informe" id="rm-informe" hidden></pre>'
         : ""}`;
 
     const estado = caja.querySelector("#rm-estado");
     const decir = (t) => { estado.textContent = t; };
+    const probar = caja.querySelector("#rm-probar");
+    const informe = caja.querySelector("#rm-informe");
 
     const deSistema = () => imprimir(datos);
 
@@ -468,9 +473,35 @@ window.Remito = (function () {
               : "No se pudo imprimir: " + m);
           } finally {
             boton.disabled = false;
+            // Recién después de intentarlo tiene sentido ofrecer la prueba, y
+            // es justo el momento en que hace falta.
+            if (probar) probar.hidden = false;
           }
         }
       : deSistema;
+
+    /* --------------------------------------------------------------------
+       Cuando la impresora conecta, dice que sí a todo y no sale un papel, no
+       hay por dónde agarrarla: el Bluetooth no avisa si la máquina entendió o
+       tiró los bytes a la basura. Esto le pregunta lo que se puede preguntar
+       y le manda una raya negra. Si la raya sale, el problema está en el
+       dibujo; si no sale nada, no le está llegando.
+       -------------------------------------------------------------------- */
+    if (probar) {
+      probar.onclick = async (ev) => {
+        const boton = ev.currentTarget;
+        boton.disabled = true;
+        informe.hidden = false;
+        informe.textContent = "Probando…";
+        try {
+          informe.textContent = await window.Impresora.diagnostico(decir);
+        } catch (err) {
+          informe.textContent = "La prueba se cortó: " + String((err && err.message) || err);
+        } finally {
+          boton.disabled = false;
+        }
+      };
+    }
 
     caja.querySelector("#rm-compartir").onclick = async () => {
       const r = await compartir(datos);

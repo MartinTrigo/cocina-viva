@@ -872,7 +872,13 @@ h3.subtitulo {
 /* Un botón secundario que acompaña, no que manda: el de agregar otro producto
    no compite con el de guardar. */
 .boton--chico { min-height: 38px; padding: 8px 12px; font-size: 14px; }
-.remito__otra { margin-top: 10px; }
+.remito__otra { margin-top: 10px; margin-right: 8px; }
+.remito__informe {
+  margin-top: 10px; padding: 10px; border-radius: 8px;
+  background: var(--fondo); border: 1px solid var(--borde); color: var(--texto);
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap; word-break: break-word; user-select: text;
+}
 
 /* ==========================================================================
    Aviso de versión nueva
