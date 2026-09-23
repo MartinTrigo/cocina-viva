@@ -41,6 +41,33 @@ window.Stock = (function () {
     },
   };
 
+  // Cómo se ordena la tabla del depósito. Por defecto, de lo que más hay a lo
+  // que menos: es como lo miran ellas, primero lo que sobra y al final lo que
+  // se acabó. Los demás órdenes están porque cada una busca otra cosa —una
+  // mira qué reponer, otra cuánta plata hay parada— y la elección queda
+  // guardada en el teléfono.
+  const ORDENES = {
+    cantidad: { dice: "Más cantidad primero", como: (a, b) => b.cantidad - a.cantidad },
+    valor:    { dice: "Más valor primero",    como: (a, b) => b.subtotal - a.subtotal },
+    precio:   { dice: "Más caro primero",     como: (a, b) => b.precio - a.precio },
+    nombre:   { dice: "Por nombre",            como: (a, b) => a.nombre.localeCompare(b.nombre, "es") },
+  };
+  const ORDEN_POR_DEFECTO = "cantidad";
+
+  function orden() {
+    try {
+      const guardado = localStorage.getItem("cv-orden-stock");
+      if (guardado && ORDENES[guardado]) return guardado;
+    } catch (err) { /* da igual */ }
+    return ORDEN_POR_DEFECTO;
+  }
+
+  function ponerOrden(cual) {
+    if (!ORDENES[cual]) return orden();
+    try { localStorage.setItem("cv-orden-stock", cual); } catch (err) { /* da igual */ }
+    return cual;
+  }
+
   let vista = null;
   let ir = null;
   let que = "produccion";
@@ -259,6 +286,11 @@ window.Stock = (function () {
 
     if (!filas.length) return `<p class="vacio">Todavía no hay productos en el catálogo.</p>`;
 
+    // El desempate por nombre es para que dos productos con la misma cantidad
+    // no se cambien de lugar entre una mirada y la siguiente.
+    const comoOrdena = ORDENES[orden()].como;
+    filas.sort((a, b) => comoOrdena(a, b) || a.nombre.localeCompare(b.nombre, "es"));
+
     return `
       <div class="cifras">
         <div class="cifra cifra--entra">
@@ -269,6 +301,14 @@ window.Stock = (function () {
           <span class="cifra__que">Valor a precio mayorista</span>
           <span class="cifra__cuanto">${dinero(total)}</span>
         </div>
+      </div>
+
+      <div class="ajustes-linea no-imprimir">
+        <label for="s-orden">Ordenar</label>
+        <select id="s-orden">
+          ${Object.keys(ORDENES).map((k) => `
+            <option value="${k}"${k === orden() ? " selected" : ""}>${esc(ORDENES[k].dice)}</option>`).join("")}
+        </select>
       </div>
 
       <div class="tabla-envoltorio">
@@ -453,6 +493,13 @@ window.Stock = (function () {
         resumenVivo();
       };
     });
+
+    // El orden de la tabla del depósito. Rehace la pantalla entera, que es lo
+    // más simple y acá no cuesta nada: es una tabla de veinte renglones.
+    const comoOrdenar = document.getElementById("s-orden");
+    if (comoOrdenar) {
+      comoOrdenar.onchange = () => { ponerOrden(comoOrdenar.value); pintar(); };
+    }
 
     document.getElementById("s-cod").onchange = resumenVivo;
     document.getElementById("s-cantidad").oninput = resumenVivo;

@@ -16,7 +16,7 @@
 // ==========================================================================
 
 window.Resumen = (function () {
-  const { esc, dinero, numero, mesDe, mesLargo } = window.Util;
+  const { esc, dinero, numero, mesDe, mesLargo, hoy } = window.Util;
 
   const VERDE = "#4a6b3a";
   const TIERRA = "#a9722f";
@@ -27,10 +27,25 @@ window.Resumen = (function () {
   const PALETA = ["#8c0730", "#a9722f", "#4a6b3a", "#6b6560", "#b4143f", "#7a6a3f", "#5b7f8c"];
 
   let vista = null;
-  let periodo = "";      // "" = todo, o "2026-08"
+
+  // Arranca en el mes en curso y no en todo lo cargado. La pregunta de todos
+  // los días es cómo viene este mes; el acumulado desde que se empezó se mira
+  // de vez en cuando. Se cambia con el selector, y lo elegido queda mientras
+  // la app esté abierta.
+  let periodo = null;    // null = todavía nadie eligió; "" = todo; o "2026-08"
+
+  function periodoInicial() {
+    const lista = meses();                  // del más nuevo al más viejo
+    const actual = mesDe(hoy());
+    if (lista.indexOf(actual) >= 0) return actual;
+    // Si el mes en curso todavía no tiene nada cargado, el último que sí:
+    // una pantalla en blanco no le dice nada a nadie.
+    return lista.length ? lista[0] : "";
+  }
 
   async function render(contenedor, ruta, navegar) {
     vista = contenedor;
+    if (periodo === null) periodo = periodoInicial();
     pintar();
     return { titulo: "Resumen", subtitulo: "Números del emprendimiento" };
   }

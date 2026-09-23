@@ -503,7 +503,7 @@ window.Remito = (function () {
         : "<strong>Imprimir</strong> abre el diálogo del sistema. Este navegador no "
           + "maneja Bluetooth —en iPhone no se puede—, así que para la térmica hay que "
           + "<strong>Guardar</strong> y abrir el archivo desde la app de la impresora."}</p>
-      <div class="remito__ajustes">
+      <div class="ajustes-linea">
         <label for="rm-tamano">Tamaño</label>
         <select id="rm-tamano">${opciones(Object.keys(ESPACIOS), tamano())}</select>
         ${conBluetooth

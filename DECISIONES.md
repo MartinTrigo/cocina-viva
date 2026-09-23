@@ -1571,3 +1571,27 @@ falló seis veces seguidas.
 
 El `VERSION` también es lo que se lee en el pie de la app y en la pantalla de
 arranque, así que ahora «¿se actualizó?» se contesta mirando.
+
+## Ordenar el depósito, y el resumen abriendo en el mes en curso
+
+Dos cosas que se pidieron juntas y tienen el mismo fondo: la pantalla arrancaba
+mostrando lo que era cómodo de programar, no lo que se mira primero.
+
+**El depósito** salía en el orden del catálogo, que no le importa a nadie. Ahora
+arranca **de lo que más hay a lo que menos**, con los que están en cero al final.
+Y se puede cambiar: por cantidad, por valor, por precio o por nombre. Los otros
+tres están porque cada una busca algo distinto —una mira qué reponer, otra
+cuánta plata hay parada—, y la elección queda guardada en el teléfono.
+
+El desempate es siempre por nombre. Sin eso, dos productos con la misma cantidad
+se cambian de lugar entre una mirada y la siguiente, y parece que algo se movió.
+
+**El resumen** abría en «todo lo cargado». La pregunta de todos los días es cómo
+viene *este* mes; el acumulado desde que se empezó se mira de vez en cuando.
+Ahora arranca en el mes en curso, y si ese mes todavía no tiene nada cargado cae
+en el último que sí: una pantalla en blanco no le dice nada a nadie. «Todo lo
+cargado» sigue estando, primero en la lista.
+
+De paso, la línea de ajustes chicos del remito —tamaño y tinta— y la del orden
+del depósito son la misma cosa, así que pasaron a compartir estilo en
+`.ajustes-linea` en vez de tener cada una el suyo.
