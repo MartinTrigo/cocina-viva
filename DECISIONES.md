@@ -1636,3 +1636,36 @@ caso es hoy: fechar algo en el futuro descoloca cualquier cuenta que mire fechas
 **Falta un paso a mano:** agregar `Corrección` como rubro en la hoja `listas`,
 columna B. Sin eso la planilla marca esas celdas con un triangulito de «valor
 fuera de la lista». No rompe nada y no hace falta tocar el código del servicio.
+
+## Una revisión que no fuera leer código
+
+Se pidió revisar todo para no tener que descubrir los errores a fuerza de
+usarla. Leer el código de nuevo no sirve para eso: lo que se rompe no está en el
+código de una pantalla, está en lo que la rodea.
+
+Así que se armó **`pruebas/pantallas.html`**, que levanta la app entera con datos
+parecidos a los reales, entra a las ocho pantallas y después **las usa**: carga
+una venta por el formulario, la borra y comprueba que el stock vuelva, carga un
+egreso, corrige el stock por conteo, suma horas, entra a un local de
+consignación y cuadra un mes. Setenta y seis comprobaciones.
+
+Encontró lo que tenía que encontrar. **`egresos.js` llamaba a
+`leerDelFormulario()`, que vive en `ingresos.js`.** Saltaba cada vez que alguien
+cambiaba el detalle de un egreso. No se veía leyendo el archivo, el navegador no
+lo marca al cargar, y como `guardar()` vuelve a leer el formulario antes de
+escribir, el egreso se guardaba igual: el error era invisible salvo por la
+consola, que nadie mira desde un teléfono.
+
+De ahí salió **`pruebas/llamadas.py`**, que busca esa clase de error en todos los
+archivos de una: llamadas a funciones que no existen. Se comprobó que encuentra
+el bug original volviéndolo a poner. Hoy dice `sospechosas: 0`.
+
+Lo demás pasó: los tres bancos en verde, y el libro auditado contra la planilla
+—189 ingresos, 25 egresos, ninguna fila sin fecha, los totales del resumen
+coinciden al peso con la suma de las filas, ningún código huérfano, y el `Code.gs`
+nuevo efectivamente publicado (la hoja `borrados` ya tiene sus cuatro columnas)—.
+
+Queda una sola cosa fuera de lugar, y no es del programa: **tres productos con
+stock negativo en el depósito** (`KIM350` −3, `VIE500` −6, `VIM500` −2). Son
+ventas por encima de lo que dijo el último conteo. Se arregla contando esos tres
+y usando *Stock → Corrección por conteo*.

@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Banco de pruebas · las pantallas</title>
+<link rel="stylesheet" href="../docs/css/estilos.css">
+<style>
+  #salida { font: 13px/1.5 ui-monospace, monospace; background: #111; color: #ddd;
+            padding: 14px; margin: 0; white-space: pre-wrap; }
+  #salida .ok { color: #6f6; }
+  #salida .mal { color: #f66; font-weight: bold; }
+  #salida .caso { color: #fc6; }
+  #vista { padding: 12px; }
+</style>
+</head>
+<body>
+<pre id="salida">corriendo…</pre>
+<div id="vista" class="pantalla"></div>
+
+<script src="../docs/js/util.js"></script>
+<script>
+// ==========================================================================
+// Las pantallas, todas, con datos de verdad
+//
+// Los otros dos bancos miran de cerca: la sincronización y los bytes de la
+// impresora. Este mira de lejos: levanta la app entera con un juego de datos
+// parecido al real y entra a cada pantalla, una por una.
+//
+// Existe porque las pantallas se rompen por lo que las rodea, no por sí
+// mismas: un dato que llega con una forma que no se esperaba, una función que
+// cambió de nombre en otro archivo, un campo que quedó sin migrar. Nada de eso
+// se ve leyendo el código de una pantalla sola, y probarlas a mano son veinte
+// minutos de tocar botones cada vez que se toca algo.
+// ==========================================================================
+
+// Lo que la app espera encontrar alrededor. El acceso y la red no se prueban
+// acá —de eso se ocupa banco.html— así que se contestan que sí y listo.
+window.Acceso = {
+  tieneAcceso: () => true, credencial: () => "DE-MENTIRA", dispositivo: () => "banco",
+  persona: () => "banco", guardarAcceso: () => {}, borrarCredencial: () => {},
+};
+
+window.__errores = [];
+window.addEventListener("error", (e) => window.__errores.push("error: " + e.message));
+window.addEventListener("unhandledrejection", (e) =>
+  window.__errores.push("promesa colgada: " + (e.reason && e.reason.message || e.reason)));
+</script>
+
+<script src="../docs/js/db.js"></script>
+<script src="../docs/js/datos.js"></script>
+<script src="../docs/js/impresora.js"></script>
+<script src="../docs/js/remito.js"></script>
+<script src="../docs/js/productos.js"></script>
+<script src="../docs/js/ingresos.js"></script>
+<script src="../docs/js/clientes.js"></script>
+<script src="../docs/js/consignacion.js"></script>
+<script src="../docs/js/egresos.js"></script>
+<script src="../docs/js/resumen.js"></script>
+<script src="../docs/js/honorarios.js"></script>
+<script src="../docs/js/stock.js"></script>
+
+<script>
+(async function () {
+  const salida = document.getElementById("salida");
+  const vista = document.getElementById("vista");
+  let fallados = 0;
+  salida.textContent = "";
+  const linea = (t, c) => { salida.innerHTML += '<span class="' + (c || "") + '">' + t + "</span>\n"; };
+  const caso = (t) => linea("\n▸ " + t, "caso");
+  const afirmar = (bien, t) => {
+    if (!bien) fallados++;
+    linea((bien ? "   ok   " : "   MAL  ") + t, bien ? "ok" : "mal");
+  };
+  const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // La red no se toca: acá se prueban las pantallas, no la sincronización.
+  window.Sincro = Object.assign(window.Sincro || {}, {
+    sincronizar: async () => ({ ok: true }),
+    estado: async () => ({ pendientes: 0 }),
+    hayServicio: () => false,
+    alCambiar: () => {},
+  });
+
+  // ---------- los datos ----------
+
+  const HOY = window.Util.hoy();
+  const MES = HOY.slice(0, 7);
+  const diaDe = (d) => MES + "-" + String(d).padStart(2, "0");
+
+  const PRODUCTOS = [
+    { cod: "CRT650", producto: "chucrut", presentacion: "650 g", costo: 4200, pmayor: 10200, pminor: 13000, activo: true, mod: 1 },
+    { cod: "KIM350", producto: "kimchi", presentacion: "350 g", costo: 2800, pmayor: 6800, pminor: 8800, activo: true, mod: 1 },
+    { cod: "VIM500", producto: "vinagre de manzana", presentacion: "500 ml", costo: 0, pmayor: 7100, pminor: 9200, activo: true, mod: 1 },
+    { cod: "ZAM700", producto: "zapallo en almíbar", presentacion: "700 g", costo: 5000, pmayor: 11250, pminor: 14500, activo: true, mod: 1 },
+    { cod: "KAL180", producto: "untable de kale", presentacion: "180 g", costo: 2000, pmayor: 5900, pminor: 7600, activo: false, mod: 1 },
+  ];
+  const CLIENTES = [
+    { nombre: "amarantus", localidad: "El Bolsón", tipo: "compra", medio_pago: "Brubank", activo: true, mod: 1 },
+    { nombre: "el molino san martin", localidad: "El Bolsón", tipo: "consignación", medio_pago: "Efectivo", activo: true, mod: 1 },
+    { nombre: "lahuan", localidad: "Lago Puelo", tipo: "consignación", medio_pago: "Efectivo", activo: true, mod: 1 },
+    { nombre: "bicho sano", localidad: "El Hoyo", tipo: "compra", medio_pago: "Efectivo", activo: false, mod: 1 },
+  ];
+  const PERSONAS = [
+    { nombre: "luna", cargo: "producción", precio_hora: 4500, activo: true, mod: 1 },
+    { nombre: "melí", cargo: "ventas", precio_hora: 4500, activo: true, mod: 1 },
+  ];
+  const INGRESOS = [
+    // una venta común de dos renglones, cobrada
+    { id: "i1", venta: "v1", fecha: diaDe(3), cliente: "amarantus", lista: "mayorista",
+      medio_pago: "Brubank", pagado: true, cod: "CRT650", cantidad: 3, precio: 10200, subtotal: 30600, obs: "", mod: 10 },
+    { id: "i2", venta: "v1", fecha: diaDe(3), cliente: "amarantus", lista: "mayorista",
+      medio_pago: "Brubank", pagado: true, cod: "KIM350", cantidad: 2, precio: 6800, subtotal: 13600, obs: "", mod: 11 },
+    // una sin cobrar
+    { id: "i3", venta: "v2", fecha: diaDe(8), cliente: "lahuan", lista: "mayorista",
+      medio_pago: "Efectivo", pagado: false, cod: "VIM500", cantidad: 4, precio: 7100, subtotal: 28400, obs: "falta cobrar", mod: 12 },
+    // una del mes pasado, para que haya más de un mes
+    { id: "i4", venta: "v3", fecha: "2026-07-15", cliente: "amarantus", lista: "minorista",
+      medio_pago: "Efectivo", pagado: true, cod: "ZAM700", cantidad: 1, precio: 14500, subtotal: 14500, obs: "", mod: 13 },
+    // y una CORRECCIÓN, que es lo último que se agregó
+    { id: "i5", venta: "i5", fecha: diaDe(28), cliente: "Corrección", lista: "mayorista",
+      medio_pago: "Efectivo", pagado: true, cod: "", cantidad: 0, precio: 0, subtotal: 5000,
+      obs: "una venta que no se anotó", mod: 14 },
+  ];
+  const EGRESOS = [
+    { id: "e1", fecha: diaDe(2), rubro: "Insumos", detalle: "verdura", persona: "",
+      cantidad: "20 k", monto: 48000, medio_pago: "Efectivo", obs: "", mod: 20 },
+    { id: "e2", fecha: diaDe(9), rubro: "Gastos Fijos", detalle: "transporte", persona: "",
+      cantidad: "", monto: 20000, medio_pago: "Efectivo", obs: "", mod: 21 },
+    { id: "e3", fecha: diaDe(20), rubro: "Honorarios", detalle: "hs luna", persona: "luna",
+      cantidad: "", monto: 90000, medio_pago: "Brubank", obs: "Liquidación", mod: 22 },
+    { id: "e4", fecha: diaDe(29), rubro: "Corrección", detalle: "faltó plata", persona: "",
+      cantidad: "", monto: 2500, medio_pago: "Efectivo", obs: "un gasto que salió distinto", mod: 23 },
+  ];
+  const MOVIMIENTOS = [
+    { id: "m1", fecha: diaDe(1), tipo: "ajuste", cod: "CRT650", cantidad: 40, desde: "", hacia: "DEPOSITO", ref: "conteo", obs: "conteo", mod: 30 },
+    { id: "m2", fecha: diaDe(1), tipo: "ajuste", cod: "KIM350", cantidad: 25, desde: "", hacia: "DEPOSITO", ref: "conteo", obs: "conteo", mod: 31 },
+    { id: "m3", fecha: diaDe(1), tipo: "ajuste", cod: "VIM500", cantidad: 12, desde: "", hacia: "DEPOSITO", ref: "conteo", obs: "conteo", mod: 32 },
+    { id: "m4", fecha: diaDe(3), tipo: "venta", cod: "CRT650", cantidad: 3, desde: "DEPOSITO", hacia: "VENDIDO", ref: "v1", obs: "amarantus", mod: 33 },
+    { id: "m5", fecha: diaDe(5), tipo: "entrega", cod: "KIM350", cantidad: 6, desde: "DEPOSITO", hacia: "el molino san martin", ref: "", obs: "", mod: 34 },
+    { id: "m6", fecha: diaDe(6), tipo: "merma", cod: "CRT650", cantidad: 1, desde: "DEPOSITO", hacia: "MERMA", ref: "", obs: "se rompió", mod: 35 },
+  ];
+  const HORAS = [
+    { id: "h1", fecha: diaDe(4), persona: "luna", actividad: "producción", horas: 6, obs: "", mod: 40 },
+    { id: "h2", fecha: diaDe(11), persona: "melí", actividad: "ventas", horas: 4, obs: "", mod: 41 },
+  ];
+
+  async function sembrar() {
+    await new Promise((r) => {
+      const p = indexedDB.deleteDatabase("cocinaviva");
+      p.onsuccess = p.onerror = p.onblocked = () => r();
+    });
+    await window.CVDB.guardarVarios("productos", PRODUCTOS);
+    await window.CVDB.guardarVarios("clientes", CLIENTES);
+    await window.CVDB.guardarVarios("personas", PERSONAS);
+    await window.CVDB.guardarVarios("ingresos", INGRESOS);
+    await window.CVDB.guardarVarios("egresos", EGRESOS);
+    await window.CVDB.guardarVarios("movimientos", MOVIMIENTOS);
+    await window.CVDB.guardarVarios("horas", HORAS);
+    window.CVDB.listas = async () => ({
+      medios_pago: ["Efectivo", "Brubank", "MP Luna", "MP Melí"],
+      rubros: ["Insumos", "Gastos Fijos", "Honorarios", "Inversión", "Otros Gastos", "Corrección"],
+    });
+    await window.Datos.cargar();
+  }
+
+  // ---------- el recorrido ----------
+
+  const ir = () => {};
+  const texto = () => vista.textContent.replace(/\s+/g, " ");
+
+  async function entrar(nombre, modulo, ruta) {
+    vista.innerHTML = "";
+    const antes = window.__errores.length;
+    let cabecera = null, roto = null;
+    try {
+      cabecera = await modulo.render(vista, ruta || nombre, ir);
+    } catch (err) {
+      roto = String((err && err.stack) || err);
+    }
+    await esperar(60);
+    const nuevos = window.__errores.slice(antes);
+    afirmar(!roto, nombre + ": se dibuja sin romperse" + (roto ? " → " + roto.slice(0, 220) : ""));
+    afirmar(!nuevos.length, nombre + ": sin errores sueltos" + (nuevos.length ? " → " + nuevos.join(" | ") : ""));
+    afirmar(!!(cabecera && cabecera.titulo), nombre + ": devuelve su encabezado"
+            + (cabecera ? " (" + cabecera.titulo + ")" : ""));
+    afirmar(vista.innerHTML.length > 200, nombre + ": dibuja algo de verdad");
+    return cabecera;
+  }
+
+  try {
+    await sembrar();
+
+    caso("Los datos cargan");
+    const d = window.Datos.todo();
+    afirmar(d.productos.length === 5, "5 productos");
+    afirmar(d.ingresos.length === 5, "5 renglones de ingreso");
+    afirmar(d.egresos.length === 4, "4 egresos");
+    afirmar(window.Datos.stockDeposito().CRT650 === 36, "el depósito calcula: 40 − 3 − 1 = "
+            + window.Datos.stockDeposito().CRT650);
+    afirmar(window.Datos.stockEn("el molino san martin").KIM350 === 6, "y lo que está en la calle también");
+
+    caso("Cada pantalla se dibuja");
+    await entrar("Ingresos", window.Ingresos);
+    await entrar("Egresos", window.Egresos);
+    await entrar("Consignación", window.Consignacion, "consignacion");
+    await entrar("Stock", window.Stock);
+    await entrar("Productos", window.Productos);
+    await entrar("Clientes", window.Clientes);
+    await entrar("Honorarios", window.Honorarios);
+    await entrar("Resumen", window.Resumen);
+
+    caso("Las correcciones no se cuelan donde no van");
+    await entrar("Ingresos", window.Ingresos);
+    afirmar(texto().indexOf("Corrección") < 0,
+            "no figuran entre las ventas");
+    await entrar("Resumen", window.Resumen);
+    const enResumen = texto();
+    afirmar(enResumen.indexOf("Corrección") >= 0, "pero sí en el resumen");
+    afirmar(enResumen.indexOf("Cuadrar el mes") >= 0, "y está el bloque para cuadrar");
+
+    caso("El resumen abre en el mes en curso");
+    const sel = document.getElementById("r-periodo");
+    afirmar(!!sel, "hay selector de período");
+    afirmar(sel && sel.value === MES, "y arranca en " + MES + ": " + (sel && sel.value));
+
+    caso("El depósito viene ordenado de mayor a menor");
+    await entrar("Stock", window.Stock);
+    const cant = Array.from(document.querySelectorAll("#vista .tabla tbody tr"))
+      .map((tr) => Number(tr.querySelectorAll("td")[1].textContent.replace(/\D/g, "")) || 0);
+    afirmar(cant.length > 1, "hay tabla de depósito: " + cant.length + " renglones");
+    afirmar(cant.every((n, i) => i === 0 || cant[i - 1] >= n),
+            "y va de mayor a menor: " + cant.join(", "));
+    afirmar(!!document.getElementById("s-orden"), "con su selector de orden");
+
+    caso("El remito se arma y mide lo que tiene que medir");
+    const venta = {
+      titulo: "Remito", numero: "1", fecha: HOY, cliente: "amarantus",
+      etiquetaCliente: "Entregado a", conPrecios: true,
+      lineas: [{ cod: "CRT650", nombre: "chucrut 650 g", cantidad: 3, precio: 10200, subtotal: 30600 }],
+      total: 30600, leyenda: "", obs: "",
+    };
+    const lienzo = await window.Remito.dibujar(venta, 1);
+    afirmar(lienzo.width === 384, "384 puntos de ancho para la térmica: " + lienzo.width);
+    afirmar(lienzo.height > 100, "y alto razonable: " + lienzo.height);
+    vista.innerHTML = "";
+    await window.Remito.mostrar(vista, venta, "muestra");
+    afirmar(!!document.getElementById("rm-imprimir"), "los botones del remito están");
+    afirmar(!!document.getElementById("rm-tamano"), "y el selector de tamaño");
+
+    /* --------------------------------------------------------------------
+       De acá para abajo ya no se mira si la pantalla se dibuja, sino si SIRVE:
+       se llenan los formularios y se toca guardar, como lo hacen ellas. Es la
+       única forma de agarrar un botón que no hace nada —que es la clase de
+       error que no se ve leyendo el código ni mirando la pantalla—.
+       -------------------------------------------------------------------- */
+
+    const pon = (id, valor, evento) => {
+      const e = vista.querySelector(id);
+      if (!e) return false;
+      e.value = valor;
+      e.dispatchEvent(new Event(evento || "change", { bubbles: true }));
+      return true;
+    };
+    const decir = (id) => {
+      const e = vista.querySelector(id);
+      return e ? e.textContent.replace(/\s+/g, " ").trim() : "";
+    };
+
+    caso("Cargar una venta, de punta a punta");
+    await window.Ingresos.render(vista, "ingresos", ir);
+    const depAntes = window.Datos.stockDeposito().CRT650;
+    const ingAntes = (await window.CVDB.todos("ingresos")).length;
+    const movAntes = (await window.CVDB.todos("movimientos")).length;
+
+    pon("#v-cliente", "amarantus");
+    const busca = vista.querySelector(".v-busca");
+    busca.value = "chucrut";
+    busca.dispatchEvent(new Event("input", { bubbles: true }));
+    await esperar(80);
+    const opcion = vista.querySelector(".buscador__op");
+    afirmar(!!opcion && opcion.dataset.cod === "CRT650",
+            "el buscador encuentra el chucrut: " + (opcion && opcion.dataset.cod));
+    opcion.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    await esperar(60);
+    pon(".v-cant", "2", "input");
+    await esperar(60);
+    afirmar(decir("#v-total").indexOf("20.400") >= 0,
+            "calcula el total mientras se tipea: " + decir("#v-total"));
+
+    // Sin medio de pago tiene que negarse, y decir por qué.
+    vista.querySelector("#btn-guardar").click();
+    await esperar(300);
+    afirmar(/medio de pago/i.test(decir("#v-error")),
+            "sin medio de pago no guarda y avisa: «" + decir("#v-error") + "»");
+    afirmar((await window.CVDB.todos("ingresos")).length === ingAntes,
+            "y no guardó nada a medias");
+
+    pon("#v-medio", "Efectivo");
+    vista.querySelector("#btn-guardar").click();
+    await esperar(600);
+    const ingDespues = await window.CVDB.todos("ingresos");
+    const guardada = ingDespues.find((f) => f.cod === "CRT650" && f.cantidad === 2);
+    afirmar(ingDespues.length === ingAntes + 1, "ahora sí guarda la venta");
+    afirmar(!!guardada && guardada.subtotal === 20400,
+            "con su precio y subtotal: " + (guardada && guardada.subtotal));
+    afirmar((await window.CVDB.todos("movimientos")).length === movAntes + 1,
+            "y el movimiento de mercadería que la acompaña");
+    afirmar(window.Datos.stockDeposito().CRT650 === depAntes - 2,
+            "el depósito baja de " + depAntes + " a " + window.Datos.stockDeposito().CRT650);
+
+    caso("Borrar esa venta devuelve el stock");
+    await window.Ingresos.render(vista, "ingresos/" + guardada.venta, ir);
+    const borrar = vista.querySelector("#btn-borrar");
+    afirmar(!!borrar, "la venta se puede abrir y tiene botón de borrar");
+    if (borrar) {
+      borrar.click();
+      await esperar(700);
+      afirmar(window.Datos.stockDeposito().CRT650 === depAntes,
+              "el stock vuelve a " + depAntes + ": " + window.Datos.stockDeposito().CRT650);
+      afirmar((await window.CVDB.todos("ingresos")).length === ingAntes,
+              "y la venta ya no está");
+    }
+
+    caso("Cargar un egreso");
+    await window.Egresos.render(vista, "egresos", ir);
+    const egAntes = (await window.CVDB.todos("egresos")).length;
+    pon("#g-rubro", "Insumos");
+    await esperar(80);
+    afirmar(!!vista.querySelector("#g-detalle-sel"),
+            "al elegir el rubro aparece la lista de detalles");
+    pon("#g-detalle-sel", "envases");
+    await esperar(60);
+    pon("#g-monto", "12345", "input");
+    pon("#g-medio", "Efectivo");
+    vista.querySelector("#g-guardar").click();
+    await esperar(600);
+    const egs = await window.CVDB.todos("egresos");
+    const egNuevo = egs.find((e) => e.monto === 12345);
+    afirmar(egs.length === egAntes + 1, "el egreso se guarda");
+    afirmar(!!egNuevo && egNuevo.detalle === "envases",
+            "con el detalle elegido: " + (egNuevo && egNuevo.detalle));
+
+    caso("Corregir el stock por conteo");
+    await window.Stock.render(vista, "stock", ir);
+    const kimAntes = window.Datos.stockDeposito().KIM350;
+    const radio = vista.querySelector('input[name="que"][value="conteo"]');
+    afirmar(!!radio, "está la opción de corregir por conteo");
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    await esperar(80);
+    pon("#s-cod", "KIM350");
+    pon("#s-cantidad", String(kimAntes + 11), "input");
+    await esperar(80);
+    afirmar(/se van a sumar 11/i.test(decir("#s-resumen")),
+            "avisa la diferencia antes de guardar: «" + decir("#s-resumen") + "»");
+    vista.querySelector("#btn-guardar").click();
+    await esperar(600);
+    afirmar(window.Datos.stockDeposito().KIM350 === kimAntes + 11,
+            "y queda en lo contado: " + window.Datos.stockDeposito().KIM350);
+
+    caso("Cargar horas");
+    await window.Honorarios.render(vista, "honorarios", ir);
+    const hAntes = (await window.CVDB.todos("horas")).length;
+    pon("#h-persona", "luna");
+    pon("#h-actividad", vista.querySelector("#h-actividad").options[1].value);
+    pon("#h-horas", "5", "input");
+    vista.querySelector("#btn-sumar").click();
+    await esperar(600);
+    afirmar((await window.CVDB.todos("horas")).length === hAntes + 1,
+            "las horas se suman");
+
+    caso("Entrar a un local de consignación");
+    await entrar("Un local", window.Consignacion, "consignacion/el molino san martin");
+    afirmar(texto().indexOf("kimchi") >= 0,
+            "muestra la mercadería que tiene ese local");
+
+    caso("Cuadrar el mes");
+    await window.Resumen.render(vista, "resumen", ir);
+    const egAntesC = (await window.CVDB.todos("egresos")).length;
+    const abrir = vista.querySelector("#r-abrir-correccion");
+    afirmar(!!abrir, "está el botón de anotar una corrección");
+    abrir.click();
+    await esperar(60);
+    pon("#c-que", "falto");
+    pon("#c-monto", "1800", "input");
+    pon("#c-por", "un vuelto que no aparece", "input");
+    vista.querySelector("#c-guardar").click();
+    await esperar(700);
+    const egsC = await window.CVDB.todos("egresos");
+    const corr = egsC.find((e) => e.monto === 1800);
+    afirmar(egsC.length === egAntesC + 1, "la corrección se guarda");
+    afirmar(!!corr && corr.rubro === "Corrección",
+            "como un egreso de rubro Corrección: " + (corr && corr.rubro));
+    afirmar(!!corr && corr.obs === "un vuelto que no aparece", "y con su motivo escrito");
+    afirmar(texto().indexOf("un vuelto que no aparece") >= 0,
+            "y queda listada a la vista");
+
+    caso("Nada quedó gritando por consola");
+    afirmar(!window.__errores.length,
+            window.__errores.length ? window.__errores.join(" | ") : "ni un error en todo el recorrido");
+
+  } catch (err) {
+    fallados++;
+    linea("\n   MAL  el banco se rompió: " + ((err && err.stack) || err), "mal");
+  }
+
+  vista.innerHTML = "";
+  linea("\n" + (fallados ? "✗ " + fallados + " afirmaciones fallaron" : "✓ todo bien"),
+        fallados ? "mal" : "ok");
+  window.__fallados = fallados;
+  window.__listo = true;
+})();
+</script>
+</body>
+</html>

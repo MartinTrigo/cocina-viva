@@ -49,3 +49,35 @@ lo único que no se puede deducir mirando.
 
 Si esto se rompe, el papel sale en blanco o con manchas y no hay forma de
 adivinar por qué. Abrirlo directo en el navegador, sin servidor.
+
+## `pantallas.html` — la app entera, usándola
+
+Los otros dos bancos miran de cerca: la sincronización y los bytes de la
+impresora. Este mira de lejos. Levanta la app completa con un juego de datos
+parecido al real —cinco productos, uno dado de baja; ventas cobradas y sin
+cobrar; una corrección; stock en el depósito y en la calle— y hace dos cosas:
+
+1. **Entra a las ocho pantallas** y comprueba que cada una se dibuje, devuelva
+   su encabezado y no tire nada por consola.
+2. **Las usa.** Carga una venta por el formulario —buscador de productos
+   incluido—, la borra y mira que el stock vuelva; carga un egreso eligiendo
+   rubro y detalle; corrige el stock por conteo; suma horas; entra a un local de
+   consignación; y cuadra un mes.
+
+Lo segundo es lo que vale. Un botón que no hace nada no se ve leyendo el código
+ni mirando la pantalla: hay que tocarlo.
+
+Se abre directo en el navegador. Usa IndexedDB de verdad y la borra al empezar.
+
+## `llamadas.py` — llamadas a funciones que no existen
+
+```
+python pruebas/llamadas.py
+```
+
+Tiene que decir **`sospechosas: 0`**.
+
+Se escribió por un bug de verdad: `egresos.js` llamaba a `leerDelFormulario()`,
+que vive en `ingresos.js`. No se ve leyendo el archivo, el navegador no lo marca
+al cargar, y no revienta hasta que alguien toca ese control. Estuvo suelto vaya
+a saber cuánto.

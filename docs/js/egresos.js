@@ -299,7 +299,7 @@ window.Egresos = (function () {
       const esOtro = sel.value === OTRO;
       caja.hidden = !esOtro;
       if (esOtro) { libre.value = ""; libre.focus(); }
-      leerDelFormulario();
+      leer();
     };
 
     ["g-detalle", "g-cantidad", "g-monto", "g-obs"].forEach((id) => {
