@@ -873,9 +873,9 @@ h3.subtitulo {
    no compite con el de guardar. */
 .boton--chico { min-height: 38px; padding: 8px 12px; font-size: 14px; }
 .remito__otra { margin-top: 10px; margin-right: 8px; }
-.remito__tinta { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.remito__tinta label { font-size: 14px; color: var(--texto-suave); }
-.remito__tinta select { width: auto; min-height: 38px; padding: 6px 10px; font-size: 14px; }
+.remito__ajustes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.remito__ajustes label { font-size: 14px; color: var(--texto-suave); }
+.remito__ajustes select { width: auto; min-height: 38px; padding: 6px 10px; font-size: 14px; }
 .remito__informe {
   margin-top: 10px; padding: 10px; border-radius: 8px;
   background: var(--fondo); border: 1px solid var(--borde); color: var(--texto);

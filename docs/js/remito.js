@@ -38,14 +38,46 @@ window.Remito = (function () {
   // tocar los treinta números del dibujo: si se agrandara solo la tipografía,
   // los renglones quedarían encimados. Así crece todo junto y en proporción
   // —letra, interlineado, rayas, logo— y el ritmo no se mueve.
-  const ANCHO = 328;
-  const CRECE = ANCHO_PAPEL / ANCHO;      // 1,17: el cuerpo 12 sale en 14
+  // Tres tamaños. El número es el ancho del espacio en que se dibuja: cuanto
+  // más chico, más hay que agrandarlo para llenar los 384 del papel y más
+  // grande sale todo. Al lado, el cuerpo 12 del nombre del producto:
+  //    normal 328 → 14 puntos    grande 288 → 16    enorme 256 → 18
+  // Se puede elegir porque desde acá no hay forma de ver el papel, y lo que en
+  // la pantalla parece bien en el papel puede ser chico.
+  const ESPACIOS = { normal: 328, grande: 288, enorme: 256 };
+  const TAMANO_POR_DEFECTO = "grande";
+
   const ESCALA = 2;           // el doble en pantalla: nítido, y exacto al reducir
 
-  // Un margen de 5 acá son 6 puntos de papel, menos de un milímetro. Más al
+  // Un margen de 5 acá son 7 puntos de papel, menos de un milímetro. Más al
   // borde no conviene: el rollo nunca entra perfectamente derecho.
   const MARGEN = 5;
-  const UTIL = ANCHO - MARGEN * 2;
+
+  // Estas tres cambian con el tamaño elegido. Las fija medidas() justo antes de
+  // dibujar, y pintar() las lee: así el dibujo no sabe nada de todo esto.
+  let ANCHO = ESPACIOS[TAMANO_POR_DEFECTO];
+  let CRECE = ANCHO_PAPEL / ANCHO;
+  let UTIL = ANCHO - MARGEN * 2;
+
+  function tamano() {
+    try {
+      const guardado = localStorage.getItem("cv-tamano");
+      if (guardado && ESPACIOS[guardado]) return guardado;
+    } catch (err) { /* da igual */ }
+    return TAMANO_POR_DEFECTO;
+  }
+
+  function ponerTamano(cual) {
+    if (!ESPACIOS[cual]) return tamano();
+    try { localStorage.setItem("cv-tamano", cual); } catch (err) { /* da igual */ }
+    return cual;
+  }
+
+  function medidas() {
+    ANCHO = ESPACIOS[tamano()];
+    CRECE = ANCHO_PAPEL / ANCHO;
+    UTIL = ANCHO - MARGEN * 2;
+  }
 
   // El papel térmico no tiene medios tonos: un palo de letra de un punto de
   // ancho sale roto o no sale. Un hilo de contorno del mismo color engorda cada
@@ -107,6 +139,7 @@ window.Remito = (function () {
   // la térmica, que quiere los 384 puntos exactos del papel y ni uno más.
   async function dibujar(datos, escala) {
     await cargarLogo();
+    medidas();
     const cuanto = escala || ESCALA;
 
     const medidor = document.createElement("canvas").getContext("2d");
@@ -449,6 +482,10 @@ window.Remito = (function () {
      en una sola de las tres. Ahora los arma este archivo, una vez.
      ---------------------------------------------------------------------- */
 
+  const opciones = (lista, elegida) => lista.map((v) =>
+    '<option value="' + v + '"' + (v === elegida ? " selected" : "") + ">" + v + "</option>"
+  ).join("");
+
   async function mostrar(caja, datos, alt) {
     const conBluetooth = window.Impresora && window.Impresora.hay();
     const url = await vistaPrevia(datos);
@@ -466,13 +503,16 @@ window.Remito = (function () {
         : "<strong>Imprimir</strong> abre el diálogo del sistema. Este navegador no "
           + "maneja Bluetooth —en iPhone no se puede—, así que para la térmica hay que "
           + "<strong>Guardar</strong> y abrir el archivo desde la app de la impresora."}</p>
+      <div class="remito__ajustes">
+        <label for="rm-tamano">Tamaño</label>
+        <select id="rm-tamano">${opciones(Object.keys(ESPACIOS), tamano())}</select>
+        ${conBluetooth
+          ? '<label for="rm-tinta">Tinta</label><select id="rm-tinta">'
+            + opciones(["claro", "medio", "oscuro"], window.Impresora.tinta()) + "</select>"
+          : ""}
+      </div>
       ${conBluetooth
-        ? '<div class="remito__tinta"><label for="rm-tinta">Tinta</label>'
-          + '<select id="rm-tinta">'
-          + ["claro", "medio", "oscuro"].map((t) => '<option value="' + t + '"'
-              + (t === window.Impresora.tinta() ? " selected" : "") + ">" + t + "</option>").join("")
-          + '</select></div>'
-          + '<button class="boton boton--secundario boton--chico remito__otra" id="rm-otra">Otra impresora</button>'
+        ? '<button class="boton boton--secundario boton--chico remito__otra" id="rm-otra">Otra impresora</button>'
           + '<button class="boton boton--secundario boton--chico remito__otra" id="rm-probar" hidden>'
           + '¿No salió? Probar la impresora</button>'
           + '<pre class="remito__informe" id="rm-informe" hidden></pre>'
@@ -555,7 +595,18 @@ window.Remito = (function () {
         decir("Tinta en " + tinta.value + ". Probá de imprimir.");
       };
     }
+
+    // El tamaño sí cambia el dibujo, así que hay que rehacerlo para que se vea
+    // en el momento lo que va a salir en el papel.
+    const cuerpo = caja.querySelector("#rm-tamano");
+    if (cuerpo) {
+      cuerpo.onchange = () => {
+        ponerTamano(cuerpo.value);
+        mostrar(caja, datos, alt);
+      };
+    }
   }
 
-  return { dibujar, compartir, guardar, imprimir, aLaTermica, vistaPrevia, mostrar };
+  return { dibujar, compartir, guardar, imprimir, aLaTermica, vistaPrevia, mostrar,
+           tamano, ponerTamano, ESPACIOS };
 })();

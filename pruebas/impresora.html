@@ -17,6 +17,8 @@
 <pre id="salida">corriendo…</pre>
 
 <script src="../docs/js/impresora.js"></script>
+<script src="../docs/js/util.js"></script>
+<script src="../docs/js/remito.js"></script>
 
 <script>
 // ==========================================================================
@@ -179,6 +181,30 @@
     try { await I.imprimir(angosto); } catch (err) { mensaje = String(err.message || err); }
     afirmar(/200/.test(mensaje) && /384/.test(mensaje),
             "un lienzo de otro ancho se rechaza antes de conectar: " + mensaje);
+
+    caso("Los tres tamaños del remito");
+    // Lo único que no se puede romper: el remito tiene que salir de 384 puntos
+    // de ancho exactos, sea cual sea el tamaño de la letra. Uno solo de más o
+    // de menos y la impresora lo rechaza o lo saca corrido.
+    const deMuestra = {
+      titulo: "Remito", numero: "1", fecha: "2026-09-22", cliente: "el molino san martin",
+      etiquetaCliente: "Entregado a", conPrecios: true,
+      lineas: [{ cod: "CRT650", nombre: "chucrut 650 g", cantidad: 3, precio: 10200, subtotal: 30600 }],
+      total: 30600, leyenda: "", obs: "",
+    };
+    const antes = window.Remito.tamano();
+    const altos = {};
+    for (const t of Object.keys(window.Remito.ESPACIOS)) {
+      window.Remito.ponerTamano(t);
+      const l = await window.Remito.dibujar(deMuestra, 1);
+      afirmar(l.width === 384, "en «" + t + "» el remito mide 384 de ancho: " + l.width);
+      altos[t] = l.height;
+    }
+    window.Remito.ponerTamano(antes);
+    afirmar(altos.normal < altos.grande && altos.grande < altos.enorme,
+            "y cada tamaño es más alto que el anterior: " + JSON.stringify(altos));
+    afirmar(window.Remito.ponerTamano("microscópico") === antes,
+            "un tamaño que no existe no rompe nada");
 
     caso("La puerta de entrada");
     afirmar(typeof I.hay === "function" && typeof I.imprimir === "function"

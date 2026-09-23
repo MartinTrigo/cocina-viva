@@ -1522,3 +1522,28 @@ papel» de la nada. Corregido, con su caso en el banco.
 Queda sin explorar el modo **HD** de la app de fábrica, que se sospecha que
 manda 4 bits por punto en vez de 1 para que la impresora haga ella misma los
 medios tonos. Para texto no debería hacer falta.
+
+### Tres tamaños, porque desde acá no se ve el papel
+
+En oscuro la impresión salió bien, pero la letra seguía chica. El truco de
+dibujar en un espacio reducido y agrandarlo para llenar los 384 del papel ya
+estaba hecho; alcanzaba con moverle el número:
+
+| | espacio | el cuerpo 12 sale en | un remito de 3 productos |
+|---|---|---|---|
+| normal | 328 | 14 puntos | 67 mm |
+| **grande** | **288** | **16 puntos** | **75 mm** |
+| enorme | 256 | 18 puntos | 83 mm |
+
+Arranca en **grande** y se elige desde el remito, al lado de la tinta. Lo mismo
+que con la densidad: desde acá no hay forma de ver el papel, y lo que en la
+pantalla parece bien en el papel puede ser chico. Que lo pueda mover quien lo
+tiene en la mano vale más que una hora de adivinar.
+
+El ancho de todos es el mismo —384 puntos, el papel entero—; lo que cambia es
+cuánto ocupa cada renglón. Cambiar el tamaño rehace la vista previa en el acto,
+así que lo que se ve es lo que va a salir.
+
+Y el banco pasó a cargar también `remito.js`, para cuidar lo único que no se
+puede romper: que el remito salga de **384 puntos exactos** en los tres tamaños.
+Uno de más o de menos y la impresora lo rechaza o lo saca corrido.
