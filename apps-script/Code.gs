@@ -231,7 +231,16 @@ function fusionar(remotas, locales, borrados, nombre) {
       return;
     }
     var previa = porId[f.id];
-    if (!previa || (Number(f.mod) || 0) > (Number(previa.mod) || 0)) porId[f.id] = f;
+    if (!previa) { porId[f.id] = f; return; }
+
+    // Las remotas se miran primero, así que en un empate de «mod» gana la
+    // planilla. Eso está bien salvo para la fecha: si la planilla perdió la
+    // suya —ya pasó dos veces— el empate alcanzaba para borrar la del
+    // teléfono. Una fecha vacía no le gana nunca a una escrita.
+    var gana = (Number(f.mod) || 0) > (Number(previa.mod) || 0) ? f : previa;
+    var pierde = gana === f ? previa : f;
+    if (!gana.fecha && pierde.fecha) gana.fecha = pierde.fecha;
+    porId[f.id] = gana;
   });
   return Object.keys(porId).map(function (id) { return porId[id]; })
     .sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });

@@ -376,6 +376,72 @@
     afirmar(filasDe("ingresos").length === 1, "correrla dos veces no rompe nada");
   }
 
+  // ---------- la planilla pierde las fechas y el teléfono no se deja ----------
+  //
+  // Esto ya pasó dos veces: la columna de fechas de «ingresos» aparece vacía en
+  // la planilla. Qué la vacía sigue sin saberse —no lo hace el código: el banco
+  // corre el ida y vuelta entero sin perder una fecha, y las otras hojas nunca
+  // se tocaron—. Pero lo que convertía un estropicio en una pérdida definitiva
+  // sí se puede arreglar, y es esto:
+  //
+  //   1. el teléfono solo manda lo que cambió de su lado, y esas filas no
+  //      cambiaron, así que no las manda;
+  //   2. recibe la lista del servicio, que viene sin fechas;
+  //   3. borra su copia y escribe esa encima.
+  //
+  // O sea que la única copia buena que quedaba se borraba sola, en silencio, en
+  // la primera sincronización después del estropicio.
+
+  async function casoLaFechaVuelveDelTelefono() {
+    caso("Si la planilla pierde una fecha, el teléfono se la devuelve");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    enLaPlanilla("ingresos", [
+      { id: "i1", venta: "v1", fecha: "2026-08-21", cliente: "amarantus", lista: "mayorista",
+        medio_pago: "Efectivo", pagado: true, cod: "CRT650", cantidad: 2, precio: 10200,
+        subtotal: 20400, obs: "", mod: 1000 },
+    ]);
+    await window.Sincro.sincronizar(true);
+    afirmar(((await localTodos("ingresos"))[0] || {}).fecha === "2026-08-21",
+            "la venta baja al teléfono con su fecha");
+
+    // El estropicio: alguien vacía la celda en la planilla. El «mod» no cambia,
+    // porque nadie editó la fila desde la app.
+    hoja("ingresos").filas[1][2] = "";
+    afirmar(!filasDe("ingresos")[0].fecha, "la planilla quedó sin la fecha");
+
+    await window.Sincro.sincronizar(true);
+    afirmar(((await localTodos("ingresos"))[0] || {}).fecha === "2026-08-21",
+            "el teléfono NO se deja pisar: "
+            + (((await localTodos("ingresos"))[0] || {}).fecha || "la perdió"));
+
+    // Y en la vuelta siguiente se la devuelve a la planilla.
+    await window.Sincro.sincronizar(true);
+    afirmar(filasDe("ingresos")[0].fecha === "2026-08-21",
+            "y la planilla la recupera sola: "
+            + (filasDe("ingresos")[0].fecha || "sigue vacía"));
+  }
+
+  async function casoEmpateDeFechas() {
+    caso("En un empate, la fecha escrita le gana a la vacía");
+    limpiarPlanilla();
+    await limpiarTelefono();
+    // Las dos partes con el mismo mod: una con fecha, la otra sin.
+    enLaPlanilla("ingresos", [
+      { id: "i2", venta: "v2", fecha: "", cliente: "lahuan", lista: "mayorista",
+        medio_pago: "Efectivo", pagado: true, cod: "KIM350", cantidad: 1, precio: 6800,
+        subtotal: 6800, obs: "", mod: 5000 },
+    ]);
+    sincronizar({ ingresos: [
+      { id: "i2", venta: "v2", fecha: "2026-09-15", cliente: "lahuan", lista: "mayorista",
+        medio_pago: "Efectivo", pagado: true, cod: "KIM350", cantidad: 1, precio: 6800,
+        subtotal: 6800, obs: "", mod: 5000 },
+    ] }, { persona: "luna" });
+    afirmar(filasDe("ingresos")[0].fecha === "2026-09-15",
+            "gana la que tiene fecha, aunque empaten: "
+            + (filasDe("ingresos")[0].fecha || "ninguna"));
+  }
+
   // ---------- que la versión y el caché vayan juntos ----------
   //
   // La app avisa «hay una versión nueva» comparándole al servidor el VERSION de
@@ -424,6 +490,7 @@
       casoFechasVaciadas, casoFechaDelHermano, casoElTelefonoNoPisaLaFecha,
       casoRestaurarFechas, casoPagadoSiONo,
       casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
+      casoLaFechaVuelveDelTelefono, casoEmpateDeFechas,
       casoLaVersionYElCache,
     ];
     for (const c of casos) {

@@ -243,6 +243,37 @@ window.CVDB = (function () {
     }
     const bajasPosteriores = (await todos("borrados")).filter((r) => (r.mod || 0) > tope);
 
+    /* ----------------------------------------------------------------------
+       UNA FECHA QUE ACÁ ESTÁ Y EN LA PLANILLA NO, NO SE ACEPTA
+
+       Pasó dos veces: la columna de fechas de «ingresos» apareció vacía en la
+       planilla. Lo grave no fue el vaciado sino cómo se propagaba. El teléfono
+       solo manda lo que cambió de este lado, y esas filas no habían cambiado:
+       no las mandaba. Recibía la versión sin fecha, borraba su copia y escribía
+       la de la planilla encima. Una sola planilla rota se llevaba puestas
+       todas las copias, que eran lo único que quedaba del dato.
+
+       Ahora, si lo que llega perdió una fecha que acá estaba, se conserva la de
+       acá y la fila queda pendiente, así viaja de vuelta y repara la planilla.
+       El teléfono deja de ser un espejo y pasa a ser una segunda copia.
+       ---------------------------------------------------------------------- */
+    let rescatadas = 0;
+    for (const nombre of Object.keys(SINCRONIZABLES)) {
+      if (!estado[nombre]) continue;
+      const fechaDeAca = {};
+      (await todos(nombre)).forEach((r) => {
+        if (r && r.id && r.fecha) fechaDeAca[r.id] = r.fecha;
+      });
+      estado[nombre].forEach((r) => {
+        if (!r || r.fecha || !fechaDeAca[r.id]) return;
+        r.fecha = fechaDeAca[r.id];
+        // Con el mod de ahora queda por delante de la marca, o sea pendiente:
+        // en la próxima vuelta sube y le devuelve la fecha a la planilla.
+        r.mod = Date.now();
+        rescatadas++;
+      });
+    }
+
     for (const nombre of Object.keys(SINCRONIZABLES)) {
       if (!estado[nombre]) continue;
       await operar(nombre, "readwrite", (a) => {
@@ -278,6 +309,7 @@ window.CVDB = (function () {
     // respuesta. Poniendo la hora de la respuesta, todo lo que pasó durante el
     // viaje quedaba por detrás de la marca y no se subía nunca más.
     await marcarSincro(tope);
+    return { rescatadas: rescatadas };
   }
 
   const listas = () => obtener("meta", "listas").then((m) => (m && m.valor) || null);

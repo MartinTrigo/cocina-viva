@@ -1669,3 +1669,42 @@ Queda una sola cosa fuera de lugar, y no es del programa: **tres productos con
 stock negativo en el depósito** (`KIM350` −3, `VIE500` −6, `VIM500` −2). Son
 ventas por encima de lo que dijo el último conteo. Se arregla contando esos tres
 y usando *Stock → Corrección por conteo*.
+
+## Las fechas, otra vez — y esta vez lo que importa no es quién las borra
+
+Volvió a pasar: la columna «fecha» de `ingresos` apareció vacía. Solo esa hoja;
+`egresos`, `movimientos` y `horas` intactas, como la vez anterior.
+
+**Sigo sin saber qué la vacía, y conviene decirlo así.** Lo que sí se sabe es
+que no es el código: el banco corre el ida y vuelta entero sin perder una fecha,
+y si fuera el código caerían las cuatro hojas, no una.
+
+Pero había algo mucho peor que el vaciado, y eso sí se arregló. **Lo que
+convertía un estropicio en una pérdida definitiva era cómo se propagaba:**
+
+1. el teléfono solo manda lo que cambió de su lado, y esas filas no cambiaron
+   —nadie las editó—, así que **no las manda**;
+2. recibe del servicio la lista sin fechas;
+3. `guardarEstado` borra su copia y escribe esa encima.
+
+O sea que la única copia buena que quedaba —la del teléfono— se borraba sola, en
+silencio, en la primera sincronización después del estropicio. Y si dos
+versiones empataban en `mod`, el servicio también le daba la razón a la planilla,
+porque las remotas se miran primero.
+
+Dos arreglos, uno de cada lado:
+
+- **En el teléfono** (`guardarEstado`): si lo que llega perdió una fecha que acá
+  estaba, se conserva la de acá y la fila queda pendiente. En la vuelta
+  siguiente sube y **le devuelve la fecha a la planilla**. El teléfono deja de
+  ser un espejo y pasa a ser una segunda copia de verdad.
+- **En el servicio** (`fusionar`): una fecha vacía no le gana nunca a una
+  escrita, empaten o no.
+
+Los dos casos están en el banco, y se los vio fallar antes de arreglar nada:
+decían *«el teléfono la perdió»* y *«la planilla sigue vacía»*. Ahora dicen
+*«la planilla la recupera sola»*.
+
+**Y una cosa que apareció buscando:** la carpeta de respaldos no existe.
+`activarRespaldoDiario()` nunca llegó a correr. La red de seguridad que se armó
+en septiembre justamente para esto no está puesta.
