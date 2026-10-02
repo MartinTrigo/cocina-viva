@@ -1658,37 +1658,86 @@ var FECHAS_DE_INGRESOS = {
 function restaurarFechasDeIngresos() { return conCandado(restaurarFechasDeIngresosAhora); }
 
 function restaurarFechasDeIngresosAhora() {
-  var porId = {};
-  Object.keys(FECHAS_DE_INGRESOS).forEach(function (f) {
-    FECHAS_DE_INGRESOS[f].split(' ').forEach(function (id) { if (id) porId[id] = f; });
-  });
-
   var filas = leerFilas('ingresos');
   var ahora = Date.now();
-  var arregladas = 0, yaEstaban = 0, sinRespaldo = [];
 
-  filas.forEach(function (o) {
-    var buena = porId[o.id];
-    if (!buena) {
-      if (o.fecha) yaEstaban++; else sinRespaldo.push(o.id);
-      return;
-    }
-    if (o.fecha === buena) { yaEstaban++; return; }
-    o.fecha = buena;
-    // Sube el mod para que la fecha corregida le gane a la que los teléfonos
-    // ya se bajaron. Si no, al sincronizar volverían a subir la equivocada.
-    o.mod = ahora;
-    arregladas++;
+  /* ------------------------------------------------------------------------
+     TRES FUENTES, DE LA MÁS CONFIABLE A LA MENOS
+
+     1. EL MOVIMIENTO. Cada venta cargada desde la app escribió, en el mismo
+        momento y con la misma fecha, un movimiento de mercadería que la
+        referencia. La hoja de movimientos nunca perdió sus fechas, así que ahí
+        está el dato original, no una reconstrucción.
+
+     2. UN HERMANO DE LA MISMA VENTA. Una venta de cinco productos son cinco
+        renglones que comparten fecha. Si a uno le quedó, les sirve a todos.
+
+     3. LA TABLA DE ARRIBA, para los 135 renglones que se importaron de la
+        planilla vieja y que nunca tuvieron movimiento asociado.
+     ------------------------------------------------------------------------ */
+
+  var porMovimiento = {};
+  leerFilas('movimientos').forEach(function (m) {
+    if (m.ref && m.fecha && !porMovimiento[m.ref]) porMovimiento[m.ref] = m.fecha;
   });
 
+  var porHermano = {};
+  filas.forEach(function (o) {
+    if (o.fecha && !porHermano[o.venta]) porHermano[o.venta] = o.fecha;
+  });
+
+  var deLaTabla = {};
+  Object.keys(FECHAS_DE_INGRESOS).forEach(function (f) {
+    FECHAS_DE_INGRESOS[f].split(' ').forEach(function (id) { if (id) deLaTabla[id] = f; });
+  });
+
+  var cuenta = { movimiento: 0, hermano: 0, tabla: 0 };
+  var yaEstaban = 0;
+  var huerfanas = [];
+
+  filas.forEach(function (o) {
+    // Para esos 135 la tabla manda aunque la fila tenga fecha: es el respaldo
+    // de antes del estropicio, y la vez pasada lo que hubo no fue un vacío
+    // sino una fecha inventada, que es peor porque parece buena.
+    if (deLaTabla[o.id]) {
+      if (o.fecha === deLaTabla[o.id]) { yaEstaban++; return; }
+      o.fecha = deLaTabla[o.id];
+      o.mod = ahora;
+      cuenta.tabla++;
+      return;
+    }
+    if (o.fecha) { yaEstaban++; return; }
+
+    var buena = porMovimiento[o.venta];
+    var deDonde = 'movimiento';
+    if (!buena) { buena = porHermano[o.venta]; deDonde = 'hermano'; }
+
+    if (!buena) {
+      huerfanas.push(o.id + ' (' + (o.cliente || 'sin cliente') + ')');
+      return;
+    }
+    o.fecha = buena;
+    // Sube el mod para que la fecha corregida le gane a la que los teléfonos
+    // ya se bajaron. Si no, al sincronizar volverían a subir la vacía.
+    o.mod = ahora;
+    cuenta[deDonde]++;
+  });
+
+  var arregladas = cuenta.movimiento + cuenta.hermano + cuenta.tabla;
   if (arregladas) escribirFilas('ingresos', filas);
 
-  var texto = 'Fechas devueltas a ' + arregladas + ' renglones. '
-    + yaEstaban + ' ya estaban bien.';
-  if (sinRespaldo.length) {
-    texto += '\nQuedaron sin fecha y sin respaldo: ' + sinRespaldo.join(', ');
+  var texto = 'Renglones de ingresos: ' + filas.length + '.'
+    + '\n  · ya tenían fecha: ' + yaEstaban
+    + '\n  · recuperadas del movimiento de mercadería: ' + cuenta.movimiento
+    + '\n  · recuperadas de otro renglón de la misma venta: ' + cuenta.hermano
+    + '\n  · recuperadas de la tabla de la planilla vieja: ' + cuenta.tabla
+    + '\n  · SIN FUENTE, siguen sin fecha: ' + huerfanas.length;
+  if (huerfanas.length) {
+    texto += '\n\nEstas no se pudieron reconstruir:\n  '
+      + huerfanas.slice(0, 40).join('\n  ')
+      + (huerfanas.length > 40 ? '\n  …y ' + (huerfanas.length - 40) + ' más' : '');
   }
-  texto += '\nSincronizar desde un teléfono para que lo vean las dos.';
+  texto += '\n\nSincronizar desde un teléfono para que lo vean las dos.';
   Logger.log(texto);
   return texto;
 }

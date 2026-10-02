@@ -273,19 +273,52 @@
   }
 
   async function casoRestaurarFechas() {
-    caso("La reparación de las fechas perdidas");
+    caso("La reparación de las fechas, por sus tres vías");
     limpiarPlanilla();
-    enLaPlanilla("ingresos", [{ id: "viejo-001", venta: "vieja-001", fecha: "2026-09-07",
-      cliente: "amarantus", lista: "mayorista", medio_pago: "Efectivo", pagado: true,
-      cod: "CRT650", cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1 }]);
-    restaurarFechasDeIngresosAhora();
-    afirmar(columnaFecha()[0] === "2026-07-10", "viejo-001 volvió al 10 de julio");
+
+    //  a1  venta de la app con movimiento → la fecha sale del movimiento
+    //  a2  hermano de esa venta, sin movimiento propio → sale del hermano
+    //  viejo-001  importado → sale de la tabla, Y le corrige una fecha mala
+    //  perdida    no tiene de dónde salir → tiene que decirlo
+    enLaPlanilla("ingresos", [
+      { id: "a1", venta: "vA", fecha: "", cliente: "lahuan", lista: "mayorista",
+        medio_pago: "Efectivo", pagado: true, cod: "CRT650", cantidad: 1, precio: 10200,
+        subtotal: 10200, obs: "", mod: 1 },
+      { id: "a2", venta: "vA", fecha: "", cliente: "lahuan", lista: "mayorista",
+        medio_pago: "Efectivo", pagado: true, cod: "KIM350", cantidad: 1, precio: 6800,
+        subtotal: 6800, obs: "", mod: 1 },
+      { id: "viejo-001", venta: "vieja-001", fecha: "2026-09-07", cliente: "amarantus",
+        lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
+        cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1 },
+      { id: "perdida", venta: "vZ", fecha: "", cliente: "nadie", lista: "mayorista",
+        medio_pago: "Efectivo", pagado: true, cod: "CRT650", cantidad: 1, precio: 1,
+        subtotal: 1, obs: "", mod: 1 },
+    ]);
+    enLaPlanilla("movimientos", [
+      { id: "mA", fecha: "2026-09-18", tipo: "venta", cod: "CRT650", cantidad: 1,
+        desde: "DEPOSITO", hacia: "VENDIDO", ref: "vA", obs: "lahuan", mod: 1 },
+    ]);
+
+    const dice = restaurarFechasDeIngresosAhora();
+    const porId = {};
+    filasDe("ingresos").forEach((o) => { porId[o.id] = o.fecha; });
+
+    afirmar(porId["a1"] === "2026-09-18",
+            "la venta recupera su fecha del movimiento: " + porId["a1"]);
+    afirmar(porId["a2"] === "2026-09-18",
+            "y el otro renglón de la misma venta también: " + porId["a2"]);
+    afirmar(porId["viejo-001"] === "2026-07-10",
+            "y la tabla corrige al importado, aunque tuviera una fecha puesta: "
+            + porId["viejo-001"]);
+    afirmar(!porId["perdida"], "la que no tiene de dónde salir queda sin fecha");
+    afirmar(/SIN FUENTE, siguen sin fecha: 1/.test(dice), "el informe la cuenta");
+    afirmar(/perdida/.test(dice), "y dice cuál es");
 
     let cuantos = 0;
     Object.keys(FECHAS_DE_INGRESOS).forEach((f) => {
       cuantos += FECHAS_DE_INGRESOS[f].split(" ").length;
     });
-    afirmar(cuantos === 135, "la tabla de respaldo tiene los 135 renglones");
+    afirmar(cuantos === 135, "la tabla de respaldo sigue teniendo los 135 renglones");
   }
 
   async function casoPagadoSiONo() {

@@ -1708,3 +1708,28 @@ decían *«el teléfono la perdió»* y *«la planilla sigue vacía»*. Ahora di
 **Y una cosa que apareció buscando:** la carpeta de respaldos no existe.
 `activarRespaldoDiario()` nunca llegó a correr. La red de seguridad que se armó
 en septiembre justamente para esto no está puesta.
+
+### Reconstruir las fechas que ya nadie tiene
+
+El arreglo de arriba evita perderlas de ahora en más, pero no inventa lo que ya
+se perdió: para cuando se notó, todos los teléfonos habían sincronizado y
+tenían la copia vacía. Había que reconstruirlas de otra parte.
+
+`restaurarFechasDeIngresos()` ahora busca en **tres fuentes, de la más confiable
+a la menos**:
+
+1. **El movimiento de mercadería.** Cada venta cargada desde la app escribió, en
+   el mismo momento y con la misma fecha, un movimiento que la referencia. La
+   hoja de movimientos nunca perdió sus fechas. O sea que ahí está el **dato
+   original**, no una reconstrucción.
+2. **Un hermano de la misma venta.** Cinco productos son cinco renglones que
+   comparten fecha; si a uno le quedó, les sirve a todos.
+3. **La tabla de las 135 filas importadas**, que no tienen movimiento asociado.
+
+Para esos 135 la tabla manda **aunque la fila ya tenga fecha**: es el respaldo de
+antes del estropicio, y la vez pasada lo que hubo no fue un vacío sino una fecha
+inventada, que es peor porque parece buena. Para el resto solo rellena vacíos.
+
+Y dice qué hizo: cuántas por cada vía, y **cuáles quedaron sin fuente**, con su
+id y su cliente. Si algo no se puede reconstruir, que se sepa cuál es y no que
+se disimule.
