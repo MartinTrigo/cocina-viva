@@ -395,6 +395,53 @@ window.addEventListener("unhandledrejection", (e) =>
     afirmar(texto().indexOf("un vuelto que no aparece") >= 0,
             "y queda listada a la vista");
 
+    caso("Liquidar sin haber cobrado");
+    await window.Consignacion.render(vista, "consignacion/el molino san martin", ir);
+    vista.querySelector('input[name="modo"][value="liquidar"]').click();
+    await esperar(80);
+    const cob = vista.querySelector("#cg-cobrada");
+    afirmar(!!cob && cob.checked, "la casilla existe y viene tildada, que es lo normal");
+    afirmar(!vista.querySelector("#cg-medio").disabled, "y pide el medio de pago");
+    cob.checked = false;
+    cob.dispatchEvent(new Event("change", { bubbles: true }));
+    await esperar(80);
+    afirmar(vista.querySelector("#cg-medio").disabled,
+            "destildada, el medio de pago se apaga: no hay con qué pagó");
+    afirmar(/[Qq]ueda a deber/.test(texto()), "y el total lo dice: queda a deber");
+
+    const ingAntesLiq = (await window.CVDB.todos("ingresos")).length;
+    pon(".cg-sacar", "2", "input");
+    await esperar(60);
+    vista.querySelector("#cg-guardar").click();
+    await esperar(700);
+    const liq = (await window.CVDB.todos("ingresos")).find((f) => f.obs === "Liquidación de consignación");
+    afirmar((await window.CVDB.todos("ingresos")).length === ingAntesLiq + 1,
+            "la liquidación se guarda igual");
+    afirmar(liq && liq.pagado === false, "pero sin cobrar: " + (liq && liq.pagado));
+    afirmar(liq && !liq.medio_pago, "y sin medio de pago inventado");
+
+    caso("El remito de lo que le queda al local");
+    await window.Consignacion.render(vista, "consignacion/el molino san martin", ir);
+    const botonRemito = vista.querySelector("#cg-remito-stock");
+    afirmar(!!botonRemito, "está el botón");
+    botonRemito.click();
+    await esperar(1600);          // dibujar el remito pasa por el logo y el lienzo
+    afirmar(!!vista.querySelector("#cg-papel img"), "se dibuja el papel");
+    afirmar(!!vista.querySelector("#rm-imprimir"), "con sus botones de imprimir");
+
+    caso("Cómo viene un cliente");
+    await entrar("Ficha de cliente", window.Clientes, "clientes/amarantus/ventas");
+    const ficha = texto();
+    afirmar(/Compró en total/.test(ficha), "dice cuánto compró en total");
+    afirmar(/Últimas ventas/.test(ficha), "y lista sus últimas ventas");
+    afirmar(vista.querySelectorAll(".renglones .renglon").length <= 3,
+            "no más de tres: "+ vista.querySelectorAll(".renglones .renglon").length);
+    afirmar(/Corr/.test(ficha) === false, "y no cuenta las correcciones como ventas");
+
+    caso("El remito arranca en el tamaño más grande");
+    afirmar(window.Remito.tamano() === "enorme",
+            "por defecto: " + window.Remito.tamano());
+
     caso("Nada quedó gritando por consola");
     afirmar(!window.__errores.length,
             window.__errores.length ? window.__errores.join(" | ") : "ni un error en todo el recorrido");

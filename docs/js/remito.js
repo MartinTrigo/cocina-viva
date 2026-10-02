@@ -45,7 +45,9 @@ window.Remito = (function () {
   // Se puede elegir porque desde acá no hay forma de ver el papel, y lo que en
   // la pantalla parece bien en el papel puede ser chico.
   const ESPACIOS = { normal: 328, grande: 288, enorme: 256 };
-  const TAMANO_POR_DEFECTO = "grande";
+  // Arranca en el más grande: el papel térmico se lee mal y quien lo recibe
+  // casi nunca lo lee con buena luz. Si gastan demasiado papel, se baja.
+  const TAMANO_POR_DEFECTO = "enorme";
 
   const ESCALA = 2;           // el doble en pantalla: nítido, y exacto al reducir
 

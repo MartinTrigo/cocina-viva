@@ -21,7 +21,7 @@
 // ==========================================================================
 
 window.Clientes = (function () {
-  const { esc, dinero, numero, unaVez } = window.Util;
+  const { esc, dinero, numero, fecha, unaVez } = window.Util;
 
   let vista = null;
   let ir = null;
@@ -36,6 +36,12 @@ window.Clientes = (function () {
 
     if (que === "nuevo") { formulario(null); return cab("Cliente nuevo", "Alta en la libreta"); }
     if (que === "bajas") { enMasa(); return cab("Dar de baja varios", "Los que ya no van"); }
+    if (que && partes[2] === "ventas") {
+      const c = buscar(que);
+      if (!c) { lista(); return cab("Clientes", "A quién le vendemos"); }
+      ficha(c);
+      return cab(c.nombre, c.localidad || "Cómo viene");
+    }
     if (que) {
       const c = buscar(que);
       if (!c) { lista(); return cab("Clientes", "A quién le vendemos"); }
@@ -112,7 +118,8 @@ window.Clientes = (function () {
       <ul class="renglones">
         ${clientes.map((c) => `
           <li class="renglon ${c.tipo === "consignación" ? "renglon--sale" : "renglon--entra"}">
-            <span class="renglon__texto">
+            <span class="renglon__texto" data-ir="clientes/${encodeURIComponent(c.nombre)}/ventas"
+                  role="button" tabindex="0">
               <span class="renglon__que">${esc(c.nombre)}</span>
               <span class="renglon__detalle">${esc(c.localidad || "sin localidad")} · ${esc(c.tipo)}${c.medio_pago ? " · " + esc(c.medio_pago) : ""}</span>
             </span>
@@ -120,6 +127,100 @@ window.Clientes = (function () {
                     aria-label="Editar ${esc(c.nombre)}">&#9998;</button>
           </li>`).join("")}
       </ul>`;
+  }
+
+  /* ------------------------------------------------------------------------
+     CÓMO VIENE UN CLIENTE
+
+     La lista dice quiénes son; esto dice cómo andan. Antes, para saber si un
+     cliente compraba seguido o hacía tres meses que no apareció, había que ir a
+     Ingresos y buscarlo entre doscientas ventas.
+
+     Tres ventas alcanzan: con eso se ve si compra seguido, cuánto gasta y si
+     quedó algo sin cobrar. Más que eso es un balance, y para eso está Resumen.
+     ------------------------------------------------------------------------ */
+
+  const CUANTAS_VENTAS = 3;
+
+  function ventasDe(nombre) {
+    const porVenta = {};
+    (window.Datos.todo().ingresos || []).forEach((f) => {
+      if (f.cliente !== nombre) return;
+      if (window.Datos.esCorreccion(f)) return;
+      const id = f.venta || f.id;
+      if (!porVenta[id]) {
+        porVenta[id] = { id: id, fecha: f.fecha, total: 0, unidades: 0,
+                         pagado: true, lineas: [] };
+      }
+      const v = porVenta[id];
+      v.total += Number(f.subtotal) || 0;
+      v.unidades += Number(f.cantidad) || 0;
+      v.lineas.push(f);
+      if (f.pagado === false) v.pagado = false;
+    });
+    return Object.keys(porVenta).map((k) => porVenta[k])
+      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }
+
+  function ficha(c) {
+    const todas = ventasDe(c.nombre);
+    const ultimas = todas.slice(0, CUANTAS_VENTAS);
+    const gastado = todas.reduce((n, v) => n + v.total, 0);
+    const debe = todas.filter((v) => !v.pagado).reduce((n, v) => n + v.total, 0);
+    const enLaCalle = c.tipo === "consignación"
+      ? window.Datos.renglonesDe(window.Datos.stockEn(c.nombre)) : [];
+
+    vista.innerHTML = `
+      <div class="cifras">
+        <div class="cifra cifra--entra">
+          <span class="cifra__que">Compró en total</span>
+          <span class="cifra__cuanto">${dinero(gastado)}</span>
+        </div>
+        <div class="cifra ${debe ? "cifra--sale" : "cifra--saldo"}">
+          <span class="cifra__que">${debe ? "Debe" : "Al día"}</span>
+          <span class="cifra__cuanto">${debe ? dinero(debe) : "—"}</span>
+        </div>
+      </div>
+
+      <h2>Últimas ventas</h2>
+      ${ultimas.length ? `
+        <ul class="renglones">
+          ${ultimas.map((v) => `
+            <li class="renglon ${v.pagado ? "" : "renglon--sale"}"
+                data-ir="ingresos/${esc(v.id)}" role="button" tabindex="0">
+              <span class="renglon__texto">
+                <span class="renglon__que">${esc(fecha(v.fecha))}${v.pagado ? "" : " · sin cobrar"}</span>
+                <span class="renglon__detalle">${numero(v.unidades)}
+                  ${v.unidades === 1 ? "unidad" : "unidades"} ·
+                  ${v.lineas.map((l) => esc(window.Datos.nombreDe(l.cod))).join(", ")}</span>
+              </span>
+              <span class="renglon__cuanto">${dinero(v.total)}</span>
+            </li>`).join("")}
+        </ul>
+        ${todas.length > ultimas.length ? `
+          <p class="nota">Tiene ${todas.length} ventas en total.</p>` : ""}`
+        : `<p class="vacio">Todavía no le vendimos nada.</p>`}
+
+      ${enLaCalle.length ? `
+        <h2 class="separado">Lo que tiene en consignación</h2>
+        <ul class="renglones">
+          ${enLaCalle.map((r) => `
+            <li class="renglon">
+              <span class="renglon__texto">
+                <span class="renglon__que">${esc(r.nombre)}</span>
+                <span class="renglon__detalle">${numero(r.cantidad)}
+                  ${r.cantidad === 1 ? "unidad" : "unidades"}</span>
+              </span>
+              <span class="renglon__cuanto">${dinero(r.subtotal)}</span>
+            </li>`).join("")}
+        </ul>
+        <button class="boton boton--secundario boton--ancho separado"
+                data-ir="consignacion/${encodeURIComponent(c.nombre)}">Ir a la consignación</button>` : ""}
+
+      <button class="boton boton--ancho separado"
+              data-ir="clientes/${encodeURIComponent(c.nombre)}">Editar los datos</button>`;
+
+    enganchar();
   }
 
   // ---------- Alta y edición ----------

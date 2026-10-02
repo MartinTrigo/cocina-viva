@@ -46,6 +46,9 @@ window.Consignacion = (function () {
   let vista = null;
   let ir = null;
   let modo = "entregar";
+  // Una liquidación casi siempre se cobra en el momento, pero no siempre: a
+  // veces se retira la mercadería vendida y el local paga después.
+  let cobrada = true;
   let entrega = null;      // borrador de la entrega: [{cod, cantidad}]
   let cuando = null;       // la fecha del formulario, común a los tres modos
   let medioPago = "";
@@ -268,7 +271,10 @@ window.Consignacion = (function () {
 
       ${renglones.length ? `
         <h2 class="separado">Lo que tiene hoy</h2>
-        ${tabla(renglones, valor)}`
+        ${tabla(renglones, valor)}
+        <button class="boton boton--secundario boton--ancho no-imprimir" id="cg-remito-stock">
+          Remito de lo que le queda</button>
+        <div id="cg-papel"></div>`
       : `<p class="vacio">${esc(local)} no tiene mercadería nuestra en este momento.</p>`}
 
       ${historial(local)}`;
@@ -350,13 +356,22 @@ window.Consignacion = (function () {
         </div>
         ${modo === "liquidar" ? `
           <div class="campo">
-            <label for="cg-medio">Con qué pagó <span class="obliga">•</span></label>
-            <select id="cg-medio">
+            <label for="cg-medio">Con qué pagó${cobrada ? ' <span class="obliga">•</span>' : ""}</label>
+            <select id="cg-medio"${cobrada ? "" : " disabled"}>
               <option value="">Elegí…</option>
               ${medios.map((x) => `<option value="${esc(x)}"${x === medioPago ? " selected" : ""}>${esc(x)}</option>`).join("")}
             </select>
           </div>` : ""}
       </div>
+
+      ${modo === "liquidar" ? `
+        <label class="chequeo separado">
+          <input type="checkbox" id="cg-cobrada"${cobrada ? " checked" : ""}>
+          <span class="celda__que">Ya la cobramos</span>
+        </label>
+        <p class="nota">Destildado, la liquidación queda anotada como venta pero
+           <strong>sin cobrar</strong>: la mercadería sale del local igual, y la
+           plata figura en «falta cobrar» hasta que la cobren.</p>` : ""}
 
       <ul class="chequeos">
         ${renglones.map((r) => `
@@ -419,7 +434,8 @@ window.Consignacion = (function () {
     });
 
     caja.innerHTML = modo === "liquidar"
-      ? `<span class="total__que">Total a cobrar · ${numero(unidades)} u.</span>
+      ? `<span class="total__que">${cobrada ? "Total a cobrar" : "Queda a deber"}
+           · ${numero(unidades)} u.</span>
          <span class="total__cuanto">${dinero(total)}</span>`
       : `<span class="total__que">Vuelven al depósito</span>
          <span class="total__cuanto">${numero(unidades)} u.</span>`;
@@ -508,7 +524,10 @@ window.Consignacion = (function () {
 
     if (modo === "liquidar") {
       medioPago = document.getElementById("cg-medio").value;
-      if (!medioPago) return avisarMal("Elegí con qué pagó.");
+      // El medio de pago solo hace falta si entró plata. Si todavía no cobraron,
+      // pedirlo sería pedir que inventen con qué les van a pagar.
+      if (cobrada && !medioPago) return avisarMal("Elegí con qué pagó.");
+      if (!cobrada) medioPago = "";
     }
 
     const ref = window.Util.nuevoId();
@@ -530,8 +549,7 @@ window.Consignacion = (function () {
         cliente: local,
         lista: "mayorista",
         medio_pago: medioPago,
-        // Una liquidación es, por definición, plata que ya entró.
-        pagado: true,
+        pagado: cobrada,
         cod: l.cod,
         cantidad: l.cantidad,
         precio: l.precio,
@@ -682,6 +700,38 @@ window.Consignacion = (function () {
 
     const f = document.getElementById("cg-fecha");
     if (f) f.onchange = () => { cuando = f.value || hoy(); };
+
+    // Tildar o destildar cambia el formulario —el medio de pago se habilita o
+    // se apaga— y el total pasa de «a cobrar» a «queda a deber», así que se
+    // redibuja la ficha entera en vez de parchear tres nodos a mano.
+    const c = document.getElementById("cg-cobrada");
+    if (c) c.onchange = () => { cobrada = c.checked; ficha(local); };
+
+    // El papel de «qué te queda»: no es una entrega ni un cobro, es el estado
+    // de cuenta de la mercadería. Se lo dejan al local para que sepa con qué
+    // se quedó, y sirve de base para el próximo conteo.
+    const rs = document.getElementById("cg-remito-stock");
+    if (rs) {
+      rs.onclick = async () => {
+        // El nodo se toma una sola vez: buscarlo de nuevo después de dibujar es
+        // pedirle al navegador que siga estando donde estaba.
+        const papel = document.getElementById("cg-papel");
+        const quedan = window.Datos.renglonesDe(window.Datos.stockEn(local));
+        await window.Remito.mostrar(papel, {
+          titulo: "Mercadería en consignación",
+          numero: "",
+          fecha: hoy(),
+          cliente: local,
+          etiquetaCliente: "Queda en",
+          conPrecios: true,
+          lineas: quedan,
+          total: quedan.reduce((n, r) => n + r.subtotal, 0),
+          leyenda: "Estado de cuenta · no es una entrega",
+          obs: "Mercadería nuestra que está hoy en el local. Se paga lo que se vende.",
+        }, "Lo que le queda a " + local);
+        papel.scrollIntoView({ block: "start" });
+      };
+    }
 
     if (modo === "entregar") {
       vista.querySelectorAll(".cg-cod").forEach((s) => {

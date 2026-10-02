@@ -1814,3 +1814,36 @@ es un dato menos sin que nadie se entere.
 Ojo con el error que me comí en el camino: el número de serie lo armaba en UTC,
 y al escribirlo con el huso de acá la medianoche caía en el día anterior. El
 banco lo agarró.
+
+## Lo que pidieron Luna y Melí — primera tanda
+
+Cuatro de los seis pedidos no tocan la planilla, así que van solos por GitHub
+Pages y los tienen apenas abren la app.
+
+**Liquidar sin haber cobrado.** Liquidar escribía siempre `pagado: true`, porque
+se asumió que liquidar *es* cobrar. No siempre: a veces se retira la mercadería
+vendida y el local paga después. Ahora hay una casilla «Ya la cobramos», tildada
+por defecto. Destildada, el medio de pago **se apaga** —pedirlo sería pedir que
+inventen con qué les van a pagar— y el total pasa de «Total a cobrar» a «Queda a
+deber». La plata queda en «falta cobrar» hasta que la cobren.
+
+**Remito de lo que le queda al local.** Debajo de «Lo que tiene hoy», un botón
+que saca un papel con el estado de cuenta de la mercadería. No es una entrega ni
+un cobro, y el remito lo aclara: «Estado de cuenta · no es una entrega». Sirve
+para dejárselo al local y de base para el próximo conteo.
+
+**Cómo viene un cliente.** Tocar el nombre en la lista abre su ficha: cuánto
+compró en total, si debe algo, sus últimas tres ventas —con fecha, productos e
+importe, y se puede entrar a cada una—, y si es de consignación, lo que tiene
+ahora. Antes había que ir a Ingresos y buscarlo entre doscientas ventas. El
+lápiz sigue llevando a editar los datos, que es otra cosa.
+
+Tres ventas y no diez a propósito: alcanzan para ver si compra seguido y cuánto
+gasta. Más que eso es un balance, y para eso está Resumen.
+
+**El remito arranca en «enorme».** El papel térmico se lee mal y quien lo recibe
+casi nunca lo lee con buena luz. Si gastan demasiado papel, se baja desde el
+mismo remito.
+
+Quedan los dos que necesitan columnas nuevas en la planilla: el precio al que se
+dejó la mercadería, y la fecha en que se cobró.
