@@ -333,6 +333,31 @@ window.Consignacion = (function () {
 
   // ---------- Liquidar y devolver: solo lo que hay en el local ----------
 
+  /* ------------------------------------------------------------------------
+     EL PRECIO AL QUE SE COBRA UNA LIQUIDACIÓN
+
+     Por defecto, el precio al que se dejó la mercadería: entre que se entrega y
+     que el local la vende pueden pasar meses, y el aumento del medio no es
+     asunto suyo. Hasta ahora se cobraba al precio de lista del día, que es lo
+     que vinieron a pedir que cambie.
+
+     Pero queda editable, porque el precio no siempre es el de la entrega: a
+     veces se acuerda otra cosa en el momento, o justamente se quiere actualizar.
+     La app propone lo correcto; quien cobra decide.
+
+     De lo que ya estaba en los locales antes de que exista la columna no quedó
+     registro del precio. Para eso se usa el de lista y se dice que es el de
+     hoy, para que no parezca un dato que no es.
+     ------------------------------------------------------------------------ */
+
+  const precioParaCobrar = (local, r) =>
+    window.Datos.precioDeEntrega(local, r.cod) || r.precio;
+
+  const deDondeSaleElPrecio = (local, r) =>
+    window.Datos.precioDeEntrega(local, r.cod)
+      ? "al precio de cuando se dejó"
+      : "al precio de hoy (no se sabe a cuánto se dejó)";
+
   function formSacar(local, renglones) {
     const m = MODOS[modo];
     const medios = window.Datos.todo().listas.medios_pago || [];
@@ -378,8 +403,13 @@ window.Consignacion = (function () {
           <li class="cuenta">
             <span class="cuenta__texto">
               <span class="celda__que">${esc(r.nombre)}</span>
-              <span class="celda__detalle">tiene ${numero(r.cantidad)} · ${dinero(r.precio)} c/u</span>
+              <span class="celda__detalle">tiene ${numero(r.cantidad)}${
+                modo === "liquidar" ? " · " + esc(deDondeSaleElPrecio(local, r)) : ""}</span>
             </span>
+            ${modo === "liquidar" ? `
+              <input type="text" class="cg-precio numero" data-cod="${esc(r.cod)}"
+                     value="${precioParaCobrar(local, r)}" inputmode="numeric"
+                     aria-label="Precio de ${esc(r.nombre)}">` : ""}
             <input type="text" class="cg-sacar numero" data-cod="${esc(r.cod)}"
                    data-hay="${r.cantidad}" data-precio="${r.precio}"
                    inputmode="numeric" placeholder="0" aria-label="Cuántas de ${esc(r.nombre)}">
@@ -398,6 +428,14 @@ window.Consignacion = (function () {
   }
 
   // ---------- Cuentas vivas ----------
+
+  // Lo que haya en la casilla de precio, o lo que se propuso si la vaciaron.
+  function precioTipeado(cod, siNoHay) {
+    const campo = vista.querySelector('.cg-precio[data-cod="' + cod + '"]');
+    if (!campo) return siNoHay;
+    const n = aNumero(campo.value);
+    return Number.isFinite(n) && n > 0 ? n : siNoHay;
+  }
 
   function recalcular(local) {
     const caja = document.getElementById("cg-total");
@@ -429,7 +467,7 @@ window.Consignacion = (function () {
       if (!Number.isFinite(n) || n <= 0) { e.classList.remove("mal"); return; }
       const hay = Number(e.dataset.hay);
       e.classList.toggle("mal", n > hay);
-      total += n * Number(e.dataset.precio);
+      total += n * precioTipeado(e.dataset.cod, Number(e.dataset.precio));
       unidades += n;
     });
 
@@ -483,6 +521,7 @@ window.Consignacion = (function () {
 
     const ref = window.Util.nuevoId();
     const movimientos = juntadas.map((l) => window.Datos.movimiento("entrega", l.cod, l.cantidad, {
+      precio: window.Datos.precioDe(l.cod),
       local: local, fecha: cuando, ref: ref,
     }));
 
@@ -508,7 +547,11 @@ window.Consignacion = (function () {
       const n = aNumero(campo.value);
       if (!Number.isFinite(n) || n <= 0) return;
       if (n > Number(campo.dataset.hay)) hayExceso = true;
-      elegidas.push({ cod: campo.dataset.cod, cantidad: n, precio: Number(campo.dataset.precio) });
+      elegidas.push({
+        cod: campo.dataset.cod,
+        cantidad: n,
+        precio: precioTipeado(campo.dataset.cod, Number(campo.dataset.precio)),
+      });
     });
 
     if (!elegidas.length) {
@@ -550,6 +593,7 @@ window.Consignacion = (function () {
         lista: "mayorista",
         medio_pago: medioPago,
         pagado: cobrada,
+        cobrado: cobrada ? cuando : "",
         cod: l.cod,
         cantidad: l.cantidad,
         precio: l.precio,
@@ -758,6 +802,8 @@ window.Consignacion = (function () {
       };
     } else {
       vista.querySelectorAll(".cg-sacar").forEach((c) => { c.oninput = () => recalcular(local); });
+      // Cambiar un precio cambia el total, igual que cambiar una cantidad.
+      vista.querySelectorAll(".cg-precio").forEach((c) => { c.oninput = () => recalcular(local); });
       vista.querySelectorAll("[data-todo]").forEach((b) => {
         b.onclick = () => {
           const campo = vista.querySelector('.cg-sacar[data-cod="' + b.dataset.todo + '"]');

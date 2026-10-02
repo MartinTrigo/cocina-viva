@@ -54,7 +54,7 @@
 // Versión del protocolo. La app rechaza una respuesta que no la traiga o que
 // traiga otra: así una implementación vieja que haya quedado publicada no
 // puede pisar los datos del teléfono con un esquema que ya no existe.
-var API = 4;
+var API = 5;
 
 // Ubicaciones reservadas del libro mayor. En mayúscula y sin acentos a
 // propósito: los locales se escriben como los nombraron ellas ("humus",
@@ -67,7 +67,7 @@ var MERMA = 'MERMA';
 var COLUMNAS = {
   productos:   ['cod', 'producto', 'presentacion', 'costo', 'pmayor', 'pminor', 'activo', 'mod'],
   clientes:    ['nombre', 'localidad', 'tipo', 'medio_pago', 'activo', 'mod'],
-  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'pagado',
+  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'pagado', 'cobrado',
                 'cod', 'cantidad', 'precio', 'subtotal', 'obs', 'mod'],
   egresos:     ['id', 'fecha', 'rubro', 'detalle', 'persona', 'cantidad', 'monto',
                 'medio_pago', 'obs', 'mod'],
@@ -76,20 +76,20 @@ var COLUMNAS = {
   personas:    ['nombre', 'cargo', 'precio_hora', 'activo', 'mod'],
   // Cada rato de trabajo, con su fecha y su actividad.
   horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'obs', 'mod'],
-  movimientos: ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'desde', 'hacia', 'ref', 'obs', 'mod'],
+  movimientos: ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'precio', 'desde', 'hacia', 'ref', 'obs', 'mod'],
   borrados:    ['id', 'mod', 'que', 'quien']
 };
 
 var ENCABEZADOS = {
   productos:   ['código', 'producto', 'presentación', 'costo', 'precio mayor', 'precio minorista', 'activo', 'mod'],
   clientes:    ['nombre', 'localidad', 'tipo', 'medio de pago habitual', 'activo', 'mod'],
-  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio de pago', 'pagado',
+  ingresos:    ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio de pago', 'pagado', 'cobrado el',
                 'código', 'cantidad', 'precio', 'subtotal', 'observaciones', 'mod'],
   egresos:     ['id', 'fecha', 'rubro', 'detalle', 'persona', 'cantidad', 'monto',
                 'medio de pago', 'observaciones', 'mod'],
   personas:    ['nombre', 'cargo', 'precio por hora', 'activo', 'mod'],
   horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'observaciones', 'mod'],
-  movimientos: ['id', 'fecha', 'tipo', 'código', 'cantidad', 'desde', 'hacia', 'referencia',
+  movimientos: ['id', 'fecha', 'tipo', 'código', 'cantidad', 'precio', 'desde', 'hacia', 'referencia',
                 'observaciones', 'mod'],
   borrados:     ['id', 'mod', 'qué se borró', 'quién lo borró'],
   listas:       ['medios de pago', 'rubros de egreso'],
@@ -326,6 +326,10 @@ function leerFilas(nombre) {
     if (nombre === 'ingresos') {
       o.venta = String(o.venta || '').trim() || o.id;
       o.pagado = siNo(o.pagado, true);
+      // Cuándo entró la plata, que no es lo mismo que cuándo se vendió. Las
+      // filas de antes de esta columna no la tienen: para ellas, lo cobrado se
+      // cobró el día de la venta, que es lo que se suponía hasta ahora.
+      o.cobrado = fechaIso(o.cobrado) || (o.pagado ? o.fecha : '');
       o.cliente = String(o.cliente || '').trim();
       o.lista = String(o.lista || '').trim().toLowerCase().indexOf('min') === 0
         ? 'minorista' : 'mayorista';
@@ -372,6 +376,10 @@ function leerFilas(nombre) {
       if (TIPOS.indexOf(o.tipo) < 0) o.tipo = 'ajuste';
       o.cod = String(o.cod || '').trim().toUpperCase();
       o.cantidad = numero(o.cantidad);
+      // El precio al que se dejó la mercadería. Solo lo llevan las entregas, y
+      // solo desde que existe esta columna: lo que ya estaba en los locales no
+      // dejó registro de a cuánto se dejó, y no hay de dónde sacarlo.
+      o.precio = numero(o.precio);
       o.desde = String(o.desde || '').trim();
       o.hacia = String(o.hacia || '').trim();
       o.ref = String(o.ref || '');
@@ -502,6 +510,7 @@ function escribirFilas(nombre, objetos) {
       if (c === 'fecha') {
         return aFecha(v || fechaVieja[o.id] || crudoVieja[o.id] || '');
       }
+      if (c === 'cobrado') return aFecha(v);
       // «pagado» sale sí/no como «activo»: la celda tiene ese desplegable y
       // venía escribiendo TRUE, que la validación marca como valor de afuera.
       if (c === 'activo' || c === 'pagado') return v === false ? 'no' : 'sí';
@@ -887,6 +896,10 @@ function prepararLibro() {
 // El orden de columnas que tenía cada hoja antes de la versión de ahora. Es lo
 // único que hace falta para migrarla: se lee con el orden con el que se
 // escribió y se vuelve a escribir con el de hoy, mapeando POR NOMBRE.
+/* Lo que la planilla tiene HOY, para que migrarHoja() sepa de dónde viene. Se
+   actualiza junto con COLUMNAS cada vez que se agrega una columna: si queda
+   describiendo un diseño de hace tres cambios, la migración lee de posiciones
+   que ya no existen. */
 var COLUMNAS_ANTERIORES = {
   productos: ['cod', 'producto', 'presentacion', 'pmayor', 'pminor', 'activo', 'mod'],
   ingresos:  ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago', 'cod',
@@ -894,6 +907,12 @@ var COLUMNAS_ANTERIORES = {
   egresos:   ['id', 'fecha', 'rubro', 'detalle', 'cantidad', 'monto', 'medio_pago',
               'obs', 'mod'],
 };
+
+// Y estas dos son el diseño del que se viene ahora, que ya tenía «pagado».
+COLUMNAS_ANTERIORES.ingresos = ['id', 'venta', 'fecha', 'cliente', 'lista', 'medio_pago',
+  'pagado', 'cod', 'cantidad', 'precio', 'subtotal', 'obs', 'mod'];
+COLUMNAS_ANTERIORES.movimientos = ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'desde',
+  'hacia', 'ref', 'obs', 'mod'];
 
 function migrarHoja(nombre) {
   var viejas = COLUMNAS_ANTERIORES[nombre];
@@ -1211,8 +1230,7 @@ function crearResumen() {
     .setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
 
   h.getRange('A3:B7').setValues([
-    ['Ingresos totales', '=SUM(ingresos!' + letraDe('ingresos', 'subtotal') + '2:'
-      + letraDe('ingresos', 'subtotal') + ')'],
+    ['Ingresos totales', formulaDeIngresos()],
     ['Egresos totales', '=SUM(egresos!' + letraDe('egresos', 'monto') + '2:'
       + letraDe('egresos', 'monto') + ')'],
     ['Balance', '=B3-B4'],
@@ -1341,12 +1359,21 @@ function egresosPorRubro(h) {
    columna ya no deja el resumen mintiendo.
    -------------------------------------------------------------------------- */
 
+// Lo cobrado, no lo facturado. Una venta entregada que todavía no pagaron no
+// está en ningún bolsillo, y sumarla hacía que el número grande del resumen no
+// cerrara nunca contra la caja. Lo que falta cobrar se mira aparte.
+function formulaDeIngresos() {
+  var pagado = letraDe('ingresos', 'pagado');
+  var subtotal = letraDe('ingresos', 'subtotal');
+  return '=SUMIF(ingresos!' + pagado + '2:' + pagado + ';"sí";ingresos!'
+       + subtotal + '2:' + subtotal + ')';
+}
+
 function arreglarFormulasDelResumen() {
   var h = SpreadsheetApp.getActive().getSheetByName('resumen');
   if (!h) return 'No hay hoja resumen.';
 
-  h.getRange('B3').setValue('=SUM(ingresos!' + letraDe('ingresos', 'subtotal') + '2:'
-    + letraDe('ingresos', 'subtotal') + ')');
+  h.getRange('B3').setValue(formulaDeIngresos());
   h.getRange('B4').setValue('=SUM(egresos!' + letraDe('egresos', 'monto') + '2:'
     + letraDe('egresos', 'monto') + ')');
 

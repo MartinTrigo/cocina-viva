@@ -492,6 +492,7 @@ window.Ingresos = (function () {
         lista: borrador.lista,
         medio_pago: borrador.medio_pago,
         pagado: borrador.pagado !== false,
+        cobrado: borrador.pagado !== false ? borrador.fecha : "",
         cod: l.cod,
         cantidad: l.cantidad,
         precio: precio,
@@ -639,7 +640,9 @@ window.Ingresos = (function () {
     if (!v) return;
     const ahora = Date.now();
     await window.CVDB.guardarVarios("ingresos",
-      v.lineas.map((l) => Object.assign({}, l, { pagado: true, mod: ahora })));
+      // Cobrada hoy, no el día de la venta: es la fecha en que entró la plata.
+      v.lineas.map((l) => Object.assign({}, l,
+        { pagado: true, cobrado: window.Util.hoy(), mod: ahora })));
     await window.Datos.cargar();
     window.Sincro.sincronizar(true);
     window.Util.brindis("Cobrada: " + v.cliente + ", " + dinero(v.total) + ".");

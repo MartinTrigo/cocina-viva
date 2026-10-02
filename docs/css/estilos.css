@@ -716,6 +716,10 @@ a.boton { text-decoration: none; }
 
 .cuenta__texto { flex: 1; min-width: 0; }
 .cuenta input { width: 78px; flex: none; }
+/* Al liquidar hay dos casillas por renglón —precio y cantidad— y en un
+   teléfono entran justas. La del precio es la más ancha: lleva más cifras. */
+.cuenta input.cg-precio { width: 74px; }
+.cuenta input.cg-sacar { width: 58px; }
 
 /* Un casillero con más de lo que el local tiene se marca en rojo mientras se
    escribe, no recién al guardar. */

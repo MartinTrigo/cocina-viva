@@ -189,6 +189,45 @@ window.Datos = (function () {
   }
 
   // Pasa un { COD: cantidad } a una lista ordenada y lista para mostrar.
+  /* ------------------------------------------------------------------------
+     A QUÉ PRECIO SE DEJÓ LO QUE TODAVÍA ESTÁ EN EL LOCAL
+
+     Se cobra al precio al que se dejó, no al de hoy: entre que se entrega y que
+     el local vende pueden pasar meses, y el aumento no es asunto suyo.
+
+     Las entregas van formando una fila de espera y las liquidaciones y
+     devoluciones la van consumiendo desde adelante, que es el orden en que se
+     vende: primero lo que llegó primero. Lo que queda al frente es lo que hay
+     hoy en el estante, y su precio es el que corresponde cobrar.
+
+     Devuelve 0 si no hay de dónde saberlo —todo lo entregado antes de que esta
+     columna existiera—, y ahí el que llama usa el precio de lista.
+     ------------------------------------------------------------------------ */
+
+  function precioDeEntrega(local, cod) {
+    const cola = [];
+    (cache ? cache.movimientos : [])
+      .filter((m) => m.cod === cod && (m.desde === local || m.hacia === local))
+      .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
+      .forEach((m) => {
+        const n = Number(m.cantidad) || 0;
+        if (m.hacia === local) {                 // llegó mercadería
+          cola.push({ quedan: n, precio: Number(m.precio) || 0 });
+          return;
+        }
+        let salen = n;                           // se vendió o volvió
+        while (salen > 0 && cola.length) {
+          const primero = cola[0];
+          const toma = Math.min(salen, primero.quedan);
+          primero.quedan -= toma;
+          salen -= toma;
+          if (primero.quedan <= 0) cola.shift();
+        }
+      });
+    const frente = cola.find((c) => c.quedan > 0 && c.precio > 0);
+    return frente ? frente.precio : 0;
+  }
+
   function renglonesDe(cuenta, lista) {
     return Object.keys(cuenta)
       .map((cod) => {
@@ -345,6 +384,10 @@ window.Datos = (function () {
       cantidad: Number(cantidad) || 0,
       desde: r.desde === "local" ? local : r.desde,
       hacia: r.hacia === "local" ? local : r.hacia,
+      // El precio al que se deja la mercadería. Solo tiene sentido en una
+      // entrega, y es lo que después se le cobra al local: si entre que se dejó
+      // y que lo vendió subió la lista, no es asunto del local.
+      precio: Number(o.precio) || 0,
       ref: o.ref || "",
       obs: o.obs || "",
     };
@@ -383,18 +426,31 @@ window.Datos = (function () {
      egresos. Tiene que ser el mismo texto en los dos lados, y por eso vive acá
      y no en cada pantalla.
      ------------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------------
+     CUÁNDO ENTRÓ LA PLATA
+
+     Una venta tiene dos fechas que casi siempre coinciden y a veces no: cuándo
+     se vendió y cuándo se cobró. Para el stock y el remito manda la primera;
+     para el balance, la segunda —una venta de agosto cobrada en octubre es
+     plata de octubre, y ponerla en agosto deja los dos meses mal—.
+
+     Las filas anteriores a la columna «cobrado» no la tienen: para ellas se
+     usa la fecha de la venta, que es lo que se suponía hasta ahora.
+     ------------------------------------------------------------------------ */
+  const cuandoEntro = (f) => (f && (f.cobrado || f.fecha)) || "";
+
   const CORRECCION = "Corrección";
   const esCorreccion = (f) => !!f && (f.cliente === CORRECCION || f.rubro === CORRECCION);
 
   return {
     DEPOSITO, PRODUCCION, VENDIDO, MERMA, RESERVADAS,
-    CORRECCION, esCorreccion,
+    CORRECCION, esCorreccion, cuandoEntro,
     cargar, hay, todo,
     producto, productosActivos, clientesActivos, localesDeConsignacion,
     persona, personasActivas, precioHora,
     nombreDe, precioDe, costoDe, hayCosto, margenDe,
     stockEn, stockDeposito, stockEnLaCalle, localesConMercaderia, valorDe, renglonesDe,
     diasDesde, ritmoDeLocal, ventasPorSemana, coberturaDeStock,
-    movimiento, ajuste,
+    movimiento, ajuste, precioDeEntrega,
   };
 })();

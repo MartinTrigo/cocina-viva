@@ -60,7 +60,10 @@ window.Resumen = (function () {
     return Object.keys(vistos).sort().reverse();
   }
 
-  const enPeriodo = (f) => !periodo || mesDe(f.fecha) === periodo;
+  // Un ingreso cae en el mes en que entró la plata; un egreso, en el de su
+  // fecha, que es la misma cosa porque un gasto se paga cuando se hace.
+  const enPeriodo = (f) => !periodo || mesDe(window.Datos.cuandoEntro(f)) === periodo;
+  const egresoEnPeriodo = (e) => !periodo || mesDe(e.fecha) === periodo;
 
   function datosDelPeriodo() {
     const d = window.Datos.todo();
@@ -396,6 +399,7 @@ window.Resumen = (function () {
         lista: "mayorista",
         medio_pago: medio,
         pagado: true,
+        cobrado: cuando,
         cod: "",
         cantidad: 0,
         precio: 0,
@@ -533,7 +537,7 @@ window.Resumen = (function () {
     const porMes = {};
     const sumar = (lista, campo, cual) => (lista || []).forEach((f) => {
       if (!f.fecha) return;
-      const m = mesDe(f.fecha);
+      const m = mesDe(window.Datos.cuandoEntro(f));
       if (!porMes[m]) porMes[m] = { ingresos: 0, egresos: 0 };
       porMes[m][cual] += Number(f[campo]) || 0;
     });
