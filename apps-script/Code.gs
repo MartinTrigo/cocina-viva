@@ -1832,23 +1832,87 @@ function respaldoDiario() {
   }
   archivo.makeCopy(nombre, carpeta);
 
-  // Y se tiran los más viejos, para que la carpeta no crezca sin fin.
-  var copias = [];
+  // Y se tiran los más viejos, para que la carpeta no crezca sin fin —pero no
+  // todos: ver cualesTirar() acá abajo.
+  var porNombre = {};
+  var nombres = [];
   var lista = carpeta.getFiles();
   while (lista.hasNext()) {
     var f = lista.next();
-    copias.push({ archivo: f, cuando: f.getDateCreated().getTime() });
+    porNombre[f.getName()] = f;
+    nombres.push(f.getName());
   }
-  copias.sort(function (a, b) { return b.cuando - a.cuando; });
-  var tirados = 0;
-  copias.slice(RESPALDOS_QUE_SE_GUARDAN).forEach(function (c) {
-    c.archivo.setTrashed(true);
-    tirados++;
-  });
+  var tirar = cualesTirar(nombres, RESPALDOS_QUE_SE_GUARDAN);
+  tirar.forEach(function (n) { porNombre[n].setTrashed(true); });
 
-  var texto = 'Respaldo guardado: ' + nombre + '. Quedan '
-    + Math.min(copias.length, RESPALDOS_QUE_SE_GUARDAN) + ' copias'
-    + (tirados ? ' (se tiraron ' + tirados + ' viejas).' : '.');
+  var texto = 'Respaldo guardado: ' + nombre + '.'
+    + '\nQuedan ' + (nombres.length - tirar.length) + ' copias en la carpeta '
+    + '«' + CARPETA_RESPALDOS + '»'
+    + (tirar.length ? ' (se tiraron ' + tirar.length + ' viejas).' : '.');
+  Logger.log(texto);
+  return texto;
+}
+
+/* --------------------------------------------------------------------------
+   QUÉ COPIAS SE TIRAN
+
+   Guardar solo los últimos treinta días deja un agujero: un problema que se
+   descubre en dos meses —y pasó, con las fechas— ya no tiene de dónde
+   recuperarse. Pero guardarlas todas tampoco: en un año son trescientas.
+
+   Así que se guardan las últimas treinta, Y ADEMÁS la primera de cada mes para
+   siempre. Doce archivos más por año, de cuarenta kilobytes cada uno. Con eso,
+   de lo reciente está todo día por día, y de lo viejo queda una foto mensual,
+   que para encontrar cuándo se rompió algo alcanza y sobra.
+
+   Está aparte y sin tocar el Drive a propósito: así se puede probar. Decidir
+   qué borrar es lo único de todo esto que no tiene vuelta atrás.
+   -------------------------------------------------------------------------- */
+
+function cualesTirar(nombres, cuantasSeGuardan) {
+  var ordenados = nombres.slice().sort().reverse();   // el nombre lleva la fecha
+  var sobran = ordenados.slice(cuantasSeGuardan);
+
+  // De las que sobran, la más vieja de cada mes se queda.
+  var ancla = {};
+  sobran.forEach(function (n) {
+    var mes = String(n).slice(-10, -3);               // de 'Cocina Viva 2026-10-02'
+    ancla[mes] = n;                                   // van de nueva a vieja
+  });
+  var guardadas = {};
+  Object.keys(ancla).forEach(function (m) { guardadas[ancla[m]] = true; });
+
+  return sobran.filter(function (n) { return !guardadas[n]; });
+}
+
+/* --------------------------------------------------------------------------
+   VER QUÉ RESPALDOS HAY
+
+   Un respaldo que corre de noche y falla no avisa a nadie. Esto se corre
+   cuando uno quiera y dice qué hay, con el más nuevo primero.
+   -------------------------------------------------------------------------- */
+
+function verRespaldos() {
+  var archivo = DriveApp.getFileById(SpreadsheetApp.getActive().getId());
+  var carpeta = carpetaDeRespaldos(archivo);
+  var nombres = [];
+  var lista = carpeta.getFiles();
+  while (lista.hasNext()) nombres.push(lista.next().getName());
+  nombres.sort().reverse();
+
+  if (!nombres.length) {
+    return 'NO HAY NINGÚN RESPALDO. Corré respaldoDiario() a mano y fijate '
+         + 'si da error: puede faltar el permiso de Drive.';
+  }
+
+  var hoy = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var ultimo = nombres[0].slice(-10);
+  var dias = Math.round((new Date(hoy) - new Date(ultimo)) / 86400000);
+
+  var texto = nombres.length + ' respaldos. El último es del ' + ultimo
+    + (dias <= 1 ? ' (al día).' : ' — HACE ' + dias + ' DÍAS. Algo no está corriendo.');
+  texto += '\n\n' + nombres.slice(0, 40).join('\n')
+        + (nombres.length > 40 ? '\n…y ' + (nombres.length - 40) + ' más' : '');
   Logger.log(texto);
   return texto;
 }

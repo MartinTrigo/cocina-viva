@@ -1760,3 +1760,26 @@ fecha de la operación sino el día en que se cargó». Es lo único de toda la
 reconstrucción que es deducido y no un dato, y quien lo lea tiene que poder
 desconfiar. Inventar una fecha en silencio fue exactamente el error de
 septiembre; hacerlo y decirlo es otra cosa.
+
+### Que el respaldo aguante más de un mes, y que se pueda mirar
+
+El respaldo arrancó, pero con dos agujeros.
+
+**El primero: treinta días no alcanzan.** Un problema que se descubre dos meses
+después —y acaba de pasar, con las fechas— ya no tendría de dónde recuperarse.
+Guardarlas todas tampoco: en un año son trescientas. Así que ahora se guardan
+las últimas treinta **y además la primera copia de cada mes, para siempre**.
+Doce archivos más por año, de cuarenta kilobytes cada uno. De lo reciente está
+todo día por día; de lo viejo queda una foto mensual, que para encontrar cuándo
+se rompió algo alcanza y sobra.
+
+Decidir qué borrar es lo único de todo esto **que no tiene vuelta atrás**, así
+que vive en `cualesTirar()`, separada del Drive y sin tocar nada, para poder
+probarla. Tiene su caso en el banco: con dos meses y medio de copias quedan 32
+—las 30 últimas más un ancla por cada mes viejo—, la primera de agosto
+sobrevive, el resto de agosto no, y con pocas copias no se tira ninguna.
+
+**El segundo: un respaldo que corre de noche y falla no avisa a nadie.**
+`verRespaldos()` se corre cuando uno quiera y dice cuántos hay y de cuándo es el
+último; si el último no es de hoy o de ayer, lo dice con todas las letras:
+«HACE N DÍAS. Algo no está corriendo».

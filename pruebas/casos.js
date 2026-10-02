@@ -487,6 +487,38 @@
             + (filasDe("ingresos")[0].fecha || "ninguna"));
   }
 
+  // ---------- qué copias de respaldo se tiran ----------
+  //
+  // Es lo único de todo el respaldo que no tiene vuelta atrás, así que la
+  // decisión está separada del Drive justamente para poder probarla acá.
+
+  async function casoQueRespaldosSeTiran() {
+    caso("Se guardan los últimos días, y la primera copia de cada mes");
+    const dia = (d) => "Cocina Viva " + d;
+    // Dos meses y medio de copias, una por día.
+    const todas = [];
+    for (let m = 8; m <= 10; m++) {
+      for (let d = 1; d <= 28; d++) {
+        todas.push(dia("2026-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0")));
+      }
+    }
+    const tirar = cualesTirar(todas, 30);
+    const quedan = todas.filter((n) => tirar.indexOf(n) < 0).sort().reverse();
+
+    afirmar(quedan.indexOf(dia("2026-10-28")) >= 0, "queda la de hoy");
+    afirmar(quedan.length === 32,
+            "quedan las 30 últimas más un ancla por mes viejo: " + quedan.length);
+    afirmar(quedan.indexOf(dia("2026-08-01")) >= 0,
+            "y la primera de agosto NO se tira, aunque tenga dos meses");
+    afirmar(quedan.indexOf(dia("2026-08-15")) < 0, "pero el resto de agosto sí");
+    afirmar(tirar.indexOf(dia("2026-10-28")) < 0, "nunca se tira una reciente");
+
+    // Con pocas copias no se tira nada.
+    afirmar(cualesTirar([dia("2026-10-01"), dia("2026-10-02")], 30).length === 0,
+            "con menos copias que el tope no se tira ninguna");
+    afirmar(cualesTirar([], 30).length === 0, "y sin copias tampoco se rompe");
+  }
+
   // ---------- que la versión y el caché vayan juntos ----------
   //
   // La app avisa «hay una versión nueva» comparándole al servidor el VERSION de
@@ -536,7 +568,7 @@
       casoRestaurarFechas, casoPagadoSiONo,
       casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
       casoLaFechaVuelveDelTelefono, casoEmpateDeFechas,
-      casoLaVersionYElCache,
+      casoQueRespaldosSeTiran, casoLaVersionYElCache,
     ];
     for (const c of casos) {
       try { await c(); }
