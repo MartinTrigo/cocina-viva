@@ -477,12 +477,16 @@ function escribirFilas(nombre, objetos) {
   // 143— y la escritura siguiente dejó el blanco firme. Ahora, si el renglón
   // que entra viene sin fecha, se queda con la que tenía la planilla.
   var fechaVieja = {};
+  var crudoVieja = {};
   var iId = cols.indexOf('id'), iFecha = cols.indexOf('fecha');
   if (iId >= 0 && iFecha >= 0 && ultima > 1) {
     h.getRange(2, 1, ultima - 1, cols.length).getValues().forEach(function (f) {
       var id = String(f[iId] || '').trim();
+      if (!id) return;
       var d = fechaIso(f[iFecha]);
-      if (id && d) fechaVieja[id] = d;
+      if (d) { fechaVieja[id] = d; return; }
+      // Había algo y no se entendió. Se guarda tal cual para no tirarlo.
+      if (f[iFecha] !== '' && f[iFecha] != null) crudoVieja[id] = f[iFecha];
     });
   }
 
@@ -492,7 +496,12 @@ function escribirFilas(nombre, objetos) {
   var filas = objetos.map(function (o) {
     return cols.map(function (c) {
       var v = o[c];
-      if (c === 'fecha') return aFecha(v || fechaVieja[o.id] || '');
+      // Si no hay fecha que escribir, antes de dejar la celda vacía se deja lo
+      // que había: una fecha que no se supo leer se ve y se arregla; una celda
+      // en blanco no se ve, y es un dato menos sin que nadie se entere.
+      if (c === 'fecha') {
+        return aFecha(v || fechaVieja[o.id] || crudoVieja[o.id] || '');
+      }
       // «pagado» sale sí/no como «activo»: la celda tiene ese desplegable y
       // venía escribiendo TRUE, que la validación marca como valor de afuera.
       if (c === 'activo' || c === 'pagado') return v === false ? 'no' : 'sí';
@@ -523,18 +532,48 @@ function dos(n) { return ('0' + n).slice(-2); }
 
 // Acepta lo que salga: el objeto Date de la planilla, "7/8/2026", "2026-08-07"
 // y también "7/8" sin año, que en la planilla vieja aparece bastante.
+/* --------------------------------------------------------------------------
+   LEER UNA FECHA ESCRITA DE CUALQUIER MANERA
+
+   Cada cosa que esta función no entiende es una fecha que se pierde, porque lo
+   que vuelve vacío se escribe vacío. Dos formas que no entendía y que aparecen
+   solas apenas alguien escribe una fecha a mano en la planilla:
+
+     · el año de dos cifras —«2/10/26»—, que queda como texto si la celda está
+       formateada como texto en vez de como fecha;
+     · el número de serie de la planilla —«46297»—, que es como Google guarda
+       una fecha por dentro y es lo que devuelve la celda si le cambiaron el
+       formato o si se pegó «solo valores» encima.
+
+   Las dos se ven igual en la pantalla y las dos valían cero acá adentro.
+   -------------------------------------------------------------------------- */
+
 function fechaIso(v) {
   if (v instanceof Date && !isNaN(v)) {
     return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
+
+  // El número de serie de la planilla: días desde el 30/12/1899. Se acota al
+  // rango razonable para no tomar por fecha una cantidad o un precio sueltos.
+  if (typeof v === 'number' && v > 36000 && v < 80000) {
+    // En hora local y no en UTC: armada en UTC, al escribirla con el huso de
+    // acá —tres horas atrás— la medianoche cae en el día anterior.
+    return fechaIso(new Date(1899, 11, 30 + Math.floor(v)));
+  }
+
   var s = String(v || '').trim();
   if (!s) return '';
   var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
   if (m) return m[3] + '-' + dos(m[2]) + '-' + dos(m[1]);
-  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
   if (m) return m[1] + '-' + dos(m[2]) + '-' + dos(m[3]);
+  // Año de dos cifras: 26 es 2026. Nadie va a cargar ventas de 1926.
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})$/);
+  if (m) return '20' + m[3] + '-' + dos(m[2]) + '-' + dos(m[1]);
   m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
   if (m) return new Date().getFullYear() + '-' + dos(m[2]) + '-' + dos(m[1]);
+  // Un número de serie que vino como texto.
+  if (/^\d{5}$/.test(s)) return fechaIso(Number(s));
   return '';
 }
 

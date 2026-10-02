@@ -12,7 +12,7 @@
   // uno y no el otro, pasa lo que ya pasó: la app se actualiza en silencio y
   // el cartel de «hay una versión nueva» no aparece nunca, porque compara
   // justamente este número. Hay un caso en el banco que lo vigila.
-  const VERSION = "1.8.4 · las fechas no se pierden";
+  const VERSION = "1.8.5 · fechas escritas a mano";
 
   const vista = document.getElementById("vista");
   const barra = document.querySelector(".barra");

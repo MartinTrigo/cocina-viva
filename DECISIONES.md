@@ -1783,3 +1783,34 @@ sobrevive, el resto de agosto no, y con pocas copias no se tira ninguna.
 `verRespaldos()` se corre cuando uno quiera y dice cuántos hay y de cuándo es el
 último; si el último no es de hoy o de ayer, lo dice con todas las letras:
 «HACE N DÍAS. Algo no está corriendo».
+
+## Por qué se borran las fechas: la hipótesis que explica las tres veces
+
+Ellas contaron la secuencia completa, y es la que faltaba: **las completaron a
+mano, y después se borraron solas** cuando alguien se conectó.
+
+Eso descarta al que se conecta como culpable y señala al que escribe. Una fecha
+escrita a mano en la planilla puede quedar guardada de formas que `fechaIso()`
+no reconocía:
+
+- **año de dos cifras** —`2/10/26`—, que es como se tipea a las apuradas y queda
+  como texto si la celda está formateada como texto;
+- **el número de serie** —`46255`—, que es como Google guarda una fecha por
+  dentro y es lo que devuelve la celda si le cambiaron el formato o si se pegó
+  «solo valores» encima.
+
+Las dos se ven como una fecha normal en la pantalla, y las dos valían cero acá
+adentro. `fechaIso()` devolvía vacío, `escribirFilas()` escribía vacío, y la
+fecha desaparecía **en la primera sincronización de cualquiera**. De ahí que
+pareciera que el que se conectaba las borraba: la sincronización es el gatillo,
+no la causa.
+
+Ahora `fechaIso()` entiende las dos formas —y el número de serie acotado a un
+rango razonable, para no tomar por fecha una cantidad o un precio—. Y sobre todo:
+**si hay algo en la celda que no se entiende, se deja como está en vez de
+borrarlo.** Una fecha ilegible se ve y se arregla; una celda vacía no se ve, y
+es un dato menos sin que nadie se entere.
+
+Ojo con el error que me comí en el camino: el número de serie lo armaba en UTC,
+y al escribirlo con el huso de acá la medianoche caía en el día anterior. El
+banco lo agarró.

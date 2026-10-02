@@ -487,6 +487,51 @@
             + (filasDe("ingresos")[0].fecha || "ninguna"));
   }
 
+  // ---------- las formas en que se puede escribir una fecha ----------
+  //
+  // Cada forma que fechaIso() no entiende es una fecha que se pierde, porque lo
+  // que vuelve vacío se escribe vacío. Y las dos que faltaban aparecen solas
+  // apenas alguien escribe una fecha a mano en la planilla.
+
+  async function casoFormasDeFecha() {
+    caso("Una fecha escrita de cualquier manera se entiende igual");
+    afirmar(fechaIso("21/08/2026") === "2026-08-21", "21/08/2026");
+    afirmar(fechaIso("2026-08-21") === "2026-08-21", "2026-08-21");
+    afirmar(fechaIso("21.08.2026") === "2026-08-21", "21.08.2026");
+    afirmar(fechaIso(new Date(2026, 7, 21)) === "2026-08-21", "un Date de verdad");
+
+    // Las dos que faltaban:
+    afirmar(fechaIso("21/8/26") === "2026-08-21",
+            "el año de dos cifras, que es como se tipea a las apuradas: "
+            + fechaIso("21/8/26"));
+    // 46255 es el 21/08/2026 en el número de serie de la planilla.
+    afirmar(fechaIso(46255) === "2026-08-21",
+            "el número de serie, que es lo que devuelve la celda si le cambiaron "
+            + "el formato: " + fechaIso(46255));
+    afirmar(fechaIso("46255") === "2026-08-21", "y el mismo número como texto");
+
+    afirmar(fechaIso("") === "", "lo vacío sigue vacío");
+    afirmar(fechaIso("cualquier cosa") === "", "lo que no es fecha sigue sin serlo");
+    afirmar(fechaIso(12) === "" && fechaIso(9800) === "",
+            "y una cantidad o un precio no se toman por fecha");
+  }
+
+  async function casoNoSeBorraLoQueNoSeEntiende() {
+    caso("Una fecha ilegible se deja a la vista, no se borra");
+    limpiarPlanilla();
+    enLaPlanilla("ingresos", [
+      { id: "x1", venta: "vX", fecha: "2026-08-21", cliente: "amarantus",
+        lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
+        cantidad: 1, precio: 10200, subtotal: 10200, obs: "", mod: 1 },
+    ]);
+    // Alguien escribe algo en la celda que no es una fecha reconocible.
+    hoja("ingresos").filas[1][2] = "el martes";
+    sincronizar({}, { persona: "luna" });
+    afirmar(hoja("ingresos").filas[1][2] === "el martes",
+            "sigue ahí para que alguien lo vea y lo corrija: "
+            + JSON.stringify(hoja("ingresos").filas[1][2]));
+  }
+
   // ---------- qué copias de respaldo se tiran ----------
   //
   // Es lo único de todo el respaldo que no tiene vuelta atrás, así que la
@@ -568,6 +613,7 @@
       casoRestaurarFechas, casoPagadoSiONo,
       casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
       casoLaFechaVuelveDelTelefono, casoEmpateDeFechas,
+      casoFormasDeFecha, casoNoSeBorraLoQueNoSeEntiende,
       casoQueRespaldosSeTiran, casoLaVersionYElCache,
     ];
     for (const c of casos) {
