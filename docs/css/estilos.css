@@ -716,10 +716,19 @@ a.boton { text-decoration: none; }
 
 .cuenta__texto { flex: 1; min-width: 0; }
 .cuenta input { width: 78px; flex: none; }
-/* Al liquidar hay dos casillas por renglón —precio y cantidad— y en un
-   teléfono entran justas. La del precio es la más ancha: lleva más cifras. */
-.cuenta input.cg-precio { width: 74px; }
-.cuenta input.cg-sacar { width: 58px; }
+/* Al liquidar hay una casilla más —el precio— y en un teléfono las tres no
+   entran en la misma línea sin dejar el nombre del producto partido en tres
+   pedazos y la aclaración cortada. El nombre se queda con el renglón entero y
+   las casillas bajan abajo, alineadas a la derecha. */
+.cuenta--conprecio { flex-wrap: wrap; }
+.cuenta--conprecio .cuenta__texto { flex: 1 0 100%; margin-bottom: 6px; }
+.cuenta--conprecio .cuenta__todo { margin-left: auto; align-self: flex-end; }
+
+/* Dos casillas sin rótulo —«1500» y «0»— no dicen cuál es cuál. El nombre va
+   arriba y no al lado, que es gratis en ancho y ahí no sobra. */
+.cuenta__campo { display: flex; flex-direction: column; gap: 2px; }
+.cuenta__campo > span { font-size: 11px; color: var(--texto-suave); padding-left: 2px; }
+.cuenta input.cg-precio { width: 86px; }
 
 /* Un casillero con más de lo que el local tiene se marca en rojo mientras se
    escribe, no recién al guardar. */

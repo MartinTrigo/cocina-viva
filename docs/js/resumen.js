@@ -63,7 +63,6 @@ window.Resumen = (function () {
   // Un ingreso cae en el mes en que entró la plata; un egreso, en el de su
   // fecha, que es la misma cosa porque un gasto se paga cuando se hace.
   const enPeriodo = (f) => !periodo || mesDe(window.Datos.cuandoEntro(f)) === periodo;
-  const egresoEnPeriodo = (e) => !periodo || mesDe(e.fecha) === periodo;
 
   function datosDelPeriodo() {
     const d = window.Datos.todo();
@@ -72,7 +71,13 @@ window.Resumen = (function () {
     return {
       ingresos: ingresos,
       egresos: egresos,
-      totalIngresos: ingresos.reduce((n, f) => n + (Number(f.subtotal) || 0), 0),
+      // Lo COBRADO, no lo facturado. Una venta entregada que todavía no
+      // pagaron no está en ningún bolsillo, y sumarla hacía que el número
+      // grande no cerrara nunca contra la caja. Lo que falta cobrar se mira
+      // aparte, abajo del cuadro por medio de pago.
+      totalIngresos: ingresos
+        .filter((f) => f.pagado !== false)
+        .reduce((n, f) => n + (Number(f.subtotal) || 0), 0),
       totalEgresos: egresos.reduce((n, e) => n + (Number(e.monto) || 0), 0),
     };
   }

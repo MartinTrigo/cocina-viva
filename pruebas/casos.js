@@ -586,6 +586,17 @@
     });
   }
 
+  async function casoLasDosApi() {
+    caso("La API del servicio y la de la app son la misma");
+    // Si se separan, la app se niega a sincronizar hasta que coincidan —y está
+    // bien que lo haga, porque una de las dos no conoce alguna columna—. Pero
+    // olvidarse de subir una de las dos deja a las dos chicas sin sincronizar
+    // sin que nadie entienda por qué. Ya pasó al agregar «cobrado».
+    const dice = sincronizar({}, { persona: "banco" });
+    afirmar(dice.api === window.Sincro.API,
+            "el servicio dice " + dice.api + " y la app espera " + window.Sincro.API);
+  }
+
   async function casoLaVersionYElCache() {
     caso("La versión de la app y la del caché son la misma");
     const app = await leerArchivo("../docs/js/app.js");
@@ -614,7 +625,7 @@
       casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
       casoLaFechaVuelveDelTelefono, casoEmpateDeFechas,
       casoFormasDeFecha, casoNoSeBorraLoQueNoSeEntiende,
-      casoQueRespaldosSeTiran, casoLaVersionYElCache,
+      casoQueRespaldosSeTiran, casoLasDosApi, casoLaVersionYElCache,
     ];
     for (const c of casos) {
       try { await c(); }

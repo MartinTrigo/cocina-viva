@@ -400,19 +400,25 @@ window.Consignacion = (function () {
 
       <ul class="chequeos">
         ${renglones.map((r) => `
-          <li class="cuenta">
+          <li class="cuenta${modo === "liquidar" ? " cuenta--conprecio" : ""}">
             <span class="cuenta__texto">
               <span class="celda__que">${esc(r.nombre)}</span>
               <span class="celda__detalle">tiene ${numero(r.cantidad)}${
                 modo === "liquidar" ? " · " + esc(deDondeSaleElPrecio(local, r)) : ""}</span>
             </span>
             ${modo === "liquidar" ? `
-              <input type="text" class="cg-precio numero" data-cod="${esc(r.cod)}"
-                     value="${precioParaCobrar(local, r)}" inputmode="numeric"
-                     aria-label="Precio de ${esc(r.nombre)}">` : ""}
-            <input type="text" class="cg-sacar numero" data-cod="${esc(r.cod)}"
-                   data-hay="${r.cantidad}" data-precio="${r.precio}"
-                   inputmode="numeric" placeholder="0" aria-label="Cuántas de ${esc(r.nombre)}">
+              <label class="cuenta__campo">
+                <span>precio</span>
+                <input type="text" class="cg-precio numero" data-cod="${esc(r.cod)}"
+                       value="${precioParaCobrar(local, r)}" inputmode="numeric"
+                       aria-label="Precio de ${esc(r.nombre)}">
+              </label>` : ""}
+            <label class="cuenta__campo">
+              <span>${modo === "liquidar" ? "vendió" : "vuelven"}</span>
+              <input type="text" class="cg-sacar numero" data-cod="${esc(r.cod)}"
+                     data-hay="${r.cantidad}" data-precio="${r.precio}"
+                     inputmode="numeric" placeholder="0" aria-label="Cuántas de ${esc(r.nombre)}">
+            </label>
             <button class="cuenta__todo" data-todo="${esc(r.cod)}">Todo</button>
           </li>`).join("")}
       </ul>

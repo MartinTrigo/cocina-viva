@@ -1847,3 +1847,48 @@ mismo remito.
 
 Quedan los dos que necesitan columnas nuevas en la planilla: el precio al que se
 dejó la mercadería, y la fecha en que se cobró.
+
+## Segunda tanda: el precio al que se dejó, y cuándo entró la plata
+
+Las dos piden guardar algo que antes no se guardaba, así que llevan columna
+nueva y suben la API a 5.
+
+**`movimientos` gana `precio`.** Cada entrega anota a cuánto se dejó la
+mercadería. Antes no quedaba registro, y al liquidar lo único disponible era el
+precio de lista del día: si entre que se entrega y que el local vende pasaban
+meses y hubo aumento, se le cobraba el aumento a quien no tenía nada que ver.
+
+`precioDeEntrega(local, cod)` arma una fila de espera: las entregas la llenan y
+las liquidaciones y devoluciones la consumen desde adelante, que es el orden en
+que se vende. Lo que queda al frente es lo que hay hoy en el estante, y su
+precio es el que corresponde cobrar. Devuelve 0 cuando no hay de dónde saberlo
+—todo lo entregado antes de que existiera la columna— y ahí se usa el de lista,
+diciéndolo: «al precio de hoy (no se sabe a cuánto se dejó)».
+
+**Y queda editable.** Lo pidieron así y es lo correcto: la app propone lo que
+corresponde, y quien cobra decide. A veces se acuerda otra cosa en el momento, o
+justamente se quiere actualizar.
+
+**`ingresos` gana `cobrado`.** Una venta tiene dos fechas que casi siempre
+coinciden y a veces no: cuándo se vendió y cuándo se cobró. Para el stock y el
+remito manda la primera; para el balance, la segunda —una venta de agosto
+cobrada en octubre es plata de octubre, y ponerla en agosto deja los dos meses
+mal—. Las filas anteriores a la columna usan la fecha de la venta, que es lo que
+se suponía hasta ahora, así que ningún número histórico se mueve.
+
+**El número grande del resumen pasa a ser lo cobrado**, no lo facturado. Una
+venta entregada que todavía no pagaron no está en ningún bolsillo. Lo que falta
+cobrar se sigue viendo aparte.
+
+### Dos cosas que aparecieron al hacerlo
+
+**La casilla de precio dejaba el renglón ilegible.** Dos casillas sin rótulo
+—«1500» y «0»— no dicen cuál es cuál, y el nombre del producto quedaba partido
+en tres pedazos. Ahora el nombre se queda con el renglón entero, las casillas
+bajan abajo y cada una lleva su nombre arriba: «precio» y «vendió».
+
+**Me olvidé de subir la API en la app.** El banco de sincronización se puso rojo
+en seis casos de golpe y el servicio andaba perfecto: la app se niega a
+sincronizar si las dos versiones no coinciden, que es exactamente lo que tiene
+que hacer. Hay un caso nuevo que las compara, como el que vigila `VERSION` y
+`CACHE`.

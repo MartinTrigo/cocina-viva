@@ -438,6 +438,65 @@ window.addEventListener("unhandledrejection", (e) =>
             "no más de tres: "+ vista.querySelectorAll(".renglones .renglon").length);
     afirmar(/Corr/.test(ficha) === false, "y no cuenta las correcciones como ventas");
 
+    /* --------------------------------------------------------------------
+       A qué precio se cobra lo que se dejó en consignación. Es lo que vinieron
+       a pedir: entre que se entrega y que el local vende pueden pasar meses, y
+       el aumento del medio no es asunto suyo.
+       -------------------------------------------------------------------- */
+
+    caso("El precio sale de la entrega, no de la lista de hoy");
+    await window.CVDB.guardarVarios("movimientos", [
+      { id: "p1", fecha: "2026-01-10", tipo: "entrega", cod: "CRT650", cantidad: 10,
+        precio: 1000, desde: "DEPOSITO", hacia: "lahuan", ref: "", obs: "", mod: 90 },
+      { id: "p2", fecha: "2026-02-10", tipo: "entrega", cod: "CRT650", cantidad: 10,
+        precio: 1500, desde: "DEPOSITO", hacia: "lahuan", ref: "", obs: "", mod: 91 },
+    ]);
+    await window.Datos.cargar();
+    afirmar(window.Datos.precioDeEntrega("lahuan", "CRT650") === 1000,
+            "con dos entregas a distinto precio, cobra la más vieja primero: "
+            + window.Datos.precioDeEntrega("lahuan", "CRT650"));
+
+    // Se liquidan 10: se termina la primera entrega y queda la segunda.
+    await window.CVDB.guardarVarios("movimientos", [
+      { id: "p3", fecha: "2026-03-10", tipo: "liquidacion", cod: "CRT650", cantidad: 10,
+        precio: 0, desde: "lahuan", hacia: "VENDIDO", ref: "", obs: "", mod: 92 },
+    ]);
+    await window.Datos.cargar();
+    afirmar(window.Datos.precioDeEntrega("lahuan", "CRT650") === 1500,
+            "agotada la primera, pasa a la segunda: "
+            + window.Datos.precioDeEntrega("lahuan", "CRT650"));
+
+    // Una devolución también consume de la fila, igual que una venta.
+    afirmar(window.Datos.precioDeEntrega("lahuan", "KIM350") === 0,
+            "y si no hay entrega con precio anotado, devuelve 0 para que el que "
+            + "llama use el de lista");
+    afirmar(window.Datos.precioDeEntrega("el molino san martin", "KIM350") === 0,
+            "lo entregado antes de que existiera la columna no tiene precio");
+
+    caso("Cuándo entró la plata");
+    const ventaVieja = { fecha: "2026-08-03", cobrado: "2026-10-01" };
+    afirmar(window.Datos.cuandoEntro(ventaVieja) === "2026-10-01",
+            "una venta de agosto cobrada en octubre es plata de octubre");
+    afirmar(window.Datos.cuandoEntro({ fecha: "2026-08-03" }) === "2026-08-03",
+            "y una fila vieja, sin la columna, cuenta en su fecha de venta");
+
+    caso("El balance cuenta lo cobrado, no lo facturado");
+    await entrar("Resumen", window.Resumen, "resumen");
+    const sel2 = document.getElementById("r-periodo");
+    sel2.value = "";                       // todo lo cargado, para no depender del mes
+    sel2.onchange({ target: sel2 });
+    await esperar(80);
+    const cobrado = (await window.CVDB.todos("ingresos"))
+      .filter((f) => f.pagado !== false)
+      .reduce((n, f) => n + (Number(f.subtotal) || 0), 0);
+    const impago = (await window.CVDB.todos("ingresos"))
+      .filter((f) => f.pagado === false)
+      .reduce((n, f) => n + (Number(f.subtotal) || 0), 0);
+    const enPantalla = Number(texto().match(/Ingresos \$([\d.]+)/)[1].replace(/\./g, ""));
+    afirmar(impago > 0, "hay algo sin cobrar en los datos de prueba: $" + impago);
+    afirmar(enPantalla === cobrado,
+            "el número grande es lo cobrado ($" + cobrado + "), no el total: " + enPantalla);
+
     caso("El remito arranca en el tamaño más grande");
     afirmar(window.Remito.tamano() === "enorme",
             "por defecto: " + window.Remito.tamano());
