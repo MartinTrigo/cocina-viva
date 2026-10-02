@@ -1733,3 +1733,30 @@ inventada, que es peor porque parece buena. Para el resto solo rellena vacíos.
 Y dice qué hizo: cuántas por cada vía, y **cuáles quedaron sin fuente**, con su
 id y su cliente. Si algo no se puede reconstruir, que se sepa cuál es y no que
 se disimule.
+
+### Las últimas trece
+
+La primera corrida recuperó **234 de 247**. Las trece que quedaron no eran un
+misterio: son justamente las filas que **a propósito no tienen movimiento de
+mercadería**, que era la fuente principal.
+
+- **6 de verdu richard bari** y **2 de amarantus**: las dos ventas viejas a las
+  que `refecharVentasViejas()` les sacó el movimiento en septiembre, porque ya
+  estaban descontadas en el conteo. Sus fechas están en `VENTAS_MAL_FECHADAS`
+  desde entonces: 21/08 y 17/07.
+- **4 de renacer**: se cargaron sin movimiento por pedido expreso. La fecha
+  —31/08— sale del archivo con el que se generaron, que sigue en
+  `datos-privados`.
+- **1 corrección de fin de mes**: por diseño no mueve stock, así que tampoco
+  tiene de dónde sacarla.
+
+Las doce primeras se resuelven con una fuente más —la venta conocida— y la
+última con la única que quedaba: **el día en que la fila se escribió**, que sale
+de su `mod`. Para algo que se carga en el momento, como una corrección, suele
+ser el mismo día.
+
+Esa última vía va **contada aparte en el informe**, y con un aviso: «esa no es la
+fecha de la operación sino el día en que se cargó». Es lo único de toda la
+reconstrucción que es deducido y no un dato, y quien lo lea tiene que poder
+desconfiar. Inventar una fecha en silencio fue exactamente el error de
+septiembre; hacerlo y decirlo es otra cosa.

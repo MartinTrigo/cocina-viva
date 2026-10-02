@@ -1691,7 +1691,7 @@ function restaurarFechasDeIngresosAhora() {
     FECHAS_DE_INGRESOS[f].split(' ').forEach(function (id) { if (id) deLaTabla[id] = f; });
   });
 
-  var cuenta = { movimiento: 0, hermano: 0, tabla: 0 };
+  var cuenta = { movimiento: 0, venta: 0, hermano: 0, tabla: 0, carga: 0 };
   var yaEstaban = 0;
   var huerfanas = [];
 
@@ -1710,7 +1710,23 @@ function restaurarFechasDeIngresosAhora() {
 
     var buena = porMovimiento[o.venta];
     var deDonde = 'movimiento';
+    // Las ventas que a propósito no mueven stock no tienen movimiento del que
+    // sacar la fecha: las viejas de verdu y amarantus, y las cuatro de renacer.
+    if (!buena && VENTAS_MAL_FECHADAS[o.venta]) {
+      buena = VENTAS_MAL_FECHADAS[o.venta].fecha;
+      deDonde = 'venta';
+    }
     if (!buena) { buena = porHermano[o.venta]; deDonde = 'hermano'; }
+
+    // Último recurso: el día en que la fila se escribió. No es su fecha, es
+    // cuándo se cargó, y para algo que se carga en el momento —una corrección
+    // de fin de mes, que tampoco mueve stock— suele ser el mismo día. Va
+    // aparte en el informe, porque es lo único acá adentro que es deducido y
+    // no un dato: quien lo lea tiene que poder desconfiar.
+    if (!buena && Number(o.mod)) {
+      buena = fechaIso(new Date(Number(o.mod)));
+      deDonde = 'carga';
+    }
 
     if (!buena) {
       huerfanas.push(o.id + ' (' + (o.cliente || 'sin cliente') + ')');
@@ -1723,15 +1739,22 @@ function restaurarFechasDeIngresosAhora() {
     cuenta[deDonde]++;
   });
 
-  var arregladas = cuenta.movimiento + cuenta.hermano + cuenta.tabla;
+  var arregladas = cuenta.movimiento + cuenta.venta + cuenta.hermano
+                 + cuenta.tabla + cuenta.carga;
   if (arregladas) escribirFilas('ingresos', filas);
 
   var texto = 'Renglones de ingresos: ' + filas.length + '.'
     + '\n  · ya tenían fecha: ' + yaEstaban
     + '\n  · recuperadas del movimiento de mercadería: ' + cuenta.movimiento
-    + '\n  · recuperadas de otro renglón de la misma venta: ' + cuenta.hermano
     + '\n  · recuperadas de la tabla de la planilla vieja: ' + cuenta.tabla
+    + '\n  · recuperadas de una venta conocida sin movimiento: ' + cuenta.venta
+    + '\n  · recuperadas de otro renglón de la misma venta: ' + cuenta.hermano
+    + '\n  · DEDUCIDAS del día en que se cargaron: ' + cuenta.carga
     + '\n  · SIN FUENTE, siguen sin fecha: ' + huerfanas.length;
+  if (cuenta.carga) {
+    texto += '\n\nOjo con las ' + cuenta.carga + ' deducidas: esa no es la fecha de '
+      + 'la operación sino el día en que se cargó. Conviene mirarlas.';
+  }
   if (huerfanas.length) {
     texto += '\n\nEstas no se pudieron reconstruir:\n  '
       + huerfanas.slice(0, 40).join('\n  ')
@@ -1926,7 +1949,10 @@ function restaurarEgresosBorradosAhora() {
 var VENTAS_MAL_FECHADAS = {
   '1c5b435d-681d-4d21-8d39-9e6f2cb50df4': { fecha: '2026-08-21', nota: '' },
   '689b660e-f6a5-47c2-84a2-9fa366cf478d': { fecha: '2026-07-17',
-    nota: 'De la planilla vieja · sin fecha en el origen' }
+    nota: 'De la planilla vieja · sin fecha en el origen' },
+  // Las cuatro de renacer: de la planilla vieja, sin cobrar, y a propósito sin
+  // movimiento de mercadería. La fecha sale del archivo con que se generaron.
+  'vieja-renacer': { fecha: '2026-08-31', nota: '' }
 };
 
 function refecharVentasViejas() { return conCandado(refecharVentasViejasAhora); }

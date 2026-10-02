@@ -273,7 +273,7 @@
   }
 
   async function casoRestaurarFechas() {
-    caso("La reparación de las fechas, por sus tres vías");
+    caso("La reparación de las fechas, por sus cinco vías");
     limpiarPlanilla();
 
     //  a1  venta de la app con movimiento → la fecha sale del movimiento
@@ -290,9 +290,12 @@
       { id: "viejo-001", venta: "vieja-001", fecha: "2026-09-07", cliente: "amarantus",
         lista: "mayorista", medio_pago: "Efectivo", pagado: true, cod: "CRT650",
         cantidad: 2, precio: 9800, subtotal: 19600, obs: "", mod: 1 },
+      { id: "renacer-001", venta: "vieja-renacer", fecha: "", cliente: "renacer",
+        lista: "mayorista", medio_pago: "", pagado: false, cod: "CRT650", cantidad: 2,
+        precio: 9800, subtotal: 19600, obs: "", mod: 1 },
       { id: "perdida", venta: "vZ", fecha: "", cliente: "nadie", lista: "mayorista",
         medio_pago: "Efectivo", pagado: true, cod: "CRT650", cantidad: 1, precio: 1,
-        subtotal: 1, obs: "", mod: 1 },
+        subtotal: 1, obs: "", mod: Date.UTC(2026, 8, 24, 15) },
     ]);
     enLaPlanilla("movimientos", [
       { id: "mA", fecha: "2026-09-18", tipo: "venta", cod: "CRT650", cantidad: 1,
@@ -310,9 +313,18 @@
     afirmar(porId["viejo-001"] === "2026-07-10",
             "y la tabla corrige al importado, aunque tuviera una fecha puesta: "
             + porId["viejo-001"]);
-    afirmar(!porId["perdida"], "la que no tiene de dónde salir queda sin fecha");
-    afirmar(/SIN FUENTE, siguen sin fecha: 1/.test(dice), "el informe la cuenta");
-    afirmar(/perdida/.test(dice), "y dice cuál es");
+    afirmar(porId["renacer-001"] === "2026-08-31",
+            "la venta que a propósito no mueve stock sale de su tabla: "
+            + porId["renacer-001"]);
+    // La última no tiene ninguna fuente, así que cae en el día en que se cargó.
+    // No es su fecha y el informe tiene que decirlo con todas las letras.
+    afirmar(porId["perdida"] === "2026-09-24",
+            "la que no tiene fuente cae en el día de carga: " + porId["perdida"]);
+    afirmar(/DEDUCIDAS del día en que se cargaron: 1/.test(dice),
+            "el informe la separa de las recuperadas");
+    afirmar(/no es la fecha de la operación/.test(dice),
+            "y avisa que eso no es un dato sino una deducción");
+    afirmar(/SIN FUENTE, siguen sin fecha: 0/.test(dice), "no queda ninguna suelta");
 
     let cuantos = 0;
     Object.keys(FECHAS_DE_INGRESOS).forEach((f) => {
