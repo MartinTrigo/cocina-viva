@@ -532,6 +532,48 @@
             + JSON.stringify(hoja("ingresos").filas[1][2]));
   }
 
+  // ---------- descorrer la hoja de movimientos ----------
+  //
+  // Al agregarle la columna «precio», movimientos quedó fuera de la lista de
+  // hojas a migrar: se leyó con el orden de once columnas sobre datos de diez y
+  // todo lo que iba después de «cantidad» quedó corrido un lugar. En el banco
+  // no hay Drive, así que esto prueba el camino sin respaldo, que es el difícil:
+  // deducir de dónde salía cada movimiento.
+
+  async function casoDescorrerMovimientos() {
+    caso("Una hoja de movimientos corrida se vuelve a acomodar");
+    limpiarPlanilla();
+    const h = hoja("movimientos");
+    // Las filas tal como quedaron: precio con el desde pisado por numero(),
+    // y todo lo demás un lugar a la izquierda de donde va.
+    //         id    fecha        tipo          cod      cant precio desde        hacia       ref      obs    mod
+    h.filas[1] = ["m1", "2026-09-01", "entrega",    "CRT650", 5, 0, "lahuan",     "v1",       "nota",  "1788537573504", 9];
+    h.filas[2] = ["m2", "2026-09-02", "liquidacion","CRT650", 2, 0, "VENDIDO",    "v2",       "lahuan","1788537573504", 9];
+    h.filas[3] = ["m3", "2026-09-03", "ajuste",     "KIM350", 7, 0, "DEPOSITO",   "conteo",   "conte", "1788537573504", 9];
+
+    const dice = repararMovimientosAhora();
+    const porId = {};
+    filasDe("movimientos").forEach((m) => { porId[m.id] = m; });
+
+    afirmar(porId.m1.desde === "DEPOSITO" && porId.m1.hacia === "lahuan",
+            "la entrega vuelve a salir del depósito y entrar al local: "
+            + porId.m1.desde + " → " + porId.m1.hacia);
+    afirmar(porId.m1.ref === "v1" && porId.m1.obs === "nota",
+            "y su referencia y observación vuelven a su lugar");
+    afirmar(porId.m2.desde === "lahuan" && porId.m2.hacia === "VENDIDO",
+            "la liquidación recupera el local desde las observaciones: "
+            + porId.m2.desde + " → " + porId.m2.hacia);
+    afirmar(porId.m3.desde === "" && porId.m3.hacia === "DEPOSITO",
+            "el ajuste vuelve a sumar al depósito en vez de restarle: "
+            + (porId.m3.desde || "(nada)") + " → " + porId.m3.hacia);
+    afirmar(/descorridos: 3/.test(dice), "y dice que acomodó las tres");
+
+    // Correrla de nuevo no tiene que volver a correr nada.
+    const otra = repararMovimientosAhora();
+    afirmar(/no está corrida/.test(otra),
+            "corrida dos veces, la segunda no toca nada: " + otra);
+  }
+
   // ---------- qué copias de respaldo se tiran ----------
   //
   // Es lo único de todo el respaldo que no tiene vuelta atrás, así que la
@@ -625,6 +667,7 @@
       casoLaLapidaCuenta, casoRestaurarEgresos, casoRefecharVentasViejas,
       casoLaFechaVuelveDelTelefono, casoEmpateDeFechas,
       casoFormasDeFecha, casoNoSeBorraLoQueNoSeEntiende,
+      casoDescorrerMovimientos,
       casoQueRespaldosSeTiran, casoLasDosApi, casoLaVersionYElCache,
     ];
     for (const c of casos) {

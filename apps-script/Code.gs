@@ -987,7 +987,13 @@ function asegurarEsquema() {
   // Antes que nada, y en cada sincronización. Es barato —mira una celda— y
   // tiene que correr SÍ O SÍ antes de leer: si alguien sincroniza con la hoja
   // en el orden viejo, las columnas se leen corridas y se escriben corridas.
-  ['productos', 'ingresos', 'egresos'].forEach(function (n) {
+  // La lista sale de COLUMNAS_ANTERIORES y NO está escrita a mano. Lo estuvo, y
+  // al agregarle la columna «precio» a movimientos quedó afuera: la hoja no se
+  // migró, se leyó con el orden nuevo sobre datos viejos, y todas las columnas
+  // a partir de «desde» quedaron corridas un lugar. Es exactamente lo que
+  // advierte el comentario de arriba, y pasó igual, que es lo que tienen las
+  // advertencias que dependen de que alguien se acuerde.
+  Object.keys(COLUMNAS_ANTERIORES).forEach(function (n) {
     var migrada = migrarHoja(n);
     if (migrada) hechas.push(migrada);
   });
@@ -2127,6 +2133,160 @@ function refecharVentasViejasAhora() {
     + '\nSincronizar desde un teléfono para que lo vean las dos.';
   Logger.log(texto);
   return texto;
+}
+
+/* --------------------------------------------------------------------------
+   DESCORRER LA HOJA DE MOVIMIENTOS
+
+   Al agregar la columna «precio», movimientos quedó fuera de la lista de hojas
+   a migrar. La hoja siguió con diez columnas y se leyó con el orden de once, así
+   que cada valor cayó un lugar a la izquierda de donde tenía que caer:
+
+       precio   ← lo que era  desde     (y pasó por numero(), o sea se perdió)
+       desde    ← lo que era  hacia
+       hacia    ← lo que era  referencia
+       referencia ← lo que era observaciones
+       observaciones ← lo que era mod
+
+   El resultado se ve en el resumen: «valor en consignación» en negativo y
+   locales con cantidades negativas, porque todo lo que entraba a un local ahora
+   figura saliendo de él.
+
+   SE REPARA CON EL RESPALDO. La copia de las 13:09 de hoy tiene la hoja bien, y
+   es de antes del estropicio. Para cada movimiento se toman de ahí los campos
+   buenos. Lo que se haya cargado después del respaldo no está en la copia, y
+   para eso se descorre a mano: hacia, referencia y observaciones vuelven de la
+   columna de al lado, y «desde» se deduce del tipo, que es lo único que no se
+   puede recuperar porque numero() lo convirtió en cero.
+   -------------------------------------------------------------------------- */
+
+// De dónde sale y a dónde va cada tipo. Es el mismo mapa que usa la app.
+var DE_DONDE = {
+  produccion:  { desde: 'PRODUCCION', hacia: 'DEPOSITO' },
+  venta:       { desde: 'DEPOSITO',   hacia: 'VENDIDO' },
+  entrega:     { desde: 'DEPOSITO',   hacia: 'local' },
+  liquidacion: { desde: 'local',      hacia: 'VENDIDO' },
+  devolucion:  { desde: 'local',      hacia: 'DEPOSITO' },
+  merma:       { desde: 'DEPOSITO',   hacia: 'MERMA' }
+};
+
+function repararMovimientos() { return conCandado(repararMovimientosAhora); }
+
+function repararMovimientosAhora() {
+  var h = hoja('movimientos');
+  var cols = COLUMNAS.movimientos;
+  var ultima = h.getLastRow();
+  if (ultima < 2) return 'La hoja de movimientos está vacía.';
+
+  var filas = h.getRange(2, 1, ultima - 1, cols.length).getValues();
+  var i = {};
+  cols.forEach(function (c, n) { i[c] = n; });
+
+  // ¿Está corrida? La señal inequívoca: «observaciones» con un número de trece
+  // cifras, que es un mod y no una observación que alguien haya escrito.
+  var corridas = filas.filter(function (f) {
+    return /^\d{13}$/.test(String(f[i.obs]).trim());
+  }).length;
+  if (!corridas) return 'La hoja no está corrida: no hay nada que reparar.';
+
+  var delRespaldo = leerMovimientosDelRespaldo();
+
+  var ahora = Date.now();
+  var cuenta = { respaldo: 0, deducidas: 0, intactas: 0 };
+  var sinDesde = [];
+
+  var salida = filas.map(function (f) {
+    var id = String(f[i.id] || '').trim();
+    if (!id || !/^\d{13}$/.test(String(f[i.obs]).trim())) { cuenta.intactas++; return f; }
+
+    var bueno = delRespaldo[id];
+    if (bueno) {
+      cuenta.respaldo++;
+      f[i.desde] = bueno.desde;
+      f[i.hacia] = bueno.hacia;
+      f[i.ref] = bueno.ref;
+      f[i.obs] = bueno.obs;
+      f[i.precio] = 0;
+      f[i.mod] = ahora;
+      return f;
+    }
+
+    // Sin respaldo: se descorre y el «desde» sale del tipo.
+    var hacia = String(f[i.desde] || '').trim();
+    var ref = String(f[i.hacia] || '').trim();
+    var obs = String(f[i.ref] || '').trim();
+    var tipo = String(f[i.tipo] || '').trim();
+    var mapa = DE_DONDE[tipo];
+    var desde = '';
+    var haciaFinal = hacia;
+    if (mapa && mapa.desde === 'local') {
+      // El local estaba en «desde» y numero() lo convirtió en cero. En una
+      // liquidación quedó escrito también en las observaciones, así que de ahí
+      // se recupera. En una devolución no quedó en ningún lado.
+      desde = obs || '';
+      haciaFinal = mapa.hacia;
+      if (!desde) sinDesde.push(id + ' (' + tipo + ')');
+    } else if (mapa) {
+      desde = mapa.desde;
+    } else if (!hacia) {
+      // Un ajuste sin destino es una baja, y esas salen del depósito.
+      desde = 'DEPOSITO';
+      sinDesde.push(id + ' (ajuste)');
+    }
+    f[i.desde] = desde;
+    f[i.hacia] = haciaFinal;
+    f[i.ref] = ref;
+    f[i.obs] = obs;
+    f[i.precio] = 0;
+    f[i.mod] = ahora;
+    cuenta.deducidas++;
+    return f;
+  });
+
+  h.getRange(2, 1, salida.length, cols.length).setValues(salida);
+
+  var texto = 'Movimientos descorridos: ' + (cuenta.respaldo + cuenta.deducidas) + '.'
+    + '\n  · recuperados del respaldo: ' + cuenta.respaldo
+    + '\n  · deducidos del tipo, sin respaldo: ' + cuenta.deducidas
+    + '\n  · estaban bien y no se tocaron: ' + cuenta.intactas;
+  if (sinDesde.length) {
+    texto += '\nOjo con ' + sinDesde.length + ' ajustes sin destino: se les puso '
+      + 'DEPOSITO, que es de donde salen casi siempre. Conviene mirarlos.';
+  }
+  texto += '\n\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
+}
+
+// La copia más nueva de la carpeta de respaldos que sea ANTERIOR al estropicio.
+function leerMovimientosDelRespaldo() {
+  var porId = {};
+  try {
+    var archivo = DriveApp.getFileById(SpreadsheetApp.getActive().getId());
+    var carpeta = carpetaDeRespaldos(archivo);
+    var copias = [];
+    var lista = carpeta.getFiles();
+    while (lista.hasNext()) {
+      var f = lista.next();
+      copias.push({ archivo: f, cuando: f.getDateCreated().getTime() });
+    }
+    if (!copias.length) return porId;
+    copias.sort(function (a, b) { return b.cuando - a.cuando; });
+
+    var hoja2 = SpreadsheetApp.openById(copias[0].archivo.getId())
+      .getSheetByName('movimientos');
+    if (!hoja2) return porId;
+    var v = hoja2.getDataRange().getValues();
+    // La copia tiene el diseño viejo, de diez columnas y sin «precio».
+    for (var k = 1; k < v.length; k++) {
+      var id = String(v[k][0] || '').trim();
+      if (!id) continue;
+      porId[id] = { desde: v[k][5], hacia: v[k][6], ref: v[k][7], obs: v[k][8] };
+    }
+  } catch (err) {
+    Logger.log('No se pudo leer el respaldo: ' + err);
+  }
+  return porId;
 }
 
 /* ================= Auxiliares ================= */

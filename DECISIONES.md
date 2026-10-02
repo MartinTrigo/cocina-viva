@@ -1892,3 +1892,49 @@ en seis casos de golpe y el servicio andaba perfecto: la app se niega a
 sincronizar si las dos versiones no coinciden, que es exactamente lo que tiene
 que hacer. Hay un caso nuevo que las compara, como el que vigila `VERSION` y
 `CACHE`.
+
+## La hoja de movimientos quedó corrida, y por qué
+
+Al agregar la columna `precio`, **`movimientos` quedó fuera de la lista de hojas
+a migrar** de `asegurarEsquema()`. Esa lista estaba escrita a mano
+—`['productos', 'ingresos', 'egresos']`— y justo encima tenía este comentario:
+
+> *tiene que correr SÍ O SÍ antes de leer: si alguien sincroniza con la hoja en
+> el orden viejo, las columnas se leen corridas y se escriben corridas.*
+
+Pasó exactamente eso. La advertencia estaba escrita y no alcanzó, porque dependía
+de que alguien se acordara de agregar una línea. **Ahora la lista sale de
+`Object.keys(COLUMNAS_ANTERIORES)`**: agregar una columna agrega su migración.
+
+El daño: la hoja siguió con diez columnas y se leyó con el orden de once, así que
+todo lo que iba después de `cantidad` cayó un lugar a la izquierda.
+
+```
+  precio        ← desde          (y numero() lo convirtió en cero: perdido)
+  desde         ← hacia
+  hacia         ← referencia
+  referencia    ← observaciones
+  observaciones ← mod
+```
+
+Se vio enseguida en el resumen: «valor en consignación» en **−$8.544.500** y
+locales con cantidades negativas, porque todo lo que entraba a un local pasó a
+figurar saliendo de él.
+
+### Cómo se repara
+
+`repararMovimientos()` descorre la hoja, y lo hace **desde el respaldo**: la copia
+de las 13:09 de hoy tiene la hoja bien y es anterior al estropicio. De ahí salen
+los campos buenos, fila por fila, por id. Es la primera vez que el respaldo
+diario sirve para algo, un día después de encenderlo.
+
+Lo cargado después del respaldo no está en la copia, y para eso se descorre a
+mano: `hacia`, `referencia` y `observaciones` vuelven de la columna de al lado, y
+`desde` se deduce del tipo —una entrega sale del depósito, una venta también, una
+merma también—. En una liquidación el local estaba en `desde` y se perdió, pero
+quedó escrito también en las observaciones, así que de ahí se recupera. En una
+devolución no quedó en ningún lado: esas se informan aparte, una por una.
+
+Reconoce si la hoja está corrida por una señal que no admite confusión:
+`observaciones` con un número de trece cifras, que es un `mod` y no algo que
+alguien haya escrito. Por eso correrla dos veces no hace nada la segunda.
