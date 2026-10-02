@@ -524,12 +524,13 @@ function escribirFilas(nombre, objetos) {
 function escribirBorrados(borrados) {
   var h = hoja('borrados');
   var ultima = h.getLastRow();
-  if (ultima > 1) h.getRange(2, 1, ultima - 1, 4).clearContent();
-  h.getRange(1, 1, 1, 4).setValues([ENCABEZADOS.borrados]);
+  var ancho = COLUMNAS.borrados.length;
+  if (ultima > 1) h.getRange(2, 1, ultima - 1, ancho).clearContent();
+  h.getRange(1, 1, 1, ancho).setValues([ENCABEZADOS.borrados]);
   var ids = Object.keys(borrados);
   if (!ids.length) return;
   asegurarFilas(h, ids.length + 1);
-  h.getRange(2, 1, ids.length, 4).setValues(ids.map(function (id) {
+  h.getRange(2, 1, ids.length, ancho).setValues(ids.map(function (id) {
     var b = borrados[id];
     return [id, b.mod, comoTexto(b.que || ''), comoTexto(b.quien || '')];
   }));
@@ -963,22 +964,6 @@ function migrarHoja(nombre) {
        + ENCABEZADOS[nombre][corte] + '» (' + salida.length + ' filas).';
 }
 
-// La hoja resumen tenía escrita la letra D para el precio mayorista. Con la
-// columna nueva, la D pasó a ser el costo: la tabla habría mostrado el stock
-// valuado al costo sin dar ningún error.
-function arreglarPrecioDelResumen() {
-  var ss = SpreadsheetApp.getActive();
-  var h = ss.getSheetByName('resumen');
-  if (!h) return;
-  var letra = letraDe('productos', 'pmayor');
-  var filas = [];
-  for (var i = 0; i < 60; i++) {
-    var p = i + 2, f = i + 11;
-    filas.push(['=IF($A' + f + '="";"";productos!' + letra + p + ')']);
-  }
-  h.getRange(11, 5, 60, 1).setValues(filas);
-}
-
 // Lo que corre también en cada sincronización: barato si ya está todo hecho.
 function asegurarEsquema() {
   var props = PropertiesService.getDocumentProperties();
@@ -1033,23 +1018,43 @@ function asegurarEsquema() {
   return hechas.length ? hechas : ['Ya estaba todo listo, no hizo falta cambiar nada.'];
 }
 
+/* --------------------------------------------------------------------------
+   LAS SEMILLAS SE ESCRIBEN POR NOMBRE DE COLUMNA
+
+   Las tres armaban la fila como una lista de valores en orden —[código,
+   producto, presentación, …]— y la pegaban de la columna A en adelante. Eso
+   funciona hasta el día en que entra una columna en el medio: la lista sigue
+   teniendo los mismos valores en el mismo orden y cada uno cae en la columna de
+   al lado, sin que nada falle. El stock inicial ya estaba así —escribía diez
+   columnas cuando movimientos tiene once desde que entró «precio»—, y eso le
+   habría puesto la ubicación en la columna del precio al primer libro nuevo.
+
+   Ahora las tres le pasan objetos a escribirFilas(), que es la misma función
+   que usa la sincronización y acomoda cada campo por su nombre. Agregar una
+   columna no toca ninguna de las tres.
+   -------------------------------------------------------------------------- */
+
 function cargarProductos() {
   var ahora = Date.now();
-  var filas = SEMILLA_PRODUCTOS.map(function (p) {
-    // El costo va vacío: no está en la planilla vieja y no se inventa.
-    return [p[0], p[1], p[2], '', p[3], p[4], 'sí', ahora];
-  });
-  hoja('productos').getRange(2, 1, filas.length, COLUMNAS.productos.length).setValues(filas);
-  return 'Cargados ' + filas.length + ' productos.';
+  escribirFilas('productos', SEMILLA_PRODUCTOS.map(function (p) {
+    return {
+      cod: p[0], producto: p[1], presentacion: p[2],
+      // El costo va vacío: no está en la planilla vieja y no se inventa.
+      costo: '', pmayor: p[3], pminor: p[4], activo: true, mod: ahora
+    };
+  }));
+  return 'Cargados ' + SEMILLA_PRODUCTOS.length + ' productos.';
 }
 
 function cargarClientes() {
   var ahora = Date.now();
-  var filas = SEMILLA_CLIENTES.map(function (c) {
-    return [c[0], c[1], c[2], '', 'sí', ahora];
-  });
-  hoja('clientes').getRange(2, 1, filas.length, 6).setValues(filas);
-  return 'Cargados ' + filas.length + ' clientes.';
+  escribirFilas('clientes', SEMILLA_CLIENTES.map(function (c) {
+    return {
+      nombre: c[0], localidad: c[1], tipo: c[2],
+      medio_pago: '', activo: true, mod: ahora
+    };
+  }));
+  return 'Cargados ' + SEMILLA_CLIENTES.length + ' clientes.';
 }
 
 // El stock inicial entra como movimientos de verdad, uno por producto, en vez
@@ -1061,12 +1066,15 @@ function cargarStockInicial() {
   var filas = [];
   SEMILLA_PRODUCTOS.forEach(function (p, i) {
     if (!p[5]) return;
-    filas.push(['ini-' + p[0], aFecha(FECHA_STOCK_INICIAL), 'ajuste', p[0], p[5],
-                '', DEPOSITO, 'conteo inicial',
-                'Stock contado el ' + FECHA_STOCK_INICIAL, ahora + i]);
+    filas.push({
+      id: 'ini-' + p[0], fecha: FECHA_STOCK_INICIAL, tipo: 'ajuste',
+      cod: p[0], cantidad: p[5], precio: 0,
+      desde: '', hacia: DEPOSITO, ref: 'conteo inicial',
+      obs: 'Stock contado el ' + FECHA_STOCK_INICIAL, mod: ahora + i
+    });
   });
   if (!filas.length) return 'No había stock inicial que cargar.';
-  hoja('movimientos').getRange(2, 1, filas.length, 10).setValues(filas);
+  escribirFilas('movimientos', filas);
   return 'Cargado el stock inicial de ' + filas.length + ' productos ('
        + FECHA_STOCK_INICIAL + ').';
 }
@@ -1225,6 +1233,77 @@ function formatoDatos(nombre, fuerte, suave) {
    Las fórmulas usan ";" como separador porque la planilla está en español.
    ========================================================================== */
 
+/* --------------------------------------------------------------------------
+   LA TABLA DE STOCK DEL RESUMEN
+
+   Las letras de las columnas de movimientos salen de letraDe() y NO están
+   escritas a mano. Lo estuvieron: decían F para «desde» y G para «hacia», que
+   era cierto hasta que entró la columna «precio» y las corrió un lugar. Desde
+   entonces la fórmula de lo que entra al depósito miraba «desde», la de lo que
+   sale miraba «precio» —que nunca dice DEPOSITO, así que daba cero— y la de la
+   calle sumaba todos los movimientos como si salieran de un local. El resumen
+   mostró «valor en consignación» en −$10.378.400 y cantidades negativas en la
+   calle sin dar un solo error: una planilla no avisa cuando una fórmula apunta
+   a la columna de al lado, solo muestra otro número.
+
+   Es el mismo error que ya había pasado con el costo, con «pagado» y con
+   «persona». La diferencia es que esta vez la función que reescribe las
+   fórmulas también toca esta tabla, así que la migración la arregla sola.
+   -------------------------------------------------------------------------- */
+
+// Sesenta filas alcanzan de sobra para el catálogo y dejan lugar a los
+// productos nuevos: la fila se completa sola cuando aparece el código.
+var FILAS_DE_STOCK = 60;
+var PRIMERA_DE_STOCK = 11;
+var ULTIMA_DE_STOCK = PRIMERA_DE_STOCK + FILAS_DE_STOCK - 1;
+
+function renglonesDeStock() {
+  var cod = letraDe('movimientos', 'cod');
+  var cant = letraDe('movimientos', 'cantidad');
+  var desde = letraDe('movimientos', 'desde');
+  var hacia = letraDe('movimientos', 'hacia');
+  var pmayor = letraDe('productos', 'pmayor');
+
+  // Cuánto de ese código se movió con un lugar fijo en una punta.
+  var enElLugar = function (f, columna, lugar) {
+    return 'SUMIFS(movimientos!$' + cant + '$2:$' + cant
+         + ';movimientos!$' + cod + '$2:$' + cod + ';$A' + f
+         + ';movimientos!$' + columna + '$2:$' + columna + ';"' + lugar + '")';
+  };
+
+  // «En la calle» es todo lo que está en un local: cualquier ubicación que no
+  // sea una de las reservadas. Se escribe como una lista de «distinto de» en
+  // vez de nombrar los locales uno por uno, así un local nuevo entra solo.
+  var enUnLocal = function (f, columna) {
+    var condiciones = ['', DEPOSITO, VENDIDO, MERMA, PRODUCCION].map(function (lugar) {
+      return ';movimientos!$' + columna + '$2:$' + columna + ';"<>' + lugar + '"';
+    }).join('');
+    return 'SUMIFS(movimientos!$' + cant + '$2:$' + cant
+         + ';movimientos!$' + cod + '$2:$' + cod + ';$A' + f + condiciones + ')';
+  };
+
+  var filas = [];
+  for (var i = 0; i < FILAS_DE_STOCK; i++) {
+    var p = i + 2;                       // fila de la hoja productos
+    var f = i + PRIMERA_DE_STOCK;        // fila de esta hoja
+    filas.push([
+      '=IF(productos!A' + p + '="";"";productos!A' + p + ')',
+      '=IF($A' + f + '="";"";productos!B' + p + '&" "&productos!C' + p + ')',
+      '=IF($A' + f + '="";"";' + enElLugar(f, hacia, DEPOSITO)
+        + '-' + enElLugar(f, desde, DEPOSITO) + ')',
+      '=IF($A' + f + '="";"";' + enUnLocal(f, hacia) + '-' + enUnLocal(f, desde) + ')',
+      '=IF($A' + f + '="";"";productos!' + pmayor + p + ')',
+      '=IF($A' + f + '="";"";C' + f + '*E' + f + ')',
+      '=IF($A' + f + '="";"";D' + f + '*E' + f + ')'
+    ]);
+  }
+  return filas;
+}
+
+function escribirStockDelResumen(h) {
+  h.getRange(PRIMERA_DE_STOCK, 1, FILAS_DE_STOCK, 7).setValues(renglonesDeStock());
+}
+
 function crearResumen() {
   var ss = SpreadsheetApp.getActive();
   if (ss.getSheetByName('resumen')) return;
@@ -1240,8 +1319,8 @@ function crearResumen() {
     ['Egresos totales', '=SUM(egresos!' + letraDe('egresos', 'monto') + '2:'
       + letraDe('egresos', 'monto') + ')'],
     ['Balance', '=B3-B4'],
-    ['Valor del stock en depósito', '=SUM(F11:F70)'],
-    ['Valor en consignación', '=SUM(G11:G70)']
+    ['Valor del stock en depósito', '=SUM(F' + PRIMERA_DE_STOCK + ':F' + ULTIMA_DE_STOCK + ')'],
+    ['Valor en consignación', '=SUM(G' + PRIMERA_DE_STOCK + ':G' + ULTIMA_DE_STOCK + ')']
   ]);
   h.getRange('A3:A7').setFontWeight('bold');
   h.getRange('B3:B7').setNumberFormat('"$"#,##0');
@@ -1251,40 +1330,9 @@ function crearResumen() {
                                     'precio mayor', 'valor depósito', 'valor en la calle']])
     .setFontWeight('bold').setBackground(COLOR.crema);
 
-  // "En la calle" es todo lo que está en un local: cualquier ubicación que no
-  // sea una de las reservadas. Se escribe como una lista de "distinto de" en
-  // vez de nombrar los locales uno por uno, así un local nuevo entra solo.
-  var noReservada = function (columna) {
-    return ';movimientos!$' + columna + '$2:$' + columna + ';"<>"'
-         + ';movimientos!$' + columna + '$2:$' + columna + ';"<>' + DEPOSITO + '"'
-         + ';movimientos!$' + columna + '$2:$' + columna + ';"<>' + VENDIDO + '"'
-         + ';movimientos!$' + columna + '$2:$' + columna + ';"<>' + MERMA + '"'
-         + ';movimientos!$' + columna + '$2:$' + columna + ';"<>' + PRODUCCION + '"';
-  };
-
-  // Sesenta filas alcanzan de sobra para el catálogo y dejan lugar a los
-  // productos nuevos: la fila se completa sola cuando aparece el código.
-  var filas = [];
-  for (var i = 0; i < 60; i++) {
-    var p = i + 2;                       // fila de la hoja productos
-    var f = i + 11;                      // fila de esta hoja
-    var entra = 'SUMIFS(movimientos!$E$2:$E;movimientos!$D$2:$D;$A' + f + ';movimientos!$G$2:$G;"' + DEPOSITO + '")';
-    var sale  = 'SUMIFS(movimientos!$E$2:$E;movimientos!$D$2:$D;$A' + f + ';movimientos!$F$2:$F;"' + DEPOSITO + '")';
-    var entraCalle = 'SUMIFS(movimientos!$E$2:$E;movimientos!$D$2:$D;$A' + f + noReservada('G') + ')';
-    var saleCalle  = 'SUMIFS(movimientos!$E$2:$E;movimientos!$D$2:$D;$A' + f + noReservada('F') + ')';
-    filas.push([
-      '=IF(productos!A' + p + '="";"";productos!A' + p + ')',
-      '=IF($A' + f + '="";"";productos!B' + p + '&" "&productos!C' + p + ')',
-      '=IF($A' + f + '="";"";' + entra + '-' + sale + ')',
-      '=IF($A' + f + '="";"";' + entraCalle + '-' + saleCalle + ')',
-      '=IF($A' + f + '="";"";productos!' + letraDe('productos', 'pmayor') + p + ')',
-      '=IF($A' + f + '="";"";C' + f + '*E' + f + ')',
-      '=IF($A' + f + '="";"";D' + f + '*E' + f + ')'
-    ]);
-  }
-  h.getRange(11, 1, 60, 7).setValues(filas);
-  h.getRange('C11:D70').setNumberFormat('0');
-  h.getRange('E11:G70').setNumberFormat('"$"#,##0');
+  escribirStockDelResumen(h);
+  h.getRange('C11:D' + ULTIMA_DE_STOCK).setNumberFormat('0');
+  h.getRange('E11:G' + ULTIMA_DE_STOCK).setNumberFormat('"$"#,##0');
 
   h.getRange('A72').setValue('INGRESOS POR MES').setFontWeight('bold').setFontColor(COLOR.bordo);
   h.getRange('D72').setValue('EGRESOS POR RUBRO').setFontWeight('bold').setFontColor(COLOR.tierra);
@@ -1321,17 +1369,40 @@ var RENGLONES_MES = 36;
 function ingresosPorMes(h) {
   h.getRange('A73:B73').setValues([['mes', 'ingresos']]).setFontWeight('bold');
 
-  h.getRange('A74').setValue(
-    '=IFERROR(SORT(UNIQUE(FILTER(TEXT(ingresos!C2:C2000;"yyyy-mm");'
-    + 'ingresos!C2:C2000<>""));1;FALSE);"")');
-
+  var fecha = letraDe('ingresos', 'fecha');
+  var cobrado = letraDe('ingresos', 'cobrado');
+  var pagado = letraDe('ingresos', 'pagado');
   var subtotal = letraDe('ingresos', 'subtotal');
+  var rango = function (letra) { return 'ingresos!$' + letra + '$2:$' + letra + '$2000'; };
+
+  // EL MES EN QUE ENTRÓ LA PLATA, no el de la venta. Una venta de agosto que
+  // pagaron en octubre es plata de octubre, y contarla en agosto deja los dos
+  // meses mal. Si no hay fecha de cobro anotada —todas las filas anteriores a
+  // esa columna— vale la de la venta, que es lo que se suponía hasta ahora.
+  //
+  // Y se cuenta solo lo cobrado, igual que el número grande de arriba: así
+  // esta columna cierra contra el balance en vez de contar una venta entregada
+  // que todavía no pagaron.
+  var cuando = 'TEXT(IF(' + rango(cobrado) + '="";' + rango(fecha) + ';'
+             + rango(cobrado) + ');"yyyy-mm")';
+  // Las dos piezas filtran por lo mismo —cobradas y con fecha—, así que la suma
+  // de la columna da igual al total de arriba. Si se separaran, la tabla y el
+  // balance mostrarían dos números distintos y no habría forma de saber cuál es.
+  var cobradas = rango(pagado) + '="sí"';
+  var conFecha = rango(fecha) + '<>""';
+
+  h.getRange('A74').setValue(
+    '=IFERROR(SORT(UNIQUE(FILTER(' + cuando + ';' + cobradas + ';'
+    + conFecha + '));1;FALSE);"")');
+
   var totales = [];
   for (var i = 0; i < RENGLONES_MES; i++) {
     var f = 74 + i;
     totales.push(['=IFERROR(IF($A' + f + '="";"";SUMPRODUCT('
-      + '(TEXT(ingresos!$C$2:$C$2000;"yyyy-mm")=$A' + f + ')'
-      + '*ingresos!$' + subtotal + '$2:$' + subtotal + '$2000));"")']);
+      + '(' + cuando + '=$A' + f + ')'
+      + '*(' + cobradas + ')'
+      + '*(' + conFecha + ')'
+      + '*' + rango(subtotal) + '));"")']);
   }
   h.getRange(74, 2, RENGLONES_MES, 1).setValues(totales);
   h.getRange(74, 2, RENGLONES_MES, 1).setNumberFormat('"$"#,##0');
@@ -1383,7 +1454,9 @@ function arreglarFormulasDelResumen() {
   h.getRange('B4').setValue('=SUM(egresos!' + letraDe('egresos', 'monto') + '2:'
     + letraDe('egresos', 'monto') + ')');
 
-  arreglarPrecioDelResumen();
+  // La tabla entera, no solo la columna del precio: acá viven las fórmulas que
+  // apuntan a movimientos, que son las que se corren al agregar una columna.
+  escribirStockDelResumen(h);
   egresosPorRubro(h);
   h.getRange('A73:B200').clearContent();
   ingresosPorMes(h);

@@ -655,6 +655,109 @@
             + enApp + " vs " + enCache);
   }
 
+  /* ------------------------------------------------------------------------
+     LA HOJA RESUMEN
+
+     Mira a las otras hojas por letra de columna, que es lo único que hay en una
+     planilla. La letra se corre cada vez que se agrega una columna y la fórmula
+     sigue apuntando al lugar de antes: no da error, muestra otro número. Ya
+     pasó con el costo, con «pagado», con «persona» y con «precio», que dejó el
+     valor en consignación en menos diez millones y las cantidades de la calle
+     en negativo. Estos dos casos no dejan que vuelva a pasar en silencio.
+     ------------------------------------------------------------------------ */
+
+  // Una hoja de mentira que no hace nada y anota todo lo que le escribieron.
+  function hojaQueAnota() {
+    const anotado = [];
+    const celda = {
+      setValues: (v) => { anotado.push(JSON.stringify(v)); return celda; },
+      setValue: (v) => { anotado.push(String(v)); return celda; },
+      setFontWeight: () => celda, setNumberFormat: () => celda,
+      setBackground: () => celda, setFontColor: () => celda,
+    };
+    return { hoja: { getRange: () => celda }, anotado };
+  }
+
+  async function casoLasLetrasDelResumen() {
+    caso("Las fórmulas de stock apuntan a las columnas de hoy");
+
+    const columnasDeLugar = ["cod", "cantidad", "desde", "hacia"];
+    const permitidas = columnasDeLugar.map((c) => letraDe("movimientos", c));
+    const usadas = new Set();
+    renglonesDeStock().forEach((fila) => fila.forEach((celda) =>
+      (String(celda).match(/movimientos!\$([A-Z]+)\$/g) || [])
+        .forEach((m) => usadas.add(m.replace(/[^A-Z]/g, "")))));
+    const lista = [...usadas].sort().join(",");
+
+    afirmar([...usadas].every((l) => permitidas.includes(l)),
+            "solo miran código, cantidad, desde y hacia (" + permitidas.join(",")
+            + "): usan " + lista);
+
+    // El precio no es un lugar. Si aparece acá, las fórmulas están corridas.
+    afirmar(!usadas.has(letraDe("movimientos", "precio")),
+            "ninguna mira la columna del precio, que no es una ubicación");
+
+    // Y cada punta cuenta para el lado que le toca: lo que entra al depósito
+    // por «hacia» y lo que sale por «desde», no al revés.
+    const enDeposito = String(renglonesDeStock()[0][2]);
+    const hacia = "movimientos!$" + letraDe("movimientos", "hacia");
+    const desde = "movimientos!$" + letraDe("movimientos", "desde");
+    afirmar(enDeposito.indexOf(hacia) >= 0 && enDeposito.indexOf(desde) >= 0
+            && enDeposito.indexOf(hacia) < enDeposito.indexOf(desde),
+            "lo que entra al depósito se suma por «hacia» y lo que sale por «desde»");
+  }
+
+  async function casoElResumenCuentaPorFechaDeCobro() {
+    caso("INGRESOS POR MES cuenta por la fecha en que entró la plata");
+    // El número grande del resumen cuenta lo cobrado. Si esta tabla contara por
+    // fecha de venta y sumara lo impago, las dos cosas nunca cerrarían entre sí
+    // y el cuadre de fin de mes no serviría para nada.
+    const m = hojaQueAnota();
+    ingresosPorMes(m.hoja);
+    const texto = m.anotado.join("\n");
+    const col = (c) => "ingresos!$" + letraDe("ingresos", c) + "$";
+
+    afirmar(texto.indexOf(col("cobrado")) >= 0,
+            "mira la columna del cobro (" + col("cobrado") + ")");
+    afirmar(texto.indexOf(col("fecha")) >= 0,
+            "y la de la venta, para las filas viejas sin cobro anotado");
+    afirmar(texto.indexOf(col("pagado")) >= 0,
+            "y descuenta lo que todavía no cobraron (" + col("pagado") + ")");
+    afirmar(texto.indexOf(col("subtotal")) >= 0,
+            "y suma el subtotal (" + col("subtotal") + ")");
+  }
+
+  async function casoLasSemillasCaenEnSuColumna() {
+    caso("Las semillas caen en la columna que les toca");
+    // Las tres armaban la fila en orden y la pegaban desde la columna A. El
+    // stock inicial escribía diez columnas cuando movimientos tiene once, así
+    // que al primer libro nuevo la ubicación le habría caído en la columna del
+    // precio y el depósito habría arrancado vacío.
+    limpiarPlanilla();
+    cargarStockInicial();
+    const ini = filasDe("movimientos").filter((f) => String(f.id).indexOf("ini-") === 0)[0];
+    afirmar(!!ini, "se cargó el stock inicial");
+    if (ini) {
+      afirmar(ini.hacia === DEPOSITO, "la ubicación quedó en «hacia»: " + ini.hacia);
+      afirmar(ini.ref === "conteo inicial", "la referencia en «referencia»: " + ini.ref);
+      afirmar(Number(ini.cantidad) > 0, "la cantidad es un número: " + ini.cantidad);
+      afirmar(String(ini.obs).indexOf("Stock contado") === 0,
+              "y la observación en la suya: " + ini.obs);
+    }
+
+    limpiarPlanilla();
+    cargarProductos();
+    const p = filasDe("productos")[0];
+    afirmar(!!p && Number(p.pmayor) > 0,
+            "el producto tiene precio mayorista: " + (p && p.pmayor));
+    afirmar(!!p && p.activo !== false, "y queda activo");
+
+    limpiarPlanilla();
+    cargarClientes();
+    const c = filasDe("clientes")[0];
+    afirmar(!!c && !!c.tipo, "el cliente tiene tipo: " + (c && c.tipo));
+  }
+
   // ---------- correr ----------
 
   async function correr() {
@@ -668,6 +771,8 @@
       casoLaFechaVuelveDelTelefono, casoEmpateDeFechas,
       casoFormasDeFecha, casoNoSeBorraLoQueNoSeEntiende,
       casoDescorrerMovimientos,
+      casoLasLetrasDelResumen, casoElResumenCuentaPorFechaDeCobro,
+      casoLasSemillasCaenEnSuColumna,
       casoQueRespaldosSeTiran, casoLasDosApi, casoLaVersionYElCache,
     ];
     for (const c of casos) {

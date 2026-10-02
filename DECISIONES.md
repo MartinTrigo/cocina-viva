@@ -1181,13 +1181,103 @@ Lo peor es que ya me había pasado con `productos!D` al agregar el costo, y cre�
 cuatro siguieron con la letra escrita a mano y se rompieron calladas en cuanto
 entraron `pagado` y `persona`.
 
-Ahora **todas** las letras salen de `COLUMNAS` con `letraDe()`, y
-`arreglarFormulasDelResumen()` las reescribe de una. La llama sola la migración:
-agregar una columna ya no puede dejar el resumen mintiendo.
+Las letras salen de `COLUMNAS` con `letraDe()`, y `arreglarFormulasDelResumen()`
+las reescribe de una. La llama sola la migración.
 
 La lección general, que vale más que el arreglo: **en una planilla, una fórmula
 que nombra una columna por su letra es una bomba de tiempo**. No falla, miente.
 Y miente en el número que uno mira para tomar decisiones.
+
+### Y volvió a pasar, con la tabla de stock
+
+Cuando escribí «ahora **todas** las letras salen de `letraDe()`» no era cierto, y
+conviene que quede escrito que no era cierto. Arreglé las cinco fórmulas que
+estaba mirando —los dos totales, el precio mayorista, los egresos por rubro y
+los ingresos por mes— y no miré las ciento veinte de la tabla de stock, que
+tenían `movimientos!$F$` para «desde» y `movimientos!$G$` para «hacia» metidas
+en un `SUMIFS`. Eran correctas mientras movimientos tuvo diez columnas.
+
+Cuando entró `precio`, F pasó a ser el precio y G pasó a ser «desde»:
+
+- lo que entraba al depósito se contaba por «desde»,
+- lo que salía se contaba por «precio», que nunca dice DEPOSITO, así que daba
+  cero,
+- y lo que estaba en la calle se calculaba contra una columna de números que
+  nunca está en blanco, así que **todos** los movimientos contaban como salidas
+  de un local.
+
+El resumen mostró «valor en consignación: −$10.378.400» y los locales en
+negativo. Ningún error, ninguna celda roja.
+
+El arreglo de fondo no es cambiar las letras otra vez —eso es el síntoma— sino
+que **la tabla de stock se genere en un solo lugar**: `renglonesDeStock()` la
+arma, `crearResumen()` la usa cuando el libro nace y `arreglarFormulasDelResumen()`
+la reescribe cuando una columna se corre. Antes había dos copias de esas
+fórmulas —una en `crearResumen()` y media en `arreglarPrecioDelResumen()`, que
+reescribía una sola columna— y la que tenía el bug era justo la que nadie
+volvía a tocar.
+
+Y como «acordate de usar `letraDe()`» ya demostró dos veces que no alcanza, ahora
+hay un caso de prueba que lo mira por mí: `casoLasLetrasDelResumen` junta todas
+las columnas que nombran esas fórmulas y falla si aparece una que no sea
+código, cantidad, desde o hacia. Si mañana entra otra columna, el banco se pone
+rojo antes de que el resumen mienta.
+
+## Las semillas se escriben por nombre de columna
+
+Mismo error, otro lugar, encontrado buscando parientes del anterior. Las tres
+funciones que llenan un libro nuevo —`cargarProductos()`, `cargarClientes()` y
+`cargarStockInicial()`— armaban cada fila como una lista de valores en orden y
+la pegaban desde la columna A:
+
+```js
+filas.push(['ini-' + p[0], aFecha(FECHA_STOCK_INICIAL), 'ajuste', p[0], p[5],
+            '', DEPOSITO, 'conteo inicial', ...]);
+hoja('movimientos').getRange(2, 1, filas.length, 10).setValues(filas);
+```
+
+Diez columnas. Movimientos tiene once desde que entró `precio`. O sea que el
+próximo libro que naciera iba a tener el stock inicial corrido: `DEPOSITO` en la
+columna del precio, la referencia en la de «desde». Nadie lo notó porque esa
+función corre una sola vez en la vida de un libro y el libro ya existía.
+
+Ahora las tres le pasan **objetos** a `escribirFilas()`, que es la misma función
+que usa la sincronización y acomoda cada campo por su nombre. Agregar una
+columna no las toca. `casoLasSemillasCaenEnSuColumna` lo verifica cargando la
+semilla en la planilla de mentira y mirando que la ubicación haya caído en
+«hacia» y no en la de al lado.
+
+El patrón común de los tres bugs de hoy —la migración que se olvidó una hoja,
+las fórmulas con la letra a mano y las semillas posicionales— es el mismo:
+**código que nombra una columna por su posición**. Donde quedaba uno, lo saqué.
+
+## El banco no puede ser una copia del servicio
+
+Había un `banco-solo.html` en la raíz: una copia pegada a mano de `Code.gs` y de
+`planilla.js` en un solo archivo, para poder abrirlo sin levantar un servidor.
+Lo borré.
+
+Cuando fui a usarlo estaba en `API = 4` —el servicio va en 5— y conservaba la
+lista de hojas a migrar escrita a mano, que es exactamente el bug que rompió la
+hoja de movimientos. O sea: un banco de pruebas que daba verde mientras el
+servicio de verdad estaba roto. Eso es peor que no tener banco, porque da
+tranquilidad falsa.
+
+El banco de verdad es `pruebas/banco.html`, que carga `../apps-script/Code.gs`
+tal como está en el disco. Una copia de la cosa que uno quiere probar no prueba
+nada.
+
+## INGRESOS POR MES cuenta por la fecha de cobro
+
+Cuando el número grande del resumen pasó a contar solo lo cobrado, esta tabla
+quedó contando por fecha de venta y sumando también lo impago. Dos números
+distintos en la misma hoja, sin forma de saber cuál mirar —y justo en la hoja
+que usan para cuadrar el mes—.
+
+Ahora las dos piezas de la tabla —la lista de meses y los totales— filtran por
+lo mismo que el total de arriba: cobradas y con fecha. El mes es el del cobro si
+está anotado y el de la venta si no, que es el criterio de `cuandoEntro()` en la
+app. La suma de la columna da igual al balance.
 
 ## Las funciones de mantenimiento toman el candado
 

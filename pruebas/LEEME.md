@@ -26,6 +26,15 @@ línea en rojo nombra qué se rompió.
 Conviene correrlo un par de veces. Los bugs de sincronización dependen de en qué
 estado quedó la vuelta anterior, y por eso aparecen a veces sí y a veces no.
 
+Y hay que correrlo **con el servidor**, aunque sea más cómodo abrir un archivo a
+mano. Hubo un `banco-solo.html` autocontenido, con `Code.gs` pegado adentro, y
+quedó viejo sin que nadie lo notara: daba verde con el servicio roto. El banco
+tiene que cargar `../apps-script/Code.gs` del disco, no una copia.
+
+Cada vez que se vuelve a correr conviene cambiarle el puerto o agregarle `?v=2` a
+la dirección: el navegador se guarda el JavaScript por URL y, si no, prueba el
+código de la vuelta anterior.
+
 ## Qué mira cada caso
 
 - Borrar un **cliente** que ya estaba en la planilla: se tiene que ir de los dos
@@ -38,6 +47,13 @@ estado quedó la vuelta anterior, y por eso aparecen a veces sí y a veces no.
   la venta se perdía entera.
 - Borrar un **producto** recién cargado.
 - Que la baja hecha en **un teléfono** llegue al otro.
+- Que ninguna fórmula del resumen **nombre una columna por su letra**. Esa es la
+  familia de bugs que mostró «valor en consignación: −$10.378.400» sin dar un
+  solo error: la letra se corre al agregar una columna y la fórmula no falla,
+  miente.
+- Que **INGRESOS POR MES** cuente por la fecha de cobro y solo lo cobrado, o sea
+  lo mismo que el balance de arriba.
+- Que las **semillas** de un libro nuevo caigan cada una en su columna.
 
 ## `impresora.html` — los bytes que salen por Bluetooth
 
