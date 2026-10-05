@@ -54,7 +54,7 @@
 // Versión del protocolo. La app rechaza una respuesta que no la traiga o que
 // traiga otra: así una implementación vieja que haya quedado publicada no
 // puede pisar los datos del teléfono con un esquema que ya no existe.
-var API = 5;
+var API = 6;
 
 // Ubicaciones reservadas del libro mayor. En mayúscula y sin acentos a
 // propósito: los locales se escriben como los nombraron ellas ("humus",
@@ -63,6 +63,39 @@ var DEPOSITO = 'DEPOSITO';
 var PRODUCCION = 'PRODUCCION';
 var VENDIDO = 'VENDIDO';
 var MERMA = 'MERMA';
+
+/* --------------------------------------------------------------------------
+   QUÉ HOJA SE SINCRONIZA Y POR QUÉ CAMPO SE RECONOCE UNA FILA
+
+   Esta lista está UNA sola vez. Estaba escrita a mano en cuatro lugares —el
+   bucle de la sincronización, el que se asegura de que las hojas existan, el
+   que les da formato y el diagnóstico— y agregar una hoja significaba acordarse
+   de los cuatro. La hoja de movimientos se rompió en octubre justamente por una
+   lista escrita a mano a la que le faltaba un nombre.
+
+   Las que dicen 'id' son libros mayores: cada fila es un hecho con su id. Las
+   otras son catálogos cortos que ellas también editan desde la planilla, y ahí
+   la fila se reconoce por su código o su nombre.
+   -------------------------------------------------------------------------- */
+var CLAVES = {
+  ingresos:    'id',
+  egresos:     'id',
+  movimientos: 'id',
+  horas:       'id',
+  caja:        'id',
+  cierres:     'id',
+  productos:   'cod',
+  clientes:    'nombre',
+  personas:    'nombre'
+};
+
+// Los libros mayores y los catálogos, separados pero sacados de CLAVES.
+function hojasPorId() {
+  return Object.keys(CLAVES).filter(function (n) { return CLAVES[n] === 'id'; });
+}
+function hojasPorClave() {
+  return Object.keys(CLAVES).filter(function (n) { return CLAVES[n] !== 'id'; });
+}
 
 var COLUMNAS = {
   productos:   ['cod', 'producto', 'presentacion', 'costo', 'pmayor', 'pminor', 'activo', 'mod'],
@@ -75,8 +108,26 @@ var COLUMNAS = {
   // como los clientes: son pocas y las escriben ellas.
   personas:    ['nombre', 'cargo', 'precio_hora', 'activo', 'mod'],
   // Cada rato de trabajo, con su fecha y su actividad.
-  horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'obs', 'mod'],
+  //
+  // «precio» se escribe EN EL MOMENTO EN QUE SE PAGA esa hora, y queda fijo. Las
+  // horas que todavía no se pagaron lo tienen vacío y valen al precio de hoy, así
+  // que subir el precio de la hora sube la deuda —que es lo que ellas esperan—
+  // sin revaluar lo que ya se cobró. «ref» es el id del egreso con que se pagó.
+  horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'precio', 'ref', 'obs', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'precio', 'desde', 'hacia', 'ref', 'obs', 'mod'],
+  // PLATA QUE CAMBIA DE BOLSILLO. Luna tiene $10.000 de la cocina en su
+  // MercadoPago y los pasa a la caja de efectivo: no es un ingreso ni un
+  // egreso, no cambia el balance, solo cambia dónde está. Tiene su propio
+  // libro mayor por eso mismo: si se anotara como un ingreso a efectivo más un
+  // egreso de MP Luna, «Ingresos totales» quedaría inflado con plata que nadie
+  // ganó, y ese número es justo el que mira para decidir.
+  caja:        ['id', 'fecha', 'desde', 'hacia', 'monto', 'obs', 'mod'],
+  // El mes que se dio por cerrado, con las cifras que tenía en ese momento.
+  // El saldo inicial del mes siguiente NO sale de acá —se calcula sumando todo
+  // lo anterior, que no se puede desincronizar—. Esta hoja es la constancia:
+  // quién lo cerró, cuándo, y con qué números. Si el mes cambia después de
+  // cerrado, se nota comparando.
+  cierres:     ['id', 'mes', 'fecha', 'ingresos', 'egresos', 'saldo', 'quien', 'obs', 'mod'],
   borrados:    ['id', 'mod', 'que', 'quien']
 };
 
@@ -88,8 +139,12 @@ var ENCABEZADOS = {
   egresos:     ['id', 'fecha', 'rubro', 'detalle', 'persona', 'cantidad', 'monto',
                 'medio de pago', 'observaciones', 'mod'],
   personas:    ['nombre', 'cargo', 'precio por hora', 'activo', 'mod'],
-  horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'observaciones', 'mod'],
+  horas:       ['id', 'fecha', 'persona', 'actividad', 'horas', 'precio de la hora',
+                'pagada con', 'observaciones', 'mod'],
   movimientos: ['id', 'fecha', 'tipo', 'código', 'cantidad', 'precio', 'desde', 'hacia', 'referencia',
+                'observaciones', 'mod'],
+  caja:        ['id', 'fecha', 'sale de', 'entra a', 'monto', 'observaciones', 'mod'],
+  cierres:     ['id', 'mes', 'cerrado el', 'ingresos', 'egresos', 'saldo', 'quién cerró',
                 'observaciones', 'mod'],
   borrados:     ['id', 'mod', 'qué se borró', 'quién lo borró'],
   listas:       ['medios de pago', 'rubros de egreso'],
@@ -188,7 +243,7 @@ function sincronizar(pedido, quien) {
   var guardados = 0;
   var resultado = { ok: true, api: API };
 
-  ['ingresos', 'egresos', 'movimientos', 'horas'].forEach(function (nombre) {
+  hojasPorId().forEach(function (nombre) {
     var entrantes = pedido[nombre] || [];
     guardados += entrantes.length;
     var fusionadas = fusionar(leerFilas(nombre), entrantes, borrados, nombre);
@@ -196,14 +251,15 @@ function sincronizar(pedido, quien) {
     resultado[nombre] = fusionadas;
   });
 
-  // Productos y clientes se identifican por su código o su nombre, no por un
-  // id: son catálogos cortos que ellas también editan desde la planilla.
-  [['productos', 'cod'], ['clientes', 'nombre'], ['personas', 'nombre']].forEach(function (par) {
-    var entrantes = pedido[par[0]] || [];
+  // Productos, clientes y personas se identifican por su código o su nombre, no
+  // por un id: son catálogos cortos que ellas también editan desde la planilla.
+  hojasPorClave().forEach(function (nombre) {
+    var entrantes = pedido[nombre] || [];
     guardados += entrantes.length;
-    var fusionadas = fusionarPorClave(leerFilas(par[0]), entrantes, par[1], borrados, par[0]);
-    escribirFilas(par[0], fusionadas);
-    resultado[par[0]] = fusionadas;
+    var fusionadas = fusionarPorClave(leerFilas(nombre), entrantes, CLAVES[nombre],
+                                      borrados, nombre);
+    escribirFilas(nombre, fusionadas);
+    resultado[nombre] = fusionadas;
   });
 
   escribirBorrados(borrados);
@@ -354,8 +410,33 @@ function leerFilas(nombre) {
       o.persona = String(o.persona || '').trim();
       o.actividad = String(o.actividad || '').trim();
       o.horas = numero(o.horas);
+      // El precio al que se pagó esta hora. Vacío mientras no se pagó, y ahí
+      // vale al precio de hoy: subir el precio de la hora sube la deuda y no
+      // revalúa lo que ya se cobró.
+      o.precio = numero(o.precio);
+      o.ref = String(o.ref || '').trim();
       o.obs = String(o.obs || '');
       if (!o.persona || !o.horas) continue;
+
+    } else if (nombre === 'caja') {
+      o.desde = String(o.desde || '').trim();
+      o.hacia = String(o.hacia || '').trim();
+      o.monto = numero(o.monto);
+      o.obs = String(o.obs || '');
+      // Un pase de un bolsillo a otro sin monto, o sin las dos puntas, no dice
+      // nada y no puede entrar: dejaría un saldo descolgado imposible de leer.
+      if (!o.monto || !o.desde || !o.hacia) continue;
+
+    } else if (nombre === 'cierres') {
+      // «mes» es la etiqueta que se lee en la planilla —«octubre 2026»— y no un
+      // dato: escribir «2026-10» ahí hace que Sheets lo convierta en una fecha.
+      // El mes de verdad viaja dentro del id, que la planilla no toca.
+      o.mes = String(o.mes || '').trim();
+      o.ingresos = numero(o.ingresos);
+      o.egresos = numero(o.egresos);
+      o.saldo = numero(o.saldo);
+      o.quien = String(o.quien || '').trim();
+      o.obs = String(o.obs || '');
 
     } else if (nombre === 'egresos') {
       o.rubro = String(o.rubro || '').trim() || 'Otros Gastos';
@@ -462,6 +543,13 @@ function describirFila(nombre, f) {
   if (nombre === 'horas') {
     return 'horas ' + (f.fecha || 'sin fecha') + ' · ' + (f.persona || '?')
          + ' · ' + (f.horas || 0) + ' h';
+  }
+  if (nombre === 'caja') {
+    return 'pase de caja ' + (f.fecha || 'sin fecha') + ' · ' + plata(f.monto)
+         + ' · ' + (f.desde || '-') + ' → ' + (f.hacia || '-');
+  }
+  if (nombre === 'cierres') {
+    return 'cierre de ' + (f.mes || '?') + ' · saldo ' + plata(f.saldo);
   }
   if (nombre === 'productos') return 'producto ' + (f.cod || '?') + ' · ' + (f.producto || '');
   if (nombre === 'clientes') return 'cliente ' + (f.nombre || '?');
@@ -914,6 +1002,7 @@ COLUMNAS_ANTERIORES.ingresos = ['id', 'venta', 'fecha', 'cliente', 'lista', 'med
   'pagado', 'cod', 'cantidad', 'precio', 'subtotal', 'obs', 'mod'];
 COLUMNAS_ANTERIORES.movimientos = ['id', 'fecha', 'tipo', 'cod', 'cantidad', 'desde',
   'hacia', 'ref', 'obs', 'mod'];
+COLUMNAS_ANTERIORES.horas = ['id', 'fecha', 'persona', 'actividad', 'horas', 'obs', 'mod'];
 
 function migrarHoja(nombre) {
   var viejas = COLUMNAS_ANTERIORES[nombre];
@@ -960,8 +1049,13 @@ function migrarHoja(nombre) {
   // Cualquier columna nueva corre las letras, y el resumen apunta por letra.
   arreglarFormulasDelResumen();
 
-  return 'Hoja «' + nombre + '» migrada: entró la columna «'
-       + ENCABEZADOS[nombre][corte] + '» (' + salida.length + ' filas).';
+  // Puede entrar más de una columna de una vez —horas recibió «precio» y «ref»
+  // juntas—, así que el mensaje las nombra a todas y no solo a la primera.
+  var entraron = nuevas.filter(function (c) { return viejas.indexOf(c) < 0; })
+    .map(function (c) { return '«' + ENCABEZADOS[nombre][nuevas.indexOf(c)] + '»'; });
+  return 'Hoja «' + nombre + '» migrada: entr'
+       + (entraron.length === 1 ? 'ó la columna ' : 'aron las columnas ')
+       + entraron.join(' y ') + ' (' + salida.length + ' filas).';
 }
 
 // Lo que corre también en cada sincronización: barato si ya está todo hecho.
@@ -983,8 +1077,8 @@ function asegurarEsquema() {
     if (migrada) hechas.push(migrada);
   });
 
-  ['productos', 'clientes', 'personas', 'ingresos', 'egresos', 'horas', 'movimientos',
-   'listas', 'invitaciones', 'dispositivos', 'borrados'].forEach(function (n) { hoja(n); });
+  Object.keys(COLUMNAS).concat(['listas', 'invitaciones', 'dispositivos'])
+    .forEach(function (n) { hoja(n); });
 
   if (props.getProperty('esquema') !== 'v1') {
     darFormato();
@@ -1107,6 +1201,8 @@ function darFormato() {
   formatoDatos('personas', COLOR.gris, '#efedea');
   formatoDatos('horas', COLOR.tierra, COLOR.tierraSuave);
   formatoDatos('movimientos', COLOR.verde, COLOR.verdeSuave);
+  formatoDatos('caja', COLOR.bordo, COLOR.bordoSuave);
+  formatoDatos('cierres', COLOR.gris, '#efedea');
 
   var l = hoja('listas');
   l.setTabColor(COLOR.gris);
@@ -1153,7 +1249,8 @@ function formatoDatos(nombre, fuerte, suave) {
     h.getRange(2, col('fecha'), FILAS_CON_FORMATO - 1).setNumberFormat('dd/mm/yyyy');
     h.setColumnWidth(col('fecha'), 95);
   }
-  ['costo', 'pmayor', 'pminor', 'precio', 'subtotal', 'monto', 'precio_hora'].forEach(function (c) {
+  ['costo', 'pmayor', 'pminor', 'precio', 'subtotal', 'monto', 'precio_hora',
+   'saldo', 'ingresos', 'egresos'].forEach(function (c) {
     if (col(c)) {
       h.getRange(2, col(c), FILAS_CON_FORMATO - 1).setNumberFormat('"$"#,##0');
       h.setColumnWidth(col(c), 110);
@@ -1174,6 +1271,12 @@ function formatoDatos(nombre, fuerte, suave) {
   };
   if (col('medio_pago')) {
     h.getRange(2, col('medio_pago'), FILAS_CON_FORMATO - 1).setDataValidation(contra('listas!A2:A200'));
+  }
+  // En la hoja de caja, «sale de» y «entra a» son medios de pago, no lugares.
+  if (nombre === 'caja') {
+    ['desde', 'hacia'].forEach(function (c) {
+      h.getRange(2, col(c), FILAS_CON_FORMATO - 1).setDataValidation(contra('listas!A2:A200'));
+    });
   }
   if (nombre === 'egresos') {
     h.getRange(2, col('rubro'), FILAS_CON_FORMATO - 1).setDataValidation(contra('listas!B2:B200'));
@@ -2362,6 +2465,102 @@ function leerMovimientosDelRespaldo() {
   return porId;
 }
 
+/* --------------------------------------------------------------------------
+   CONGELAR EL PRECIO DE LAS HORAS YA PAGADAS
+
+   Se corre UNA vez, al pasar a este esquema, y después no hace falta nunca más.
+
+   El saldo de honorarios se calculaba así:
+
+       saldo = Σ (horas × precio de la hora DE HOY) − Σ (pagos)
+
+   El precio de hoy multiplicaba TODA la historia, incluidas las horas que ya se
+   habían cobrado. Entonces subir el precio de la hora revalúa lo ya pagado y
+   aparece una deuda que no existe. Les pasó: cobraron todo, el saldo quedó en
+   cero, subieron el precio y apareció una deuda nueva, así que volvieron el
+   precio para atrás. O sea: el sistema les impidió aumentarse el sueldo.
+
+   Esta función recorre las horas de cada una de la más vieja a la más nueva y
+   le escribe el precio de hoy a todas las que los pagos ya cubren. De ahí en
+   más esas quedan fijas y subir el precio solo mueve la deuda.
+
+   IMPORTANTE: hay que correrla ANTES de volver a subir el precio de la hora.
+   Congela al precio que figura hoy en la hoja «personas», que es el precio al
+   que efectivamente se pagó. Si primero se sube el precio, congela al nuevo y
+   da de más.
+   -------------------------------------------------------------------------- */
+
+function congelarHorasPagadas() { return conCandado(congelarHorasPagadasAhora); }
+
+function congelarHorasPagadasAhora() {
+  var precio = {};
+  leerFilas('personas').forEach(function (p) { precio[p.nombre] = numero(p.precio_hora); });
+
+  // Lo pagado a cada una: los egresos de honorarios que llevan su nombre.
+  var pagado = {};
+  leerFilas('egresos').forEach(function (e) {
+    if (String(e.rubro).trim().toLowerCase().indexOf('honorario') !== 0) return;
+    var q = String(e.persona || '').trim();
+    if (!q) return;
+    pagado[q] = (pagado[q] || 0) + numero(e.monto);
+  });
+
+  var horas = leerFilas('horas').sort(function (a, b) {
+    return String(a.fecha).localeCompare(String(b.fecha));
+  });
+
+  // LO QUE YA SE APLICÓ NO SE PUEDE APLICAR DE NUEVO. Una hora que ya tiene
+  // precio se pagó con parte de esos egresos, así que esa plata ya está gastada
+  // y no queda disponible para congelar otra hora. Sin este descuento, correr la
+  // función dos veces congelaba horas que nadie había pagado —y el banco de
+  // pruebas lo encontró justamente corriéndola dos veces—.
+  horas.forEach(function (h) {
+    if (!h.precio) return;
+    var q = h.persona;
+    pagado[q] = (pagado[q] || 0) - numero(h.horas) * numero(h.precio);
+  });
+
+  var ahora = Date.now();
+  var cuenta = { congeladas: 0, yaEstaban: 0, sinPagar: 0 };
+  var porPersona = {};
+
+  horas.forEach(function (h) {
+    var q = h.persona;
+    if (h.precio) { cuenta.yaEstaban++; return; }
+    var cuanto = numero(h.horas) * (precio[q] || 0);
+    if (!cuanto) { cuenta.sinPagar++; return; }
+    // La más vieja primero: un pago cubre lo que se trabajó antes.
+    if ((pagado[q] || 0) >= cuanto) {
+      pagado[q] -= cuanto;
+      h.precio = precio[q];
+      h.mod = ahora;
+      cuenta.congeladas++;
+      porPersona[q] = (porPersona[q] || 0) + 1;
+    } else {
+      cuenta.sinPagar++;
+    }
+  });
+
+  escribirFilas('horas', horas);
+
+  var detalle = Object.keys(porPersona).sort().map(function (q) {
+    return '  · ' + q + ': ' + porPersona[q] + ' al precio de ' + dinero(precio[q]);
+  });
+
+  var texto = 'Horas con el precio congelado: ' + cuenta.congeladas + '.'
+    + (detalle.length ? '\n' + detalle.join('\n') : '')
+    + '\n  · ya lo tenían: ' + cuenta.yaEstaban
+    + '\n  · todavía sin pagar, valen al precio de hoy: ' + cuenta.sinPagar
+    + '\n\nDe acá en más subir el precio de la hora mueve solo la deuda.'
+    + '\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
+}
+
+function dinero(n) {
+  return '$' + String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 /* ================= Auxiliares ================= */
 
 // La letra de una columna, calculada desde COLUMNAS. Escribir la letra a mano
@@ -2400,8 +2599,8 @@ function limpiarHojaSobrante() {
 function revisar() {
   var ss = SpreadsheetApp.getActive();
   var lineas = ['Libro: ' + ss.getName(), ''];
-  ['productos', 'clientes', 'ingresos', 'egresos', 'movimientos', 'listas',
-   'invitaciones', 'dispositivos', 'borrados', 'resumen'].forEach(function (n) {
+  Object.keys(COLUMNAS).concat(['listas', 'invitaciones', 'dispositivos', 'resumen'])
+    .forEach(function (n) {
     var h = ss.getSheetByName(n);
     lineas.push((h ? '✓ ' : '✗ ') + n + (h ? '  (' + Math.max(0, h.getLastRow() - 1) + ' filas)' : '  falta'));
   });

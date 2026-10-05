@@ -749,6 +749,22 @@ a.boton { text-decoration: none; }
 }
 .cuenta__todo:active { background: var(--bordo-suave); }
 
+/* Un botón dentro de una celda de tabla. El de «cancelar» va al final del
+   renglón de cada medio de pago, y ahí un botón de tamaño normal empuja la
+   tabla a lo ancho y obliga a arrastrarla en el teléfono. */
+.boton--mini {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 9px;
+  border: 1px solid var(--bordo);
+  border-radius: var(--radio);
+  background: var(--blanco);
+  color: var(--bordo);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.boton--mini:active { background: var(--bordo-suave); }
+
 /* ==========================================================================
    Componentes del resumen
    ========================================================================== */

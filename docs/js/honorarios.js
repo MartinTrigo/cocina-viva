@@ -98,10 +98,17 @@ window.Honorarios = (function () {
   const horasDelPeriodo = () => horasTodas().filter((h) => entra(h.fecha));
   const pagosDelPeriodo = () => pagosTodos().filter((e) => entra(e.fecha));
 
-  // Lo que vale un rato de trabajo. El precio sale de la persona HOY: si le
-  // suben la hora, sube el valor de lo que todavía no cobró, que es lo que
-  // ellas esperan que pase.
-  const valorDe = (h) => (Number(h.horas) || 0) * window.Datos.precioHora(h.persona);
+  // Lo que vale un rato de trabajo.
+  //
+  // Si la hora ya se pagó, tiene el precio escrito y vale eso: es el precio al
+  // que se cobró. Si no, vale al precio de hoy, así que subir el precio de la
+  // hora sube lo que falta cobrar —que es lo que ellas esperan que pase—.
+  //
+  // Antes el precio de hoy multiplicaba TODA la historia, también las horas ya
+  // cobradas: cobraban todo, el saldo quedaba en cero, subían el precio de la
+  // hora y aparecía una deuda que no existía. Volvieron el precio para atrás
+  // por eso. El sistema les estaba impidiendo aumentarse el sueldo.
+  const valorDe = (h) => window.Datos.valorHora(h);
 
   // El saldo de cada una: todo lo trabajado menos todo lo pagado, SIEMPRE sobre
   // la historia completa y no sobre el período elegido. Una deuda no se achica
@@ -599,12 +606,26 @@ window.Honorarios = (function () {
       medio_pago: medio,
       obs: obs || "Liquidación de horas",
     };
-    await window.CVDB.guardar("egresos", Object.assign({}, egreso, { mod: Date.now() }));
+    // SE CONGELA EL PRECIO DE LO QUE SE ESTÁ PAGANDO. De la hora más vieja a la
+    // más nueva, hasta donde llega el monto: esas quedan valuadas para siempre
+    // al precio de hoy, y lo que falta cobrar sigue moviéndose si el precio
+    // sube. Las que el pago cubre a medias se dejan sin tocar; el saldo cierra
+    // igual porque es todo lo trabajado menos todo lo pagado.
+    const congeladas = window.Datos.horasQueCubre(quien, monto);
+    const ahora = Date.now();
+
+    await window.CVDB.guardar("egresos", Object.assign({}, egreso, { mod: ahora }));
+    if (congeladas.length) {
+      await window.CVDB.guardarVarios("horas", congeladas.map((h) =>
+        Object.assign({}, h, { ref: egreso.id, mod: ahora })));
+    }
     await window.Datos.cargar();
     window.Sincro.sincronizar(true);
 
     if (!conRecibo) {
-      window.Util.brindis("Liquidado: " + quien + ", " + dinero(monto) + ".");
+      window.Util.brindis("Liquidado: " + quien + ", " + dinero(monto) + "."
+        + (congeladas.length ? " Quedaron " + congeladas.length
+            + (congeladas.length === 1 ? " hora" : " horas") + " al precio de hoy." : ""));
       ir("honorarios");
       return;
     }

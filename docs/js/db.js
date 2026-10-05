@@ -22,7 +22,7 @@ window.CVDB = (function () {
   // Sube de a uno cada vez que se agrega un almacén. Si alguien se olvida, la
   // apertura lo detecta y lo arregla sola —ver abrir()—, pero conviene subirla:
   // así la base se crea bien de una y no hace falta el reintento.
-  const VERSION = 2;
+  const VERSION = 3;
 
   // Los almacenes que se sincronizan, con cuál es su clave. Para agregar uno
   // más adelante: sumarlo acá y subir VERSION en uno.
@@ -31,6 +31,8 @@ window.CVDB = (function () {
     egresos:     "id",
     movimientos: "id",
     horas:       "id",
+    caja:        "id",
+    cierres:     "id",
     productos:   "cod",
     clientes:    "nombre",
     personas:    "nombre",

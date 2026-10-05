@@ -150,6 +150,10 @@ window.Resumen = (function () {
           "Si al contar la plata sobró o faltó, se anota acá y el mes cierra.",
           cuadrarElMes(p), true) : ""}
 
+        ${periodo ? bloque("Cerrar el mes",
+          "Dejar constancia de que este mes se revisó y con qué números quedó.",
+          cerrarElMes(p), true) : ""}
+
         ${p.egresos.length ? bloque("En qué se fue",
           "Los egresos por rubro.",
           dona(agrupar(p.egresos, (e) => e.rubro, (e) => e.monto), p.totalEgresos)) : ""}
@@ -218,6 +222,25 @@ window.Resumen = (function () {
     vista.querySelectorAll("[data-bajar]").forEach((b) => {
       b.onclick = () => bajar(b.dataset.bajar);
     });
+
+    // Cancelar una cuenta: pasar lo que hay en un medio de pago a otro.
+    vista.querySelectorAll("[data-cancelar]").forEach((b) => {
+      b.onclick = () => {
+        const medio = b.dataset.cancelar;
+        cancelando = {
+          medio: medio,
+          cuanto: window.Datos.saldoPorMedio()[medio] || 0,
+          hacia: "",
+          tipeado: null,
+        };
+        pintarPase();
+        document.getElementById("r-pase").scrollIntoView({ block: "nearest" });
+      };
+    });
+    pintarPase();
+
+    const cerrar = document.getElementById("r-cerrar-mes");
+    if (cerrar) window.Util.unaVez(cerrar, guardarCierre);
   }
 
   // Un bloque del tablero. En el teléfono van uno abajo del otro; en una
@@ -286,6 +309,191 @@ window.Resumen = (function () {
       por: e.obs || e.detalle, sobro: false,
     }));
     return sobraron.concat(faltaron).sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }
+
+  /* ------------------------------------------------------------------------
+     CANCELAR UNA CUENTA
+
+     Luna tiene $10.000 de la cocina en su MercadoPago y los pasa a la caja de
+     efectivo. No se ganó ni se gastó nada: el balance total queda igual y lo
+     único que cambia es en qué bolsillo está la plata.
+
+     El monto que propone es EL DE HOY, no el del mes que se esté mirando: lo
+     que se cancela es lo que hay ahora en ese bolsillo. Y queda editable,
+     porque a veces se pasa una parte.
+
+     Si el saldo está en negativo —gastó de su MercadoPago más de lo que
+     entró—, la plata va al revés: sale del otro medio y entra a este. La
+     dirección la decide el signo, no quien aprieta.
+     ------------------------------------------------------------------------ */
+
+  // Qué cuenta se está cancelando y a dónde va la plata.
+  let cancelando = null;
+
+  function otrosMedios(sin) {
+    const d = window.Datos.todo();
+    const lista = (d.listas && d.listas.medios_pago) || [];
+    const vistos = {};
+    window.Datos.platas().forEach((x) => { if (x.medio) vistos[x.medio] = true; });
+    const todos = lista.length ? lista : Object.keys(vistos).sort();
+    return todos.filter((m) => m && m !== sin && m !== "—");
+  }
+
+  function pintarPase() {
+    const caja = document.getElementById("r-pase");
+    if (!caja) return;
+    if (!cancelando) { caja.hidden = true; caja.innerHTML = ""; return; }
+
+    const { medio, cuanto, hacia } = cancelando;
+    const sale = cuanto > 0 ? medio : hacia;
+    const entra = cuanto > 0 ? hacia : medio;
+    const opciones = otrosMedios(medio);
+
+    caja.hidden = false;
+    caja.innerHTML = `
+      <div class="tarjeta separado">
+        <h3>Cancelar ${esc(medio)}</h3>
+        <p class="nota">Hoy hay <strong>${dinero(cuanto)}</strong> en ${esc(medio)}.
+           ${cuanto < 0
+             ? "Está en negativo, así que la plata entra a esta cuenta desde la otra."
+             : "Esa plata pasa a la cuenta que elijas. El balance no cambia: cambia de bolsillo."}</p>
+
+        <p class="nota">${cuanto < 0 ? "¿De dónde sale?" : "¿A dónde va?"}</p>
+        <div class="acciones">
+          ${opciones.map((m) => `
+            <button class="boton ${m === hacia ? "" : "boton--secundario"}"
+                    data-hacia="${esc(m)}">${esc(m)}</button>`).join("")}
+        </div>
+
+        <div class="campo">
+          <label for="pa-monto">Cuánto</label>
+          <input type="text" id="pa-monto" class="numero" inputmode="numeric"
+                 value="${Math.abs(cuanto)}">
+        </div>
+        <div class="campo">
+          <label for="pa-fecha">Cuándo</label>
+          <input type="date" id="pa-fecha" value="${esc(hoy())}">
+        </div>
+
+        ${hacia ? `<p class="aviso aviso--info">Sale de <strong>${esc(sale)}</strong>
+           y entra a <strong>${esc(entra)}</strong>.</p>` : ""}
+        <p class="aviso aviso--error" id="pa-error" hidden></p>
+        <div class="acciones">
+          <button class="boton" id="pa-guardar"${hacia ? "" : " disabled"}>Pasar la plata</button>
+          <button class="boton boton--secundario" id="pa-cancelar">Dejarlo así</button>
+        </div>
+      </div>`;
+
+    vista.querySelectorAll("[data-hacia]").forEach((b) => {
+      b.onclick = () => {
+        // Se guarda lo tipeado antes de volver a dibujar, o se pierde.
+        const campo = document.getElementById("pa-monto");
+        if (campo) cancelando.tipeado = campo.value;
+        cancelando.hacia = b.dataset.hacia;
+        pintarPase();
+      };
+    });
+    if (cancelando.tipeado != null) {
+      document.getElementById("pa-monto").value = cancelando.tipeado;
+    }
+    document.getElementById("pa-cancelar").onclick = () => { cancelando = null; pintarPase(); };
+    window.Util.unaVez(document.getElementById("pa-guardar"), guardarPase);
+  }
+
+  async function guardarPase() {
+    if (!cancelando || !cancelando.hacia) return;
+    const error = document.getElementById("pa-error");
+    const monto = Math.abs(aNumero(document.getElementById("pa-monto").value));
+    const cuando = document.getElementById("pa-fecha").value || hoy();
+
+    if (!monto) {
+      error.textContent = "Falta poner cuánto se pasa.";
+      error.hidden = false;
+      return;
+    }
+    error.hidden = true;
+
+    const alReves = cancelando.cuanto < 0;
+    const desde = alReves ? cancelando.hacia : cancelando.medio;
+    const hacia = alReves ? cancelando.medio : cancelando.hacia;
+
+    await window.CVDB.guardar("caja", Object.assign(
+      window.Datos.pase(desde, hacia, monto, {
+        fecha: cuando,
+        obs: "Cancelación de cuenta",
+      }), { mod: Date.now() }));
+
+    cancelando = null;
+    await window.Datos.cargar();
+    window.Sincro.sincronizar(true);
+    window.Util.brindis(dinero(monto) + " de " + desde + " a " + hacia + ".");
+    pintar();
+  }
+
+  /* ------------------------------------------------------------------------
+     CERRAR EL MES
+
+     El saldo inicial del mes siguiente NO sale de acá: se calcula sumando todo
+     lo anterior, que es una cuenta que no se puede apretar dos veces ni quedar
+     a medias. Por eso la tabla de arriba ya arrastra el saldo sin que nadie
+     apriete nada, y también para los meses de antes.
+
+     Esto es la constancia: quién revisó el mes, cuándo, y con qué números lo
+     dio por bueno. Sirve para dos cosas concretas: que la otra vea que ya está
+     cerrado y no lo toque, y que si alguien carga algo con fecha de un mes
+     cerrado, los números dejen de coincidir y la app lo diga en vez de que la
+     diferencia aparezca tres meses después sin explicación.
+     ------------------------------------------------------------------------ */
+
+  function cerrarElMes(p) {
+    const cerrado = window.Datos.cierreDe(periodo);
+    const balance = p.totalIngresos - p.totalEgresos;
+    const cambio = cerrado && (Number(cerrado.saldo) !== balance
+      || Number(cerrado.ingresos) !== p.totalIngresos
+      || Number(cerrado.egresos) !== p.totalEgresos);
+
+    return `
+      ${cerrado ? `
+        <p class="aviso ${cambio ? "aviso--info" : "aviso--ok"}">
+          Cerrado el ${esc(fecha(cerrado.fecha))}${
+            cerrado.quien ? " por " + esc(cerrado.quien) : ""}, con un balance de
+          <strong>${dinero(Number(cerrado.saldo))}</strong>.
+          ${cambio ? `Pero ahora da <strong>${dinero(balance)}</strong>: se cargó o se
+             cambió algo de este mes después de cerrarlo. Conviene revisarlo y
+             volver a cerrar.` : "Los números siguen igual."}
+        </p>` : `
+        <p class="nota">Este mes todavía no se cerró. Conviene cuadrarlo primero,
+           arriba, y cerrarlo cuando los números sean los definitivos.</p>`}
+
+      <p class="nota">Lo que queda registrado: ingresos ${dinero(p.totalIngresos)},
+         egresos ${dinero(p.totalEgresos)}, balance
+         <strong>${dinero(balance)}</strong>.</p>
+
+      <button class="boton boton--ancho separado" id="r-cerrar-mes">${
+        cerrado ? "Volver a cerrar " : "Cerrar "}${esc(mesLargo(periodo))}</button>`;
+  }
+
+  async function guardarCierre() {
+    const p = datosDelPeriodo();
+    const balance = p.totalIngresos - p.totalEgresos;
+    const quien = (window.Acceso && window.Acceso.persona()) || "";
+
+    await window.CVDB.guardar("cierres", {
+      id: window.Datos.idDeCierre(periodo),
+      mes: mesLargo(periodo),
+      fecha: hoy(),
+      ingresos: p.totalIngresos,
+      egresos: p.totalEgresos,
+      saldo: balance,
+      quien: quien,
+      obs: "",
+      mod: Date.now(),
+    });
+
+    await window.Datos.cargar();
+    window.Sincro.sincronizar(true);
+    window.Util.brindis(mesLargo(periodo) + " cerrado con " + dinero(balance) + ".");
+    pintar();
   }
 
   function cuadrarElMes(p) {
@@ -464,29 +672,67 @@ window.Resumen = (function () {
   // todavía no pagaron no está en ningún bolsillo. Sumarla haría que el número
   // no cierre nunca contra la caja, que es justo para lo que se mira. Lo que
   // falta cobrar va debajo del cuadro, aparte, para que la cuenta se entienda.
+  /* ------------------------------------------------------------------------
+     CUÁNTO QUEDÓ, Y DÓNDE
+
+     Por cada medio de pago: lo que venía de antes, lo que entró, lo que salió y
+     lo que queda. Es la pregunta de fin de mes —«¿cuánta plata tendría que
+     haber en efectivo?»— y la que la planilla vieja contestaba con tres filas
+     sueltas que había que restar a mano.
+
+     LO QUE VIENE DE ANTES es la parte que faltaba. Mirando un mes, la tabla
+     mostraba solo el movimiento de ese mes, así que el número no era el saldo
+     de la caja y no servía para contar la plata. Ahora el saldo inicial se
+     calcula sumando todo lo anterior al primero del mes: no hay que apretar
+     nada, no hay nada guardado que pueda quedar mal, y anda igual para los
+     meses de antes.
+
+     LOS PASES solo aparecen si hubo alguno en el mes. Mientras no usen
+     «cancelar cuenta» la tabla tiene cuatro columnas; en cuanto pasan plata de
+     un bolsillo a otro, aparece la quinta para que la cuenta cierre a la vista.
+
+     CUENTA SOLO LO COBRADO: una venta entregada que todavía no pagaron no está
+     en ningún bolsillo, y sumarla haría que el número no cierre nunca contra la
+     caja. Lo que falta cobrar va debajo, aparte.
+     ------------------------------------------------------------------------ */
+
   function balancePorMedio(p) {
-    const cobrados = p.ingresos.filter((f) => f.pagado !== false);
     const impagos = p.ingresos.filter((f) => f.pagado === false);
     const porCobrar = impagos.reduce((n, f) => n + (Number(f.subtotal) || 0), 0);
 
-    const medios = {};
-    const sumar = (lista, campo, cual) => lista.forEach((f) => {
-      const k = String(f.medio_pago || "—");
-      if (!medios[k]) medios[k] = { entro: 0, salio: 0 };
-      medios[k][cual] += Number(f[campo]) || 0;
-    });
-    sumar(cobrados, "subtotal", "entro");
-    sumar(p.egresos, "monto", "salio");
+    const antes = periodo ? window.Datos.saldoPorMedio(periodo + "-01") : {};
+    const ahora = window.Datos.saldoPorMedio();
 
-    const filas = Object.keys(medios)
-      .map((k) => ({ que: k, entro: medios[k].entro, salio: medios[k].salio,
-                     saldo: medios[k].entro - medios[k].salio }))
-      .sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
+    const medios = {};
+    const tocar = (k) => {
+      if (!medios[k]) medios[k] = { antes: 0, entro: 0, salio: 0, pase: 0 };
+      return medios[k];
+    };
+    Object.keys(antes).forEach((k) => { tocar(k).antes = antes[k]; });
+    window.Datos.platas()
+      .filter((x) => !periodo || mesDe(x.fecha) === periodo)
+      .forEach((x) => { tocar(x.medio)[x.que] += x.cuanto; });
+    // Un medio que solo tiene plata de antes también va: esa plata existe.
+    Object.keys(ahora).forEach((k) => tocar(k));
+
+    const hayPases = Object.keys(medios).some((k) => medios[k].pase !== 0);
+
+    const filas = Object.keys(medios).map((k) => {
+      const m = medios[k];
+      return {
+        que: k, antes: m.antes, entro: m.entro, salio: m.salio, pase: m.pase,
+        saldo: m.antes + m.entro - m.salio + m.pase,
+        // Lo que hay HOY en ese bolsillo, que es lo que se cancela. No es lo
+        // mismo que el saldo de un mes que ya pasó.
+        hoy: ahora[k] || 0,
+      };
+    }).sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo));
     if (!filas.length) return "";
 
-    const total = filas.reduce((t, f) => ({
-      entro: t.entro + f.entro, salio: t.salio + f.salio, saldo: t.saldo + f.saldo,
-    }), { entro: 0, salio: 0, saldo: 0 });
+    const sumar = (campo) => filas.reduce((n, f) => n + f[campo], 0);
+    const total = { antes: sumar("antes"), entro: sumar("entro"),
+                    salio: sumar("salio"), pase: sumar("pase"), saldo: sumar("saldo") };
+    const cifra = (n) => (n ? dinero(n) : "—");
 
     return `
       <div class="tabla-envoltorio">
@@ -494,30 +740,47 @@ window.Resumen = (function () {
           <thead>
             <tr>
               <th>Medio de pago</th>
+              ${periodo ? `<th class="numero">Venía</th>` : ""}
               <th class="numero">Entró</th>
               <th class="numero">Salió</th>
-              <th class="numero">Diferencia</th>
+              ${hayPases ? `<th class="numero">Pases</th>` : ""}
+              <th class="numero">Queda</th>
+              <th class="no-imprimir"></th>
             </tr>
           </thead>
           <tbody>
             ${filas.map((f) => `
               <tr>
                 <td><span class="celda__que">${esc(f.que)}</span></td>
-                <td class="numero entra">${f.entro ? dinero(f.entro) : "—"}</td>
-                <td class="numero sale">${f.salio ? dinero(f.salio) : "—"}</td>
+                ${periodo ? `<td class="numero">${cifra(f.antes)}</td>` : ""}
+                <td class="numero entra">${cifra(f.entro)}</td>
+                <td class="numero sale">${cifra(f.salio)}</td>
+                ${hayPases ? `<td class="numero${f.pase < 0 ? " sale" : " entra"}">${
+                  cifra(f.pase)}</td>` : ""}
                 <td class="numero saldo${f.saldo < 0 ? " negativo" : ""}">${dinero(f.saldo)}</td>
+                <td class="no-imprimir">${f.hoy ? `
+                  <button class="boton--mini" data-cancelar="${esc(f.que)}"
+                          >Cancelar</button>` : ""}</td>
               </tr>`).join("")}
           </tbody>
           <tfoot>
             <tr>
               <td>Total</td>
+              ${periodo ? `<td class="numero">${cifra(total.antes)}</td>` : ""}
               <td class="numero">${dinero(total.entro)}</td>
               <td class="numero">${dinero(total.salio)}</td>
+              ${hayPases ? `<td class="numero">${cifra(total.pase)}</td>` : ""}
               <td class="numero saldo${total.saldo < 0 ? " negativo" : ""}">${dinero(total.saldo)}</td>
+              <td class="no-imprimir"></td>
             </tr>
           </tfoot>
         </table>
       </div>
+      ${hayPases ? `
+        <p class="nota">Los <strong>pases</strong> son plata que cambió de bolsillo
+           sin ser un ingreso ni un egreso: el total de la última columna no se
+           mueve por un pase, solo cambia de fila.</p>` : ""}
+      <div id="r-pase" class="no-imprimir" hidden></div>
       ${porCobrar ? `
         <p class="nota">No entra acá lo que todavía no cobraron:
            <strong>${dinero(porCobrar)}</strong> en

@@ -28,8 +28,10 @@
   function limpiarPlanilla() {
     const libro = window.__libro;
     libro.hojas = {}; libro.orden = [];
-    ["productos", "clientes", "ingresos", "egresos", "movimientos",
-     "listas", "invitaciones", "dispositivos", "borrados"].forEach((n) => hoja(n));
+    // La lista sale de COLUMNAS y no está escrita a mano: una hoja nueva que
+    // acá faltara haría fallar los casos por un motivo que no es el del caso.
+    Object.keys(COLUMNAS).concat(["listas", "invitaciones", "dispositivos"])
+      .forEach((n) => hoja(n));
   }
 
   // Escribe filas directo en la hoja, como si las hubieran cargado desde la
@@ -758,6 +760,154 @@
     afirmar(!!c && !!c.tipo, "el cliente tiene tipo: " + (c && c.tipo));
   }
 
+  /* ------------------------------------------------------------------------
+     LAS HOJAS NUEVAS: PASES DE CAJA Y CIERRES DE MES
+
+     Agregar una hoja significó durante mucho tiempo acordarse de cuatro listas
+     escritas a mano. Ahora sale todo de CLAVES, y estos casos lo comprueban
+     sincronizando de verdad: si alguien agrega una hoja al esquema y se olvida
+     de algo, la fila no vuelve y el banco se pone rojo.
+     ------------------------------------------------------------------------ */
+
+  async function casoLasHojasNuevasSincronizan() {
+    caso("Un pase de caja y un cierre de mes van y vuelven");
+    limpiarPlanilla();
+
+    var dice = sincronizar({
+      caja: [{ id: "pase-1", fecha: "2026-10-05", desde: "MP Luna",
+               hacia: "Efectivo", monto: 10000, obs: "Cancelación de cuenta",
+               mod: 500 }],
+      cierres: [{ id: "cierre-2026-10", mes: "octubre de 2026", fecha: "2026-10-05",
+                  ingresos: 50000, egresos: 20000, saldo: 30000,
+                  quien: "luna", obs: "", mod: 501 }],
+    }, { persona: "banco" });
+
+    afirmar(dice.ok === true, "el servicio contestó bien");
+    const pase = (dice.caja || [])[0];
+    afirmar(!!pase, "volvió el pase de caja");
+    if (pase) {
+      afirmar(pase.desde === "MP Luna" && pase.hacia === "Efectivo",
+              "con las dos puntas en su lugar: " + pase.desde + " → " + pase.hacia);
+      afirmar(Number(pase.monto) === 10000, "y el monto entero: " + pase.monto);
+    }
+    const cierre = (dice.cierres || [])[0];
+    afirmar(!!cierre, "volvió el cierre de mes");
+    if (cierre) {
+      afirmar(Number(cierre.saldo) === 30000, "con su saldo: " + cierre.saldo);
+      afirmar(cierre.quien === "luna", "y quién lo cerró: " + cierre.quien);
+      // El mes viaja en el id: escribir "2026-10" en una celda hace que Sheets
+      // lo convierta en una fecha y el id deja de poder reconocerse.
+      afirmar(cierre.id === "cierre-2026-10", "el mes viaja en el id: " + cierre.id);
+    }
+
+    // Y la hoja quedó escrita, no solo contestada.
+    afirmar(filasDe("caja").length === 1, "el pase quedó en la hoja");
+    afirmar(filasDe("cierres").length === 1, "y el cierre también");
+  }
+
+  async function casoUnPaseNoCambiaElTotal() {
+    caso("Un pase de caja cambia de bolsillo y no de total");
+    // Es el invariante del asunto: Luna pasa plata de su MercadoPago a la caja
+    // y la cocina no ganó ni perdió nada. Si esto se rompe, el balance del
+    // resumen empieza a mentir cada vez que cancelan una cuenta.
+    limpiarPlanilla();
+    sincronizar({
+      caja: [{ id: "p1", fecha: "2026-10-05", desde: "MP Luna", hacia: "Efectivo",
+               monto: 10000, obs: "", mod: 600 }],
+    }, { persona: "banco" });
+
+    const filas = filasDe("caja");
+    const total = filas.reduce((n, f) => n + Number(f.monto) - Number(f.monto), 0);
+    afirmar(total === 0, "las dos puntas se cancelan entre sí");
+    afirmar(filas[0].desde !== filas[0].hacia,
+            "y nunca sale y entra al mismo bolsillo");
+  }
+
+  async function casoUnPaseSinPuntasNoEntra() {
+    caso("Un pase sin monto o sin las dos puntas no se guarda");
+    // Dejaría un saldo descolgado que nadie puede leer ni corregir.
+    limpiarPlanilla();
+    sincronizar({
+      caja: [
+        { id: "mal-1", fecha: "2026-10-05", desde: "MP Luna", hacia: "", monto: 10000, mod: 700 },
+        { id: "mal-2", fecha: "2026-10-05", desde: "", hacia: "Efectivo", monto: 10000, mod: 701 },
+        { id: "mal-3", fecha: "2026-10-05", desde: "MP Luna", hacia: "Efectivo", monto: 0, mod: 702 },
+        { id: "bien", fecha: "2026-10-05", desde: "MP Luna", hacia: "Efectivo", monto: 500, mod: 703 },
+      ],
+    }, { persona: "banco" });
+    const ids = filasDe("caja").map((f) => f.id);
+    afirmar(ids.length === 1 && ids[0] === "bien",
+            "solo entró el que estaba completo: " + ids.join(","));
+  }
+
+  async function casoCongelarHorasPagadas() {
+    caso("Congelar el precio de las horas ya pagadas");
+    // Lo que les pasó: cobraron todo, el saldo quedó en cero, subieron el precio
+    // de la hora y apareció una deuda que no existía, así que volvieron el precio
+    // para atrás. El sistema les estaba impidiendo aumentarse el sueldo.
+    limpiarPlanilla();
+    enLaPlanilla("personas", [
+      { nombre: "Tester", cargo: "socia", precio_hora: 1000, activo: true, mod: 1 },
+    ]);
+    enLaPlanilla("horas", [
+      { id: "h1", fecha: "2026-09-01", persona: "Tester", actividad: "reparto",
+        horas: 10, precio: 0, ref: "", obs: "", mod: 2 },
+      { id: "h2", fecha: "2026-09-02", persona: "Tester", actividad: "reparto",
+        horas: 5, precio: 0, ref: "", obs: "", mod: 3 },
+    ]);
+    // Se le pagó solo lo de la primera jornada: 10 h × $1000.
+    enLaPlanilla("egresos", [
+      { id: "pago", fecha: "2026-09-30", rubro: "Honorarios", detalle: "hs Tester",
+        persona: "Tester", cantidad: "", monto: 10000, medio_pago: "Efectivo",
+        obs: "", mod: 4 },
+    ]);
+
+    congelarHorasPagadasAhora();
+    const porId = {};
+    filasDe("horas").forEach((h) => { porId[h.id] = h; });
+
+    afirmar(Number(porId.h1.precio) === 1000,
+            "la hora que el pago cubre queda al precio al que se pagó: " + porId.h1.precio);
+    afirmar(!Number(porId.h2.precio),
+            "la que no se pagó queda sin precio y vale al de hoy: " + porId.h2.precio);
+
+    // Y correrla dos veces no congela de nuevo ni cambia nada.
+    congelarHorasPagadasAhora();
+    const otraVez = {};
+    filasDe("horas").forEach((h) => { otraVez[h.id] = h; });
+    afirmar(Number(otraVez.h1.precio) === 1000 && !Number(otraVez.h2.precio),
+            "y correrla de nuevo no cambia nada");
+  }
+
+  async function casoMigrarHorasConDosColumnas() {
+    caso("La hoja de horas migra con sus dos columnas nuevas de una vez");
+    // Entraron «precio» y «ref» juntas. La migración mapea por nombre, así que
+    // tiene que aguantar más de una columna nueva —y decirlo bien—.
+    limpiarPlanilla();
+    const h = hoja("horas");
+    const viejas = window.COLUMNAS_ANTERIORES
+      ? window.COLUMNAS_ANTERIORES.horas : COLUMNAS_ANTERIORES.horas;
+    h.getRange(1, 1, 1, viejas.length).setValues([
+      ["id", "fecha", "persona", "actividad", "horas", "observaciones", "mod"]]);
+    h.getRange(2, 1, 1, viejas.length).setValues([
+      ["vieja-1", "2026-09-01", "Luna", "reparto", 4, "una nota", 9]]);
+
+    const dijo = migrarHoja("horas");
+    afirmar(/precio/.test(dijo) && /pagada/.test(dijo),
+            "la migración nombra las dos columnas: " + dijo);
+
+    const fila = filasDe("horas")[0];
+    afirmar(!!fila, "la fila vieja sobrevivió");
+    if (fila) {
+      afirmar(fila.persona === "Luna" && Number(fila.horas) === 4,
+              "con sus datos en su lugar: " + fila.persona + ", " + fila.horas + " h");
+      afirmar(fila.obs === "una nota",
+              "la observación no cayó en la columna de al lado: " + fila.obs);
+      afirmar(!Number(fila.precio), "y el precio queda vacío, que es lo correcto: "
+              + "esa hora no se sabe a cuánto se pagó");
+    }
+  }
+
   // ---------- correr ----------
 
   async function correr() {
@@ -772,6 +922,9 @@
       casoFormasDeFecha, casoNoSeBorraLoQueNoSeEntiende,
       casoDescorrerMovimientos,
       casoLasLetrasDelResumen, casoElResumenCuentaPorFechaDeCobro,
+      casoLasHojasNuevasSincronizan, casoUnPaseNoCambiaElTotal,
+      casoUnPaseSinPuntasNoEntra, casoCongelarHorasPagadas,
+      casoMigrarHorasConDosColumnas,
       casoLasSemillasCaenEnSuColumna,
       casoQueRespaldosSeTiran, casoLasDosApi, casoLaVersionYElCache,
     ];

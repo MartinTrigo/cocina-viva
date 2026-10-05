@@ -45,7 +45,8 @@ window.Datos = (function () {
   // este volumen de datos es instantáneo y evita el problema clásico de tener
   // media app mirando una copia vieja.
   async function cargar() {
-    const [productos, clientes, personas, movimientos, ingresos, egresos, horas, listas] =
+    const [productos, clientes, personas, movimientos, ingresos, egresos, horas,
+           caja, cierres, listas] =
       await Promise.all([
         window.CVDB.todos("productos"),
         window.CVDB.todos("clientes"),
@@ -54,6 +55,8 @@ window.Datos = (function () {
         window.CVDB.todos("ingresos"),
         window.CVDB.todos("egresos"),
         window.CVDB.todos("horas"),
+        window.CVDB.todos("caja"),
+        window.CVDB.todos("cierres"),
         window.CVDB.listas(),
       ]);
 
@@ -61,7 +64,7 @@ window.Datos = (function () {
       productos: productos.sort((a, b) => a.cod.localeCompare(b.cod)),
       clientes: clientes.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
       personas: personas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
-      movimientos, ingresos, egresos, horas,
+      movimientos, ingresos, egresos, horas, caja, cierres,
       listas: listas || { medios_pago: [], rubros: [] },
       porCod: Object.fromEntries(productos.map((p) => [p.cod, p])),
       porPersona: Object.fromEntries(personas.map((p) => [p.nombre, p])),
@@ -227,6 +230,135 @@ window.Datos = (function () {
     const frente = cola.find((c) => c.quedan > 0 && c.precio > 0);
     return frente ? frente.precio : 0;
   }
+
+  /* ------------------------------------------------------------------------
+     TODO LO QUE MUEVE PLATA, EN UNA SOLA LISTA
+
+     Tres cosas mueven plata de lugar: un cobro la hace entrar a un medio de
+     pago, un gasto la hace salir, y un pase de caja la saca de uno y la mete en
+     otro sin cambiar el total.
+
+     Está en una sola función a propósito. El saldo por medio de pago se mira en
+     dos lugares —la tabla del resumen y lo que propone «cancelar cuenta»— y si
+     cada uno lo sumara por su cuenta, tarde o temprano darían distinto y no
+     habría forma de saber cuál de los dos tiene razón.
+
+     Lo que todavía no se cobró NO está acá: no está en ningún bolsillo. La
+     pregunta que contesta esto es «cuánta plata tendría que haber».
+     ------------------------------------------------------------------------ */
+
+  function platas() {
+    const r = [];
+    (cache ? cache.ingresos : []).forEach((f) => {
+      if (f.pagado === false) return;
+      r.push({ fecha: cuandoEntro(f), medio: String(f.medio_pago || "—"),
+               cuanto: Number(f.subtotal) || 0, que: "entro" });
+    });
+    (cache ? cache.egresos : []).forEach((e) => {
+      r.push({ fecha: e.fecha || "", medio: String(e.medio_pago || "—"),
+               cuanto: Number(e.monto) || 0, que: "salio" });
+    });
+    // Un pase cuenta dos veces, una en cada punta y con signo contrario: por eso
+    // la suma de todos los medios no cambia cuando se pasa plata de bolsillo.
+    (cache ? cache.caja : []).forEach((p) => {
+      const n = Number(p.monto) || 0;
+      r.push({ fecha: p.fecha || "", medio: String(p.hacia || "—"), cuanto: n, que: "pase" });
+      r.push({ fecha: p.fecha || "", medio: String(p.desde || "—"), cuanto: -n, que: "pase" });
+    });
+    return r;
+  }
+
+  // Cuánta plata hay en cada medio de pago. Con «hasta» (un aaaa-mm-dd) cuenta
+  // solo lo anterior a ese día, que es el saldo inicial de un mes; sin «hasta»
+  // cuenta todo, que es el saldo de hoy —el que hay que cancelar—.
+  function saldoPorMedio(hasta) {
+    const saldo = {};
+    platas().forEach((p) => {
+      if (hasta && !(p.fecha && p.fecha < hasta)) return;
+      const n = p.que === "salio" ? -p.cuanto : p.cuanto;
+      saldo[p.medio] = (saldo[p.medio] || 0) + n;
+    });
+    return saldo;
+  }
+
+  /* ------------------------------------------------------------------------
+     PASAR PLATA DE UN BOLSILLO A OTRO
+
+     Luna tiene $10.000 de la cocina en su MercadoPago y los pasa a la caja de
+     efectivo. No se ganó ni se gastó nada: el balance queda igual y lo único
+     que cambia es dónde está la plata.
+
+     Tiene su propio registro por eso. Anotarlo como un ingreso a efectivo más
+     un egreso de MP Luna daría los mismos saldos, pero dejaría «Ingresos
+     totales» inflado con plata que nadie ganó, y ese es justo el número que
+     miran para decidir.
+     ------------------------------------------------------------------------ */
+
+  function pase(desde, hacia, monto, opciones) {
+    const o = opciones || {};
+    return {
+      id: o.id || window.Util.nuevoId(),
+      fecha: o.fecha || window.Util.hoy(),
+      desde: String(desde || "").trim(),
+      hacia: String(hacia || "").trim(),
+      monto: Math.abs(Number(monto) || 0),
+      obs: o.obs || "",
+    };
+  }
+
+  /* ------------------------------------------------------------------------
+     LO QUE VALE UNA HORA
+
+     Si la hora tiene precio escrito, ese: es el precio al que se cobró y no se
+     vuelve a discutir. Si no lo tiene, todavía no se pagó y vale al precio de
+     hoy, así que subir el precio de la hora sube la deuda.
+
+     Antes el precio de hoy multiplicaba toda la historia, incluidas las horas ya
+     cobradas: cobraban todo, el saldo quedaba en cero, subían el precio y
+     aparecía una deuda que no existía. O sea que el sistema les impedía
+     aumentarse el sueldo, que es lo último que tenía que hacer.
+     ------------------------------------------------------------------------ */
+
+  const valorHora = (h) =>
+    (Number(h.horas) || 0) * (Number(h.precio) || precioHora(h.persona));
+
+  // Qué horas cubre un pago. De la más vieja a la más nueva —se paga primero lo
+  // que se trabajó primero— y solo las que entran enteras: una hora pagada a
+  // medias se deja sin congelar, y el saldo sigue cerrando porque es
+  // «todo lo trabajado menos todo lo pagado» y no una suma de horas sueltas.
+  function horasQueCubre(persona, monto) {
+    const precio = precioHora(persona);
+    let queda = Number(monto) || 0;
+    const elegidas = [];
+    (cache ? cache.horas : [])
+      .filter((h) => h.persona === persona && !Number(h.precio))
+      .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
+      .forEach((h) => {
+        const cuanto = (Number(h.horas) || 0) * precio;
+        if (!cuanto || cuanto > queda) return;
+        queda -= cuanto;
+        elegidas.push(Object.assign({}, h, { precio: precio }));
+      });
+    return elegidas;
+  }
+
+  /* ------------------------------------------------------------------------
+     EL MES CERRADO
+
+     El saldo inicial del mes siguiente NO sale de acá: se calcula sumando todo
+     lo anterior, que es una cuenta que no se puede desincronizar ni apretar dos
+     veces. Esto es la constancia de que el mes se revisó: quién lo cerró,
+     cuándo, y con qué números. Si después alguien carga algo con fecha de un
+     mes cerrado, las cifras dejan de coincidir y se puede avisar.
+
+     El mes de verdad viaja en el id. La columna «mes» de la planilla lleva la
+     etiqueta en castellano porque escribir «2026-10» en una celda hace que
+     Sheets lo convierta en una fecha.
+     ------------------------------------------------------------------------ */
+
+  const idDeCierre = (mes) => "cierre-" + mes;
+  const cierreDe = (mes) =>
+    (cache ? cache.cierres : []).find((c) => c.id === idDeCierre(mes)) || null;
 
   function renglonesDe(cuenta, lista) {
     return Object.keys(cuenta)
@@ -452,5 +584,6 @@ window.Datos = (function () {
     stockEn, stockDeposito, stockEnLaCalle, localesConMercaderia, valorDe, renglonesDe,
     diasDesde, ritmoDeLocal, ventasPorSemana, coberturaDeStock,
     movimiento, ajuste, precioDeEntrega,
+    platas, saldoPorMedio, pase, valorHora, horasQueCubre, idDeCierre, cierreDe,
   };
 })();
