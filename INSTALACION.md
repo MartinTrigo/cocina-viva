@@ -137,11 +137,17 @@ Cuando cambie `Code.gs`:
 1. Pegar el `Code.gs` nuevo en el editor y guardar.
 2. **Implementar → Administrar implementaciones → ✏ (editar) → Versión: Nueva
    versión → Implementar.**
-3. Si el cambio toca el formato, los desplegables o el ancho de las columnas,
+3. **Sincronizar desde un teléfono**, antes de correr cualquier función de
+   mantenimiento. Es lo que migra la planilla al orden nuevo.
+4. Si el cambio toca el formato, los desplegables o el ancho de las columnas,
    ejecutar además **`reaplicarFormato()`** a mano. `darFormato()` corre una
    sola vez, la primera; si corriera siempre pisaría los retoques que ellas le
    hayan hecho a la planilla. Esa función es la puerta para forzarlo, y no toca
    ni una fila de datos.
+
+El paso 3 ya no es imprescindible —las funciones de mantenimiento migran la
+planilla solas antes de escribirla—, pero sigue siendo el orden sano: así se ve
+que la sincronización anda antes de tocar nada a mano.
 
 Así la URL `/exec` **no cambia**. Si en cambio se hace una *implementación
 nueva*, sale una URL distinta y hay que actualizarla en `sincro.js` y subir el
@@ -163,3 +169,12 @@ al valor al que se pagó, correr la función, y recién entonces subirlo.
 
 Se puede correr dos veces sin problema: lo que ya tiene precio congelado no se
 vuelve a tocar.
+
+Si el libro pasó por la primera versión de este paso —la que decía de correr la
+función antes de sincronizar—, el precio quedó en la columna «observaciones» y
+hay que correr una vez más:
+
+    rescatarPrecioDeLasHoras()
+
+Lo devuelve a su columna. No se perdió nada: el número estaba ahí, solo en el
+lugar equivocado.

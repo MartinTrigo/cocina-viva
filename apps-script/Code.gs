@@ -1058,6 +1058,31 @@ function migrarHoja(nombre) {
        + entraron.join(' y ') + ' (' + salida.length + ' filas).';
 }
 
+/* --------------------------------------------------------------------------
+   PONER LA PLANILLA EN EL ORDEN DE HOY
+
+   Solo la migración y que las hojas existan. NO el armado inicial —sembrar el
+   catálogo, crear el resumen, esconder las hojas de servicio—, que corre una
+   sola vez en la vida de un libro.
+
+   Está separado porque lo necesitan dos caminos distintos: la sincronización,
+   que además puede tener que armar un libro nuevo, y las funciones de
+   mantenimiento, que se corren a mano y solo necesitan que las columnas estén
+   donde ellas creen que están.
+   -------------------------------------------------------------------------- */
+
+function migrarTodo() {
+  var hechas = [];
+  // La lista sale de COLUMNAS_ANTERIORES y NO está escrita a mano.
+  Object.keys(COLUMNAS_ANTERIORES).forEach(function (n) {
+    var migrada = migrarHoja(n);
+    if (migrada) hechas.push(migrada);
+  });
+  Object.keys(COLUMNAS).concat(['listas', 'invitaciones', 'dispositivos'])
+    .forEach(function (n) { hoja(n); });
+  return hechas;
+}
+
 // Lo que corre también en cada sincronización: barato si ya está todo hecho.
 function asegurarEsquema() {
   var props = PropertiesService.getDocumentProperties();
@@ -1072,13 +1097,7 @@ function asegurarEsquema() {
   // a partir de «desde» quedaron corridas un lugar. Es exactamente lo que
   // advierte el comentario de arriba, y pasó igual, que es lo que tienen las
   // advertencias que dependen de que alguien se acuerde.
-  Object.keys(COLUMNAS_ANTERIORES).forEach(function (n) {
-    var migrada = migrarHoja(n);
-    if (migrada) hechas.push(migrada);
-  });
-
-  Object.keys(COLUMNAS).concat(['listas', 'invitaciones', 'dispositivos'])
-    .forEach(function (n) { hoja(n); });
+  migrarTodo().forEach(function (m) { hechas.push(m); });
 
   if (props.getProperty('esquema') !== 'v1') {
     darFormato();
@@ -1860,6 +1879,35 @@ function devolverStockAlConteoAhora() {
    está adentro del candado de doPost.
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   TODA FUNCIÓN DE MANTENIMIENTO MIGRA LA PLANILLA ANTES DE ESCRIBIRLA
+
+   Esto salió de romper la hoja de horas, y conviene que quede escrito porque la
+   trampa es fina.
+
+   asegurarEsquema() corría SOLO al sincronizar. Las funciones de mantenimiento
+   se corren a mano desde el editor, sin sincronizar, y escriben con
+   escribirFilas(), que usa el orden de columnas de HOY. O sea: una función de
+   mantenimiento recién pegada escribe nueve columnas en una hoja que todavía
+   tiene siete, y el encabezado sigue diciendo siete porque escribirFilas no lo
+   toca. Después llega la primera sincronización, la migración ve el encabezado
+   viejo, lee esas nueve columnas como si fueran siete y mapea por los nombres
+   de antes. El precio de la hora terminó en la columna de observaciones.
+
+   Lo peor es que era el orden que yo mismo dejé escrito en INSTALACION.md:
+   pegar, publicar, correr la función, sincronizar. Las instrucciones causaron
+   el problema, así que arreglar las instrucciones no alcanza.
+
+   Ahora migrarTodo() pasa adentro del candado y antes de la tarea: cualquier
+   función de mantenimiento encuentra la planilla en el orden que ella espera, se
+   corra antes o después de sincronizar. Es barato si ya está todo hecho —mira
+   una celda por hoja— y vale el precio.
+
+   Va migrarTodo() y no asegurarEsquema() a propósito: una función de
+   mantenimiento necesita que las columnas estén en su lugar, no que se siembre
+   el catálogo ni que se cree la hoja resumen.
+   -------------------------------------------------------------------------- */
+
 function conCandado(tarea) {
   var candado = LockService.getScriptLock();
   try {
@@ -1869,6 +1917,7 @@ function conCandado(tarea) {
          + 'en 30 segundos. Probá de nuevo en un minuto. No se tocó nada.';
   }
   try {
+    migrarTodo();
     return tarea();
   } finally {
     candado.releaseLock();
@@ -2559,6 +2608,67 @@ function congelarHorasPagadasAhora() {
 
 function dinero(n) {
   return '$' + String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/* --------------------------------------------------------------------------
+   SACAR EL PRECIO DE LA HORA DE LA COLUMNA DE OBSERVACIONES
+
+   Se corre UNA vez, y solo en el libro que pasó por el problema de arriba.
+
+   congelarHorasPagadas() escribió el precio con la hoja todavía en el orden
+   viejo, y la migración posterior lo leyó corrido: el precio de la hora quedó
+   en «observaciones» y la columna del precio en cero. No se perdió nada —el
+   número está ahí—, pero mientras siga en la columna equivocada el precio de
+   esas horas no está congelado, y subir el precio de la hora volvería a inventar
+   la deuda que esto venía a resolver.
+
+   Es cuidadosa a propósito: mueve el número solo si la fila no tiene precio, si
+   la observación es un número pelado y si ese número coincide con el precio por
+   hora que esa persona tiene hoy, que es el precio con el que congeló. Una
+   observación escrita por ellas no cumple las tres cosas y no se toca.
+   -------------------------------------------------------------------------- */
+
+function rescatarPrecioDeLasHoras() { return conCandado(rescatarPrecioDeLasHorasAhora); }
+
+function rescatarPrecioDeLasHorasAhora() {
+  var precio = {};
+  leerFilas('personas').forEach(function (p) { precio[p.nombre] = numero(p.precio_hora); });
+
+  var horas = leerFilas('horas');
+  var ahora = Date.now();
+  var cuenta = { rescatadas: 0, yaEstaban: 0, sinNada: 0, raras: [] };
+
+  horas.forEach(function (h) {
+    if (Number(h.precio)) { cuenta.yaEstaban++; return; }
+    var obs = String(h.obs == null ? '' : h.obs).trim();
+    if (!obs) { cuenta.sinNada++; return; }
+    if (!/^\d+([.,]\d+)?$/.test(obs)) { cuenta.sinNada++; return; }
+
+    var n = numero(obs);
+    if (n && n === precio[h.persona]) {
+      h.precio = n;
+      h.obs = '';
+      h.mod = ahora;
+      cuenta.rescatadas++;
+    } else {
+      // Un número que no es el precio de esa persona. No se toca, se avisa.
+      cuenta.raras.push(h.persona + ' ' + h.fecha + ': ' + obs);
+    }
+  });
+
+  escribirFilas('horas', horas);
+
+  var texto = 'Horas con el precio devuelto a su columna: ' + cuenta.rescatadas + '.'
+    + '\n  · ya lo tenían bien: ' + cuenta.yaEstaban
+    + '\n  · sin precio y sin nada que rescatar: ' + cuenta.sinNada;
+  if (cuenta.raras.length) {
+    texto += '\n\nOjo con ' + cuenta.raras.length + ' observaciones que son un número '
+      + 'pero no el precio de esa persona. No se tocaron:\n  '
+      + cuenta.raras.slice(0, 10).join('\n  ');
+  }
+  texto += '\n\nSincronizar desde un teléfono para que lo vean las dos.';
+  Logger.log(texto);
+  return texto;
 }
 
 /* ================= Auxiliares ================= */

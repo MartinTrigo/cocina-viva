@@ -908,6 +908,85 @@
     }
   }
 
+  async function casoMantenimientoSobreHojaVieja() {
+    caso("Una función de mantenimiento no escribe sobre la hoja sin migrar");
+    /* Esto pasó de verdad y hay que reproducirlo tal cual.
+
+       asegurarEsquema() corría solo al sincronizar. congelarHorasPagadas() se
+       corrió desde el editor, sin sincronizar, sobre una hoja de horas que
+       todavía tenía siete columnas. escribió nueve, el encabezado siguió
+       diciendo siete, y la primera sincronización las leyó como siete: el
+       precio de la hora terminó en la columna de observaciones.
+
+       Peor: era el orden que estaba escrito en INSTALACION.md. */
+    limpiarPlanilla();
+    enLaPlanilla("personas", [
+      { nombre: "Luna", cargo: "socia", precio_hora: 9000, activo: true, mod: 1 },
+    ]);
+    enLaPlanilla("egresos", [
+      { id: "pago", fecha: "2026-09-30", rubro: "Honorarios", detalle: "hs Luna",
+        persona: "Luna", cantidad: "", monto: 90000, medio_pago: "Efectivo",
+        obs: "", mod: 2 },
+    ]);
+
+    // La hoja de horas EN EL ORDEN VIEJO, como la encontró la función.
+    const h = hoja("horas");
+    h.getRange(1, 1, 1, 7).setValues([
+      ["id", "fecha", "persona", "actividad", "horas", "observaciones", "mod"]]);
+    h.getRange(2, 1, 1, 7).setValues([
+      ["hv", "2026-09-01", "Luna", "reparto", 10, "", 3]]);
+
+    // Y ahora la función de mantenimiento, sin sincronizar antes.
+    congelarHorasPagadas();
+
+    const fila = filasDe("horas")[0];
+    afirmar(!!fila, "la hora sigue ahí");
+    if (fila) {
+      afirmar(Number(fila.precio) === 9000,
+              "el precio quedó EN SU COLUMNA: " + fila.precio);
+      afirmar(!String(fila.obs || "").trim(),
+              "y la observación quedó vacía, no con el precio adentro: «"
+              + fila.obs + "»");
+      afirmar(fila.persona === "Luna" && Number(fila.horas) === 10,
+              "sin correr nada más: " + fila.persona + ", " + fila.horas + " h");
+    }
+
+    // Y una sincronización después no vuelve a corrrerlo todo.
+    const dice = sincronizar({}, { persona: "banco" });
+    const tras = (dice.horas || [])[0];
+    afirmar(tras && Number(tras.precio) === 9000,
+            "y sigue en su lugar después de sincronizar: " + (tras && tras.precio));
+  }
+
+  async function casoRescatarElPrecioDeLasHoras() {
+    caso("Rescatar el precio que quedó en la columna de observaciones");
+    limpiarPlanilla();
+    enLaPlanilla("personas", [
+      { nombre: "Luna", cargo: "socia", precio_hora: 9000, activo: true, mod: 1 },
+    ]);
+    // Tal como quedó el libro de verdad: precio en cero, el número en obs.
+    enLaPlanilla("horas", [
+      { id: "a", fecha: "2026-09-01", persona: "Luna", actividad: "reparto",
+        horas: 10, precio: 0, ref: "", obs: "9000", mod: 2 },
+      { id: "b", fecha: "2026-09-02", persona: "Luna", actividad: "reparto",
+        horas: 5, precio: 0, ref: "", obs: "lloviznaba", mod: 3 },
+      { id: "c", fecha: "2026-09-03", persona: "Luna", actividad: "reparto",
+        horas: 5, precio: 0, ref: "", obs: "4", mod: 4 },
+    ]);
+
+    rescatarPrecioDeLasHorasAhora();
+    const porId = {};
+    filasDe("horas").forEach((f) => { porId[f.id] = f; });
+
+    afirmar(Number(porId.a.precio) === 9000 && !String(porId.a.obs).trim(),
+            "el precio volvió a su columna y la observación quedó limpia");
+    afirmar(porId.b.obs === "lloviznaba" && !Number(porId.b.precio),
+            "una observación de verdad no se toca: «" + porId.b.obs + "»");
+    afirmar(porId.c.obs === "4" && !Number(porId.c.precio),
+            "y un número que no es el precio de esa persona tampoco: «"
+            + porId.c.obs + "»");
+  }
+
   // ---------- correr ----------
 
   async function correr() {
@@ -925,6 +1004,7 @@
       casoLasHojasNuevasSincronizan, casoUnPaseNoCambiaElTotal,
       casoUnPaseSinPuntasNoEntra, casoCongelarHorasPagadas,
       casoMigrarHorasConDosColumnas,
+      casoMantenimientoSobreHojaVieja, casoRescatarElPrecioDeLasHoras,
       casoLasSemillasCaenEnSuColumna,
       casoQueRespaldosSeTiran, casoLasDosApi, casoLaVersionYElCache,
     ];

@@ -1405,6 +1405,51 @@ escrito en dos lugares, tarde o temprano uno de los dos se queda viejo**. No fal
 al escribirlo; falla meses después, cuando nadie se acuerda de que había dos.
 
 
+## La instrucción que rompía la planilla
+
+Esta la puse yo, en `INSTALACION.md`, con todas las letras: pegar el `Code.gs`
+nuevo, publicar, **correr `congelarHorasPagadas()`**, sincronizar. Martín lo hizo
+en ese orden, que era el orden que yo le había dado, y la hoja de horas quedó con
+el precio en la columna de observaciones.
+
+La cadena es fina y vale seguirla entera:
+
+1. `asegurarEsquema()` —lo que migra la planilla— corría **solo al sincronizar**.
+2. Las funciones de mantenimiento se corren a mano desde el editor. Ninguna
+   sincronización de por medio, así que la hoja seguía con siete columnas.
+3. `leerFilas()` usa `getDataRange()`, o sea lee **las columnas que hay**, no las
+   que debería haber. Leyó siete contra nueve nombres: el `mod` viejo cayó en
+   `ref` y los dos últimos campos quedaron vacíos.
+4. `escribirFilas()` escribe **nueve**, porque usa `COLUMNAS` de hoy. El precio
+   quedó bien, en la sexta columna.
+5. Pero el encabezado seguía diciendo siete, porque `escribirFilas` no lo toca.
+6. Primera sincronización: `migrarHoja()` ve el encabezado viejo, concluye que la
+   hoja no está migrada, lee **siete** columnas de los nueve datos que había y las
+   mapea por los nombres de antes. La sexta columna —el precio— se llamaba
+   `obs` en el orden viejo. El precio terminó en observaciones.
+
+Cada paso hace exactamente lo que tiene que hacer. El problema es que **nadie era
+responsable de que la planilla estuviera en el orden de hoy antes de escribirla**:
+se daba por hecho que alguien habría sincronizado antes.
+
+El arreglo no es cambiar las instrucciones. Las instrucciones ya estaban escritas
+y causaron el problema igual, que es el patrón de toda esta semana: **una regla
+que depende de que alguien se acuerde no es una regla, es una apuesta**. Ahora
+`conCandado()` —por el que pasan todas las funciones de mantenimiento— corre
+`migrarTodo()` antes de la tarea. La función encuentra la planilla como ella cree
+que está, se corra antes o después de sincronizar.
+
+De paso quedó separado `migrarTodo()` de `asegurarEsquema()`. Una función de
+mantenimiento necesita que las columnas estén en su lugar; no necesita que se
+siembre el catálogo ni que se cree la hoja resumen, que es cosa de un libro
+recién nacido.
+
+Y el caso de prueba reproduce el desastre tal cual: arma la hoja de horas en el
+orden viejo, corre la función de mantenimiento sin sincronizar, y comprueba que
+el precio quede en su columna y la observación vacía. Si alguna vez alguien
+saca esa línea del candado, el banco lo dice.
+
+
 ## Las funciones de mantenimiento toman el candado
 
 Surgió de una pregunta de Martín: estaban cargando egresos mientras yo
