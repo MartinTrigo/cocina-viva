@@ -501,6 +501,164 @@ window.addEventListener("unhandledrejection", (e) =>
     afirmar(window.Remito.tamano() === "enorme",
             "por defecto: " + window.Remito.tamano());
 
+    /* --------------------------------------------------------------------
+       LO QUE PIDIERON EN OCTUBRE: pases de caja, cierre de mes y el precio
+       de la hora. Las tres cosas se probaron a mano manejando la app; esto
+       es para que no se rompan en silencio después.
+       -------------------------------------------------------------------- */
+
+    caso("El precio de la hora no revalúa lo que ya se cobró");
+    // El caso exacto que les pasó: cobraron todo, el saldo quedó en cero,
+    // subieron el precio de la hora y apareció una deuda que no existía, así
+    // que volvieron el precio para atrás. El sistema les estaba impidiendo
+    // aumentarse el sueldo.
+    await window.CVDB.guardar("personas",
+      { nombre: "Tester", cargo: "socia", precio_hora: 1000, activo: true, mod: 1 });
+    await window.CVDB.guardarVarios("horas", [
+      { id: "th1", fecha: "2026-09-01", persona: "Tester", actividad: "reparto",
+        horas: 10, precio: 0, ref: "", obs: "", mod: 2 },
+      { id: "th2", fecha: "2026-09-02", persona: "Tester", actividad: "reparto",
+        horas: 5, precio: 0, ref: "", obs: "", mod: 3 },
+    ]);
+    await window.Datos.cargar();
+
+    const deudaDeTester = () => {
+      const t = window.Datos.todo();
+      const gano = t.horas.filter((h) => h.persona === "Tester")
+        .reduce((n, h) => n + window.Datos.valorHora(h), 0);
+      const pago = t.egresos.filter((e) => e.persona === "Tester")
+        .reduce((n, e) => n + (Number(e.monto) || 0), 0);
+      return gano - pago;
+    };
+
+    afirmar(deudaDeTester() === 15000, "15 h a $1000 se deben: " + deudaDeTester());
+
+    // Se le paga TODO, igual que hicieron ellas.
+    const cubiertas = window.Datos.horasQueCubre("Tester", 15000);
+    afirmar(cubiertas.length === 2 && cubiertas.every((h) => h.precio === 1000),
+            "el pago congela las dos horas al precio de hoy: "
+            + cubiertas.map((h) => h.id + "@" + h.precio).join(" "));
+    await window.CVDB.guardar("egresos", { id: "tpago", fecha: "2026-09-30",
+      rubro: "Honorarios", detalle: "hs Tester", persona: "Tester", cantidad: "",
+      monto: 15000, medio_pago: "Efectivo", obs: "", mod: 4 });
+    await window.CVDB.guardarVarios("horas",
+      cubiertas.map((h) => Object.assign({}, h, { ref: "tpago", mod: 5 })));
+    await window.Datos.cargar();
+    afirmar(deudaDeTester() === 0, "cobrado todo, no se debe nada: " + deudaDeTester());
+
+    // Y ahora el aumento, que es lo que antes inventaba la deuda.
+    await window.CVDB.guardar("personas",
+      { nombre: "Tester", cargo: "socia", precio_hora: 1200, activo: true, mod: 6 });
+    await window.Datos.cargar();
+    afirmar(deudaDeTester() === 0,
+            "suben la hora a $1200 y NO aparece una deuda nueva: " + deudaDeTester());
+
+    caso("Pero lo que falta cobrar sí se actualiza");
+    // La otra mitad del pedido, que es la que ellas querían de entrada.
+    await window.CVDB.guardar("horas", { id: "th3", fecha: "2026-10-01",
+      persona: "Tester", actividad: "reparto", horas: 10, precio: 0, ref: "",
+      obs: "", mod: 7 });
+    await window.Datos.cargar();
+    afirmar(deudaDeTester() === 12000, "10 h sin pagar a $1200: " + deudaDeTester());
+    await window.CVDB.guardar("personas",
+      { nombre: "Tester", cargo: "socia", precio_hora: 1500, activo: true, mod: 8 });
+    await window.Datos.cargar();
+    afirmar(deudaDeTester() === 15000,
+            "suben la hora a $1500 y la deuda sube con ella: " + deudaDeTester());
+
+    // plata() es local: este banco no importa los ayudantes de Util.
+    const plata = (n) => "$" + Number(n).toLocaleString("es-AR");
+
+    caso("Cancelar una cuenta cambia de bolsillo, no de total");
+    await entrar("Resumen", window.Resumen, "resumen");
+    const totalAntes = Object.values(window.Datos.saldoPorMedio())
+      .reduce((a, b) => a + b, 0);
+    // Cuántos ingresos hay ANTES, no un número escrito a mano: los casos de
+    // arriba ya cargaron ventas, y un número fijo acá falla por el motivo
+    // equivocado cada vez que se agrega un caso antes de este.
+    const ingresosAntes = (await window.CVDB.todos("ingresos")).length;
+    const cualquiera = vista.querySelector("[data-cancelar]");
+    afirmar(!!cualquiera, "hay un botón de cancelar en la tabla por medio de pago");
+    if (cualquiera) {
+      const medio = cualquiera.dataset.cancelar;
+      const había = window.Datos.saldoPorMedio()[medio] || 0;
+      cualquiera.click();
+      await esperar(60);
+
+      const panel = document.getElementById("r-pase");
+      afirmar(panel && !panel.hidden, "se abre el panel para elegir a dónde va");
+      afirmar(document.getElementById("pa-guardar").disabled,
+              "y no deja guardar hasta elegir la otra cuenta");
+
+      const destino = panel.querySelector("[data-hacia]");
+      const aDonde = destino.dataset.hacia;
+      destino.click();
+      await esperar(60);
+      afirmar(!document.getElementById("pa-guardar").disabled,
+              "elegida " + aDonde + ", ya se puede guardar");
+      afirmar(Number(document.getElementById("pa-monto").value) === Math.abs(había),
+              "propone lo que hay hoy en " + medio + ": " + plata(Math.abs(había)));
+
+      document.getElementById("pa-guardar").click();
+      await esperar(300);
+
+      const ahora = window.Datos.saldoPorMedio();
+      const totalDespues = Object.values(ahora).reduce((a, b) => a + b, 0);
+      afirmar(totalDespues === totalAntes,
+              "EL TOTAL NO SE MUEVE: " + plata(totalAntes) + " antes y "
+              + plata(totalDespues) + " después");
+      afirmar((ahora[medio] || 0) === 0,
+              medio + " quedó en cero: " + plata(ahora[medio] || 0));
+      afirmar((await window.CVDB.todos("caja")).length === 1,
+              "y quedó anotado como un pase de caja, no como un ingreso");
+      const ingresos = (await window.CVDB.todos("ingresos")).length;
+      afirmar(ingresos === ingresosAntes,
+              "sin inventar ningún ingreso: eran " + ingresosAntes
+              + " y siguen siendo " + ingresos);
+    }
+
+    caso("Cerrar el mes deja constancia, y avisa si después cambia");
+    await entrar("Resumen", window.Resumen, "resumen");
+    const selMes = document.getElementById("r-periodo");
+    const unMes = [...selMes.options].map((o) => o.value).filter((v) => v)[0];
+    selMes.value = unMes;
+    selMes.onchange({ target: selMes });
+    await esperar(120);
+
+    const cabezas = [...vista.querySelectorAll("table.tabla")][0]
+      .querySelectorAll("th");
+    afirmar([...cabezas].some((t) => /Venía/.test(t.textContent)),
+            "mirando un mes, la tabla arrastra lo que venía de antes");
+
+    const botonCierre = document.getElementById("r-cerrar-mes");
+    afirmar(!!botonCierre, "y aparece el botón de cerrar el mes");
+    if (botonCierre) {
+      botonCierre.click();
+      await esperar(300);
+      const cierre = (await window.CVDB.todos("cierres"))[0];
+      afirmar(!!cierre, "quedó el cierre guardado");
+      if (cierre) {
+        afirmar(cierre.id === "cierre-" + unMes,
+                "el mes viaja en el id: " + cierre.id);
+        afirmar(!/^\d{4}-\d{2}$/.test(String(cierre.mes)),
+                "y la columna del mes lleva la etiqueta, no «" + unMes
+                + "», que Sheets convertiría en una fecha: " + cierre.mes);
+      }
+
+      // Alguien carga un gasto de un mes ya cerrado: tiene que avisar.
+      await window.CVDB.guardar("egresos", { id: "tarde", fecha: unMes + "-04",
+        rubro: "Insumos", detalle: "apareció tarde", persona: "", cantidad: "",
+        monto: 7000, medio_pago: "Efectivo", obs: "", mod: Date.now() });
+      await window.Datos.cargar();
+      await entrar("Resumen", window.Resumen, "resumen");
+      const sel2 = document.getElementById("r-periodo");
+      sel2.value = unMes;
+      sel2.onchange({ target: sel2 });
+      await esperar(120);
+      afirmar(/se cambió algo de este mes después de cerrarlo/.test(texto()),
+              "avisa que los números dejaron de coincidir con el cierre");
+    }
+
     caso("Nada quedó gritando por consola");
     afirmar(!window.__errores.length,
             window.__errores.length ? window.__errores.join(" | ") : "ni un error en todo el recorrido");

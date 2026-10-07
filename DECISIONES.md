@@ -1279,6 +1279,132 @@ lo mismo que el total de arriba: cobradas y con fecha. El mes es el del cobro si
 está anotado y el de la venta si no, que es el criterio de `cuandoEntro()` en la
 app. La suma de la columna da igual al balance.
 
+## La plata que cambia de bolsillo tiene su propio libro
+
+Luna lo pidió así: un botón al lado de «MP Luna» que diga «cancelar cuenta», y
+que al elegir «efectivo» los $10.000 que tenía en su MercadoPago pasen a la caja.
+MP Luna queda en 0 y efectivo sube $10.000.
+
+Lo fácil era anotarlo como un ingreso a efectivo más un egreso de MP Luna. Los
+saldos por medio de pago darían exactamente lo mismo, no hace falta ninguna hoja
+nueva y se termina en diez minutos.
+
+**Y estaría mal.** Esa plata no la ganó nadie ni la gastó nadie: ya estaba. Si se
+anota como ingreso, «Ingresos totales» sube $10.000 sin que se haya vendido nada,
+y ese es justo el número que miran para decidir si el mes cerró bien. Cada vez que
+cancelaran una cuenta, el resumen les mentiría un poco más.
+
+Por eso hay una hoja `caja`, con `desde` y `hacia`, que es el mismo mecanismo que
+`movimientos` usa para el stock. La plata se mueve entre lugares igual que los
+frascos. La suma de todos los medios no cambia cuando se hace un pase —cuenta dos
+veces, una en cada punta y con signo contrario— y eso está en el banco de pruebas
+como el invariante del asunto: si alguna vez se rompe, el balance empieza a
+mentir cada vez que cancelan una cuenta.
+
+Dos detalles que salieron de probarlo a mano:
+
+- **El monto que propone es el de HOY**, no el del mes que se esté mirando. Lo que
+  se cancela es lo que hay ahora en ese bolsillo; el saldo de septiembre no se
+  puede cancelar en octubre.
+- **Si el saldo está en negativo, la plata va al revés.** Gastó de su MercadoPago
+  más de lo que entró, así que cancelar significa que la cocina le repone. La
+  dirección la decide el signo, no quien aprieta el botón. El rótulo cambia solo:
+  deja de decir «¿a dónde va?» y dice «¿de dónde sale?».
+
+## El saldo inicial se calcula; el cierre del mes es una constancia
+
+Pidieron un botón «cerrar el mes» que pase el saldo al mes siguiente. Eran dos
+cosas distintas metidas en una.
+
+**El arrastre del saldo no necesita ningún botón.** El saldo inicial de octubre es
+la suma de todo lo anterior al 1º de octubre, y eso se calcula. Si en cambio lo
+escribiera un botón, habría que apretarlo exactamente una vez por mes: dos veces
+y el saldo se duplica, ninguna vez y el mes arranca en cero. Calculado anda sin
+que nadie se acuerde de nada, anda igual para los meses de antes —que nunca
+tuvieron botón— y no hay un dato guardado que pueda quedar mal.
+
+La tabla por medio de pago pasó a decir **Venía · Entró · Salió · Queda**. Antes
+mostraba solo el movimiento del mes, así que el número no era el saldo de la caja
+y no servía para contar la plata, que es exactamente para lo que se mira.
+
+**El botón sí sirve, pero para otra cosa**: dejar constancia de que el mes se
+revisó, quién lo revisó y con qué cifras. Eso habilita algo que antes no se podía
+hacer: si después alguien carga un gasto con fecha de un mes ya cerrado, las
+cifras dejan de coincidir con el cierre y la app lo dice en el momento —«cerrado
+con −$125.445, pero ahora da −$132.445»— en vez de que la diferencia aparezca
+tres meses después sin que nadie entienda de dónde salió.
+
+Los pases de caja solo aparecen como columna si hubo alguno en el mes. Mientras no
+usen «cancelar cuenta», la tabla tiene cuatro columnas y entra en un teléfono; en
+cuanto pasan plata de un bolsillo a otro aparece la quinta, para que la cuenta
+cierre a la vista y no haya que creerle al último número.
+
+## El sistema les impedía aumentarse el sueldo
+
+Este es el más interesante de los tres, porque el código hacía exactamente lo que
+yo había escrito que tenía que hacer, y estaba mal igual.
+
+El comentario original decía: «el precio sale de la persona HOY: si le suben la
+hora, sube el valor de lo que todavía no cobró, que es lo que ellas esperan que
+pase». La idea era correcta. La cuenta era:
+
+    saldo = Σ (horas × precio de la hora DE HOY) − Σ (pagos)
+
+El precio de hoy multiplicaba **toda** la historia, también las horas que ya se
+habían cobrado. Entonces:
+
+| | ganado | pagado | saldo |
+|---|---|---|---|
+| 100 h a $9.000, todo cobrado | $900.000 | $900.000 | **$0** ✓ |
+| suben la hora a $10.000 | $1.000.000 | $900.000 | **$100.000** ✗ |
+
+Lo contaron así: «recién cobramos todo y quedó en 0 la deuda de hora y cuando
+actualizamos el precio de la hora apareció una deuda nueva, así que lo volvimos a
+como estaba». Volvieron el precio para atrás. **El sistema les impidió aumentarse
+el sueldo**, que es lo último que tenía que hacer un programa escrito para que
+ellas vivan mejor de su trabajo.
+
+El arreglo es el mismo que el del precio de consignación, y no es casualidad:
+**un precio que se acordó en el pasado deja de ser una variable y pasa a ser un
+hecho**. La hora guarda su precio, escrito en el momento de liquidar y de la más
+vieja a la más nueva. Lo que tiene precio se pagó a ese precio y no se vuelve a
+discutir; lo que no lo tiene vale al precio de hoy y sube cuando suben la hora.
+Las dos mitades del pedido con una sola columna.
+
+El diseño viejo tenía una virtud que no quería perder: no marcaba horas como
+liquidadas una por una, porque se paga un monto y no un conjunto de horas. Eso se
+mantiene —el saldo sigue siendo todo lo trabajado menos todo lo pagado— y el
+precio se congela aparte, sin que el pago tenga que apuntar a una lista de horas.
+
+### El banco encontró lo que yo no vi
+
+`congelarHorasPagadas()`, la función que congela de una vez lo ya pagado, **no era
+idempotente**. En la segunda corrida volvía a contar los mismos egresos como
+plata disponible y congelaba horas que nadie había pagado. No lo vi leyendo el
+código: lo encontró un caso de prueba que la corre dos veces seguidas, escrito
+justamente porque de estas funciones de mantenimiento uno nunca sabe si ya las
+corrió.
+
+El arreglo es contable: lo que ya tiene precio congelado se pagó con parte de esos
+egresos, así que esa plata está gastada y se descuenta antes de repartir el resto.
+
+## Una sola lista de hojas, por fin
+
+Agregar `caja` y `cierres` obligó a tocar la lista de hojas en cuatro lugares: el
+bucle de la sincronización, el que se asegura de que las hojas existan, el
+diagnóstico y el `limpiarPlanilla()` del banco de pruebas. Cuatro listas escritas
+a mano, y acordarse de las cuatro.
+
+Es la misma trampa que rompió la hoja de movimientos en octubre: una lista escrita
+a mano a la que le faltaba un nombre. Así que ahora sale de `CLAVES`, que dice una
+sola vez qué hoja se sincroniza y por qué campo se reconoce una fila. Las cuatro
+listas se derivan de ahí.
+
+Vale anotar el patrón, porque ya van cinco: **cada vez que el mismo hecho está
+escrito en dos lugares, tarde o temprano uno de los dos se queda viejo**. No falla
+al escribirlo; falla meses después, cuando nadie se acuerda de que había dos.
+
+
 ## Las funciones de mantenimiento toman el candado
 
 Surgió de una pregunta de Martín: estaban cargando egresos mientras yo

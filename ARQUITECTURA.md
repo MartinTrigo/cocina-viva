@@ -25,7 +25,7 @@ exactamente lo que corre.
   │  Datos  (caché + cálculo)│  estado    │            │            │
   │           │              │  completo  │            ▼            │
   │           ▼              │            │   LA PLANILLA           │
-  │  CVDB   (IndexedDB)      │            │   9 hojas de datos      │
+  │  CVDB   (IndexedDB)      │            │   11 hojas de datos     │
   └──────────────────────────┘            └─────────────────────────┘
 ```
 
@@ -242,6 +242,16 @@ navegador, `git push` podría exigir que pasen.
 - **Los rubros viven en la hoja `listas` y se escriben a mano**: hoy dice
   `Correción`, y la app escribe `Corrección`. Un error de tipeo rompe el calce.
 - **`describirFila()` repite el formato del dinero** en vez de usar un ayudante.
+- **Una hora pagada a medias no congela su precio.** El precio se escribe solo en
+  las horas que un pago cubre enteras; si un pago cubre media fila, esa fila
+  queda sin precio y un aumento posterior la revalúa toda. El saldo sigue
+  cerrando —es todo lo trabajado menos todo lo pagado— y el error nunca deja la
+  deuda por debajo de lo que les corresponde, que es el lado del que conviene
+  equivocarse. Partir la fila en dos arreglaría la cuenta y dejaría la hoja
+  ilegible, así que se decidió a favor de la hoja.
+- **`COLUMNAS_ANTERIORES` guarda un solo paso atrás.** Un libro que se quedara
+  dos versiones abajo no se migra solo. Hoy no pasa porque el libro va al día,
+  pero no hay nada que lo impida.
 
 ---
 

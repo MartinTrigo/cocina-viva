@@ -146,3 +146,20 @@ Cuando cambie `Code.gs`:
 Así la URL `/exec` **no cambia**. Si en cambio se hace una *implementación
 nueva*, sale una URL distinta y hay que actualizarla en `sincro.js` y subir el
 número de caché del service worker.
+
+### Al pasar a API 6 (pases de caja, cierres y el precio de la hora)
+
+Una sola vez, y **antes de volver a tocar el precio de la hora**:
+
+    congelarHorasPagadas()
+
+Le escribe a cada hora ya cobrada el precio al que se pagó, que es el que figura
+hoy en la hoja `personas`. Desde ahí, subir el precio de la hora mueve solo lo
+que falta cobrar.
+
+El orden importa: si primero se sube el precio, congela al precio nuevo y les
+paga de más lo que ya estaba cobrado. Si ya se subió por error, hay que bajarlo
+al valor al que se pagó, correr la función, y recién entonces subirlo.
+
+Se puede correr dos veces sin problema: lo que ya tiene precio congelado no se
+vuelve a tocar.
